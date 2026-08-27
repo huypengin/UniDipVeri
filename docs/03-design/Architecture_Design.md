@@ -93,18 +93,18 @@ walt.id's Community Stack exposes issuance and verification only through the sta
 
 ## 4. API-to-Infrastructure Mapping
 
-| Application API | Infrastructure |
-| ---------------------------------------------------------------------------- | ----------------------------------------------- |\
-| `POST /api/academic-records/import` | Academic Record Source (inbound) |
-| `POST /api/students/{id}/wallet/provision` | walt.id Wallet API (provisioning) |
-| `POST /api/students/{id}/eligibility/evaluate` | EligibilityService (internal, no external call) |
-| `POST /api/credential-requests/{id}/issue` (internal, triggered on approval) | walt.id issuer & student wallet |
-| `POST /api/credentials/{id}/revoke` | walt.id status mechanism |
-| `POST /api/public/shares/{token}/verify` | walt.id verifier |
-| `POST /api/staff` / `PATCH /api/staff/{id}` | UserManagementService (internal DB) |
-| `Credential.vc_reference` | walt.id credential reference |
-| `STUDENT.wallet_id` | walt.id server-managed wallet ID |
-| `CredentialSchema` | walt.id schema/configuration |
+| Application API                                                              | Infrastructure                                  |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `POST /api/academic-records/import`                                          | Academic Record Source (inbound)                |
+| `POST /api/students/{id}/wallet/provision`                                   | walt.id Wallet API (provisioning)               |
+| `POST /api/students/{id}/eligibility/evaluate`                               | EligibilityService (internal, no external call) |
+| `POST /api/credential-requests/{id}/issue` (internal, triggered on approval) | walt.id issuer & student wallet                 |
+| `POST /api/credentials/{id}/revoke`                                          | walt.id status mechanism                        |
+| `POST /api/public/shares/{token}/verify`                                     | walt.id verifier                                |
+| `POST /api/staff` / `PATCH /api/staff/{id}`                                  | UserManagementService (internal DB)             |
+| `Credential.vc_reference`                                                    | walt.id credential reference                    |
+| `STUDENT.wallet_id`                                                          | walt.id server-managed wallet ID                |
+| `CredentialSchema`                                                           | walt.id schema/configuration                    |
 
 ## 5. End-to-End Workflow (Design)
 
