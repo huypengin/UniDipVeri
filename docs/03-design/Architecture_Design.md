@@ -2,7 +2,7 @@
 
 **Version:** 2.0
 
-This document contains architectural and design decisions that support the requirements in `docs/01-requirements/SRS.md` (v2.0). It is not part of the SRS: it describes _how_ the system is built, not _what_ it must do.
+This document contains architectural and design decisions that support the requirements in `repo/docs/01-requirements/SRS.md` (v2.0). It is not part of the SRS: it describes _how_ the system is built, not _what_ it must do.
 
 **Updated for v2.0:** the SRS now models academic records as arriving from an external, trusted Academic Record Source, and inserts a graduation-eligibility evaluation step before a credential can be requested. This document adds the components that implement that.
 
@@ -75,13 +75,13 @@ Not exposed as a public API endpoint. This is the seam where a different VC prov
 
 ## 3a. walt.id Integration Model (custody & protocol choice)
 
-UniDipVeri uses three walt.id Community Stack capabilities, all reached exclusively through `WaltIdVCService` — never called by any frontend, and never called directly by the student or verifier:
+walt.id's Community Stack exposes issuance and verification only through the standard OID4VCI (issuance) and OID4VP (presentation/verification) protocols — there is no non-protocol shortcut. Both protocols are designed around a *holder-interactive* exchange (a QR code or deep link, a wallet app opening, the holder tapping to consent). UniDipVeri's constraint is not "avoid these protocols" but "never surface their interactive steps to a human" — the backend completes both flows itself, automatically, against a **server-managed wallet identity** rather than a student-held wallet app. All of this happens exclusively through `WaltIdVCService` — never called by any frontend, and never requiring action from the student or verifier:
 
-- **Issuer API** — signs and issues the VC when `Domain services → Credential Management` completes an approved request.
-- **Wallet API (custodial, server-managed)** — holds the issued VC on the university's behalf. There is no student-controlled wallet identity, no wallet app, and no student action required to "receive" a credential: on successful issuance, the VC is placed directly into a server-managed wallet entry associated with the student, and `Credential.vc_reference` (Data_Model.md) stores that entry's identifier — not the raw VC document. This is what makes SRS §2.6's "no custom wallet" constraint concrete: UniDipVeri builds no wallet UX because the student is never expected to hold or operate a wallet at all.
-- **Verifier API** — called server-to-server by the Verification Service using the stored `vc_reference`, not by presenting a credential from an external, student-held wallet.
+- **Wallet API (custodial, server-managed)** — each student is associated with a server-side wallet identity (`wallet_id`) provisioned by UniDipVeri, not chosen or installed by the student. There is no wallet app and no student-controlled identity to set up.
+- **Issuer API + OID4VCI, driven server-side** — when `Domain services → Credential Management` completes an approved request, `WaltIdVCService` itself acts as the "holder" side of the OID4VCI exchange, using the student's `wallet_id` to accept the offered credential automatically. No QR code or wallet-app redirect ever reaches the student; "receiving" a credential requires zero student interaction. The resulting wallet entry's identifier is stored as `Credential.vc_reference` (Data_Model.md) — not the raw VC document. This is what makes SRS §2.6's "no custom wallet" constraint concrete: UniDipVeri builds no wallet UX because the OID4VCI holder role is played by the backend, not by the student.
+- **Verifier API + OID4VP, driven server-side** — at verification time, the Verification Service resolves the incoming share token to the underlying `wallet_id`/`vc_reference`, then `WaltIdVCService` itself acts as both requesting party and (via the server-managed wallet) responding holder in the OID4VP exchange — i.e., it triggers and completes the presentation internally and reads back the result. The verifier's browser only ever talks to UniDipVeri's own `/api/public/shares/{token}/verify` endpoint (API_Specification.md §10); it never sees a wallet redirect, consent screen, or OID4VP authorization request directly.
 
-**Why not OID4VP.** OID4VP is a holder-initiated presentation protocol: it assumes a verifier requests a credential and a student's wallet is online to respond at that moment. UniDipVeri's sharing model (UC-12/UC-14) is the opposite — the student pre-authorizes one credential via a share link, and any verifier who later opens that link gets a result with no student interaction at verification time. Wrapping this in OID4VP would require the student's wallet to be reachable whenever a verifier checks the link, which conflicts with the "issue-once, verify-anytime" model (SRS §1.2). UniDipVeri's share token is therefore its own application-level artifact (`SHARE.token_hash`), and verification is a direct `WaltIdVCService.verifyCredential(vc_reference)` call. Any OID4VP capability the Community Stack exposes is not used by this system — consistent with SRS §3.2, which lists OID4VP as future work, not a chosen mechanism.
+**Why this still matches "issue-once, verify-anytime" (SRS §1.2).** Because the holder side of both protocols is played by UniDipVeri's own server-managed wallet rather than a student's device, neither the student nor their wallet needs to be online at issuance or verification time — the backend can complete the OID4VCI/OID4VP handshake whenever it needs to, on demand. This is also why the share-link UX (UC-12/UC-14) can stay a plain opaque token rather than an OID4VP authorization request URL: the protocol still runs, just entirely behind UniDipVeri's API boundary (NFR-05).
 
 ## 4. API-to-Infrastructure Mapping
 
@@ -223,7 +223,7 @@ flowchart TB
 
 **walt.id's contribution:** VC infrastructure, cryptographic issuance and verification mechanisms.
 
-Freeze this scope. Do not add multi-university support, OID4VP, multi-step approval chains, or a real integration with a specific SIS during the MVP — put them under Future Work. The research question stays clean: _can a VC-based, eligibility-gated, approval-gated, short-lived self-service verification workflow make academic credential verification more convenient than the traditional manual process?_
+Freeze this scope. Do not add multi-university support, student-facing/holder-interactive OID4VP (see SRS §3.2 — distinct from the server-side OID4VCI/OID4VP already used internally per §3a), multi-step approval chains, or a real integration with a specific SIS during the MVP — put them under Future Work. The research question stays clean: _can a VC-based, eligibility-gated, approval-gated, short-lived self-service verification workflow make academic credential verification more convenient than the traditional manual process?_
 
 ## 9. Future Work
 
