@@ -48,3 +48,7 @@ nav:
     - Analysis:
           - Activity Diagrams: 02-analysis/Activity_Diagrams.md
           - DFD: 02-analysis/DFD.md
+
+    - Design:
+          - Architecture Design: 03-design/Architecture_Design.md
+          - Data Model: 03-design/Data_Model.md
