@@ -25,7 +25,7 @@ Application REST API ──▶ Domain services (Eligibility, Approval, Credentia
                                      └── VC Infrastructure Adapter
                                                   │
                                                   ▼
-                                               walt.id (Issuer + Verifier)
+                                               walt.id (Issuer + Wallet + Verifier)
 ```
 
 The frontend never calls walt.id, or the Academic Record Source, directly. Two adapters bound the system: the **Academic Record Adapter** (inbound, trusted external data) and the **VC Infrastructure Adapter** (outbound, cryptographic operations). Everything between them is domain logic the thesis owns.
