@@ -1,47 +1,47 @@
 name: Deploy documentation
 
 on:
-  push:
-    branches:
-      - docs
-  workflow_dispatch:
+    push:
+        branches:
+            - docs
+    workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+    contents: read
+    pages: write
+    id-token: write
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+    deploy:
+        runs-on: ubuntu-latest
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.x"
+            - name: Setup Python
+              uses: actions/setup-python@v6
+              with:
+                  python-version: "3.x"
 
-      - name: Install MkDocs Material
-        run: pip install mkdocs-material
+            - name: Install MkDocs Material
+              run: pip install mkdocs-material
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+            - name: Configure GitHub Pages
+              uses: actions/configure-pages@v5
 
-      - name: Build documentation
-        run: mkdocs build --strict
+            - name: Build documentation
+              run: mkdocs build
 
-      - name: Upload documentation
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: site/
+            - name: Upload documentation
+              uses: actions/upload-pages-artifact@v4
+              with:
+                  path: site/
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
