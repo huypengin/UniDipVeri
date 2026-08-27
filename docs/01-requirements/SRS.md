@@ -122,6 +122,9 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - Multi-tenant / multi-university support. The data model may use identifiers that happen to be unique per record, but no tenant-isolation, tenant-switching, or cross-university functionality shall be built, tested, or assumed to work.
 - Verification of the _underlying academic record_ itself (grade authenticity, plagiarism, enrollment fraud, etc.) — see AS-01. The system verifies the credential, not the academic claim it encodes.
 - Independent authentication or investigation of the underlying academic records, including verification of individual grades, course completion evidence, plagiarism, enrollment fraud, or other academic misconduct.
+- Batch/bulk academic record import (multi-record upload, CSV/file-based ingestion). The MVP import path (FR-STU-01) handles one record per call; batching is an efficiency concern for large graduating cohorts, not a functional gap.
+- Batch eligibility evaluation across a cohort in a single operation.
+- Batch/bulk approval of multiple issuance requests in a single action.
 - Blockchain of any kind.
 - Custom cryptographic algorithms.
 - Custom wallet implementation.
