@@ -1,8 +1,8 @@
 # Data Flow Diagrams — UniDipVeri
 
-**Version:** 2.0
+**Version:** 2.1
 
-Companion to `docs/01-requirements/SRS.md` (v2.0), `docs/01-requirements/Use_Cases.md`, `docs/03-design/Data_Model.md`, and `docs/03-design/Architecture_Design.md`. This document shows _what data moves where_, complementing the use cases (interaction detail) and the architecture doc (component/layering detail). Notation: external entities are rectangles, processes are rounded/circular nodes numbered `P<n>`, data stores are open-ended boxes numbered `D<n>`, and arrows are labeled data flows. It does not introduce any process, store, or flow that isn't implied by the SRS functional requirements.
+Companion to `docs/01-requirements/SRS.md` (v2.1), `docs/01-requirements/Use_Cases.md`, `docs/03-design/Data_Model.md`, and `docs/03-design/Architecture_Design.md`. This document shows _what data moves where_, complementing the use cases (interaction detail) and the architecture doc (component/layering detail). Notation: external entities are rectangles, processes are rounded/circular nodes numbered `P<n>`, data stores are open-ended boxes numbered `D<n>`, and arrows are labeled data flows. It does not introduce any process, store, or flow that isn't implied by the SRS functional requirements.
 
 ---
 
@@ -18,21 +18,21 @@ flowchart LR
     Admin(["Platform Administrator"])
     Student(["Student"])
     Verifier(["Verifier (anonymous)"])
-    Walt(["walt.id (Issuer + Verifier)"])
+    Walt(["walt.id (Issuer + Wallet + Verifier)"])
 
     Sys(("0.0\nUniDipVeri"))
 
     Source -->|academic record payload| Sys
     Sys -->|import accepted/rejected| Source
 
-    Registrar -->|credentials, program data, eligibility rules, issuance requests, revoke/reissue requests| Sys
-    Sys -->|program list, eligibility results, request status, audit views| Registrar
+    Registrar -->|credentials, program data, eligibility rules, issuance requests, revoke/reissue requests, wallet retry| Sys
+    Sys -->|program list, student list, eligibility results, request status, audit views| Registrar
 
     Approver -->|credentials, approve/reject decision| Sys
     Sys -->|pending request queue, decision confirmation| Approver
 
-    Admin -->|credentials, approval policy config| Sys
-    Sys -->|current policy| Admin
+    Admin -->|credentials, staff user management, approval policy config| Sys
+    Sys -->|staff list, current policy| Admin
 
     Student -->|credentials, share request, share revoke| Sys
     Sys -->|credential list, share links, verification history| Student
@@ -40,8 +40,8 @@ flowchart LR
     Verifier -->|share token| Sys
     Sys -->|verification result| Verifier
 
-    Sys -->|issue / revoke / verify VC request| Walt
-    Walt -->|VC reference, status, verification outcome| Sys
+    Sys -->|provision wallet / issue VC / revoke VC / verify VC| Walt
+    Walt -->|wallet_id, VC reference, status, verification outcome| Sys
 ```
 
 ---
@@ -75,6 +75,8 @@ flowchart TB
     P11(("P11\nManage Share"))
     P12(("P12\nVerify Credential"))
     P13(("P13\nRecord Audit Event"))
+    P14(("P14\nManage Staff &\nStudent Accounts"))
+    P15(("P15\nProvision Student\nWallet"))
 
     %% Data stores
     D1[(D1 University /\nUniversityStaff)]
@@ -87,22 +89,36 @@ flowchart TB
     D8[(D8 Share)]
     D9[(D9 VerificationEvent)]
 
-    %% Auth
+    %% Auth & User Management
     Registrar -->|credentials| P1
     Approver -->|credentials| P1
     Admin -->|credentials| P1
     Student -->|credentials| P1
     P1 <-->|staff/session lookup| D1
+    P1 <-->|student lookup| D3
+
+    Admin -->|staff account CRUD & roles| P14
+    P14 <-->|read/write staff data| D1
+    Registrar -->|view student list| P14
+    P14 <-->|read student accounts| D3
+    P14 -->|user event| P13
 
     %% Program & rules
     Registrar -->|program data, rule set| P2
     Admin -->|rule set| P2
     P2 <-->|program & rule-set records| D2
 
-    %% Import & eligibility
+    %% Import, Wallet Provisioning & eligibility
     Source -->|record payload| P3
     P3 -->|create/update| D3
-    P3 -->|trigger| P4
+    P3 -->|trigger wallet creation| P15
+    P3 -->|trigger evaluation| P4
+    Registrar -->|retry wallet provisioning| P15
+    P15 -->|create wallet request| Walt
+    Walt -->|wallet_id & DID| P15
+    P15 -->|update wallet_id & status| D3
+    P15 -->|wallet event| P13
+
     Registrar -->|manual re-evaluate| P4
     P4 -->|read academic record| D3
     P4 -->|read active rule set| D2
@@ -112,6 +128,7 @@ flowchart TB
     %% Issuance request
     Registrar -->|request issuance| P5
     P5 -->|read latest evaluation| D4
+    P5 -->|check wallet_status ACTIVE| D3
     P5 -->|check existing requests/credentials| D6
     P5 -->|read policy| D5
     P5 -->|write PENDING_APPROVAL| D6
@@ -127,7 +144,8 @@ flowchart TB
 
     %% Issuance
     P7 -->|read request, schema| D6
-    P7 -->|issue VC| Walt
+    P7 -->|read student wallet_id| D3
+    P7 -->|issue VC to wallet| Walt
     Walt -->|VC reference| P7
     P7 -->|write VALID credential| D7
     P7 -->|mark ISSUED| D6
@@ -159,13 +177,14 @@ flowchart TB
     Verifier -->|share token| P12
     P12 -->|resolve token| D8
     P12 -->|read credential| D7
-    P12 -->|verify VC| Walt
+    P12 -->|verify VC against wallet| Walt
     Walt -->|issuer/status result| P12
     P12 -->|plain-language result| Verifier
     P12 -->|write verification event| D9
     P12 -->|verification event| P13
 
     %% Audit
+    P13 -->|persist event| D1
     P13 -->|persist event| D3
     P13 -->|persist event| D4
     P13 -->|persist event| D6
@@ -176,21 +195,23 @@ flowchart TB
     Student -->|view own history| P13
 ```
 
-**Note on P13 (Record Audit Event):** per `Data_Model.md` §2, there is no separately-maintained audit log table — the traceability chain (NFR-06) is reconstructed by joining `D3`–`D9` directly. `P13` is shown as a logical process (every write above carries its own timestamp/actor) rather than a physical store of its own; `GET /api/audit/*` (API_Specification.md §11) reads across `D3`–`D9`, it does not read a `D10 AuditLog`.
-
 ---
 
-## 3. Level 2 — Import → Eligibility Subsystem
+## 3. Level 2 — Import → Wallet Provisioning → Eligibility Subsystem
 
-Decomposes `P3` and `P4`, the trust-boundary-critical subsystem (AS-01, NFR-07 layer 1→2).
+Decomposes `P3`, `P15`, and `P4`.
 
 ```mermaid
 flowchart TB
     Source(["Academic Record Source"])
     Registrar(["Registrar"])
+    Walt(["walt.id Wallet API"])
 
     P3_1(("P3.1\nValidate Payload\n(known program?)"))
     P3_2(("P3.2\nUpsert Student &\nAcademic Record"))
+    P15_1(("P15.1\nCheck Wallet State"))
+    P15_2(("P15.2\nCall walt.id Wallet API"))
+    P15_3(("P15.3\nSave wallet_id &\nStatus (ACTIVE/FAILED)"))
     P4_1(("P4.1\nLoad Record +\nActive Rule Set"))
     P4_2(("P4.2\nCheck Rules\n(credits, GPA, courses)"))
     P4_3(("P4.3\nRecord Result"))
@@ -204,7 +225,16 @@ flowchart TB
     P3_1 -->|reject: unknown program| Source
     P3_1 -->|valid payload| P3_2
     P3_2 -->|create/update| D3
-    P3_2 -->|trigger| P4_1
+    P3_2 -->|trigger wallet provisioning| P15_1
+    P3_2 -->|trigger eligibility| P4_1
+
+    Registrar -->|retry wallet provisioning| P15_1
+    P15_1 -->|read student wallet state| D3
+    P15_1 -->|unprovisioned / failed| P15_2
+    P15_2 -->|provision wallet request| Walt
+    Walt -->|wallet_id| P15_2
+    P15_2 -->|result| P15_3
+    P15_3 -->|write wallet_id & status| D3
 
     Registrar -->|manual re-evaluate request| P4_1
     P4_1 -->|read record| D3
@@ -216,7 +246,42 @@ flowchart TB
 
 ---
 
-## 4. Level 2 — Issuance Request → Approval → Credential Subsystem
+## 4. Level 2 — User Management Subsystem
+
+Decomposes `P14`.
+
+```mermaid
+flowchart TB
+    Admin(["Platform Administrator"])
+    Registrar(["Registrar"])
+
+    P14_1(("P14.1\nCreate Staff User\n& Assign Roles"))
+    P14_2(("P14.2\nUpdate Staff User\n& Roles"))
+    P14_3(("P14.3\nDeactivate Staff User"))
+    P14_4(("P14.4\nList & View\nStudents"))
+
+    D1[(D1 UniversityStaff)]
+    D3[(D3 Student)]
+
+    Admin -->|new staff payload| P14_1
+    P14_1 -->|verify email uniqueness| D1
+    P14_1 -->|write staff record| D1
+
+    Admin -->|updated profile / roles| P14_2
+    P14_2 -->|update staff row| D1
+
+    Admin -->|deactivate request| P14_3
+    P14_3 -->|check not last Admin| D1
+    P14_3 -->|set status INACTIVE| D1
+
+    Registrar -->|query students| P14_4
+    Admin -->|query students| P14_4
+    P14_4 -->|read student records & wallet states| D3
+```
+
+---
+
+## 5. Level 2 — Issuance Request → Approval → Credential Subsystem
 
 Decomposes `P5`, `P6`, `P7` — the thesis's central workflow.
 
@@ -227,14 +292,16 @@ flowchart TB
     Walt(["walt.id Issuer"])
 
     P5_1(("P5.1\nCheck Latest\nEvaluation = ELIGIBLE"))
-    P5_2(("P5.2\nCheck No Active\nDuplicate Request"))
-    P5_3(("P5.3\nCreate Request\nPENDING_APPROVAL"))
+    P5_2(("P5.2\nCheck Student Wallet\nstatus = ACTIVE"))
+    P5_3(("P5.3\nCheck No Active\nDuplicate Request"))
+    P5_4(("P5.4\nCreate Request\nPENDING_APPROVAL"))
     P6_1(("P6.1\nRecord\nApprove/Reject"))
     P6_2(("P6.2\nCount Distinct\nApprovals vs Policy"))
     P7_1(("P7.1\nBuild Credential\nSubject"))
-    P7_2(("P7.2\nCall VC Adapter"))
+    P7_2(("P7.2\nCall VC Adapter\n(with wallet_id)"))
     P7_3(("P7.3\nStore Credential\n(VALID) & Mark ISSUED"))
 
+    D3[(D3 Student)]
     D4[(D4 EligibilityEvaluation)]
     D5[(D5 ApprovalPolicy)]
     D6[(D6 CredentialIssuanceRequest /\nCredentialApproval)]
@@ -244,10 +311,13 @@ flowchart TB
     P5_1 -->|read latest| D4
     P5_1 -->|NOT_ELIGIBLE: refuse + failed requirements| Registrar
     P5_1 -->|ELIGIBLE| P5_2
-    P5_2 -->|check existing| D6
-    P5_2 -->|duplicate: refuse| Registrar
-    P5_2 -->|clear| P5_3
-    P5_3 -->|write request, link evaluation| D6
+    P5_2 -->|read wallet status| D3
+    P5_2 -->|wallet not ACTIVE: refuse| Registrar
+    P5_2 -->|wallet ACTIVE| P5_3
+    P5_3 -->|check existing| D6
+    P5_3 -->|duplicate: refuse| Registrar
+    P5_3 -->|clear| P5_4
+    P5_4 -->|write request, link evaluation| D6
 
     Approver -->|decision + comment/reason| P6_1
     P6_1 -->|prevent duplicate approver vote| D6
@@ -260,7 +330,8 @@ flowchart TB
     P6_2 -->|"threshold met: trigger issuance"| P7_1
 
     P7_1 -->|read request + student/program data| D6
-    P7_1 -->|subject payload| P7_2
+    P7_1 -->|read student wallet_id| D3
+    P7_1 -->|subject + wallet_id payload| P7_2
     P7_2 -->|issueCredential| Walt
     Walt -->|vc_reference| P7_2
     P7_2 -->|result| P7_3
@@ -270,7 +341,7 @@ flowchart TB
 
 ---
 
-## 5. Level 2 — Share → Public Verification Subsystem
+## 6. Level 2 — Share → Public Verification Subsystem
 
 Decomposes `P11` and `P12` — the public-facing, unauthenticated path (NFR-02, NFR-07 layer 3).
 
@@ -315,18 +386,18 @@ flowchart TB
 
 ---
 
-## 6. Data Store Cross-Reference
+## 7. Data Store Cross-Reference
 
-| Store | Entity/Entities (Data_Model.md)                  | Written by                            | Read by                             |
-| ----- | ------------------------------------------------ | ------------------------------------- | ----------------------------------- |
-| D1    | UNIVERSITY, UNIVERSITY_STAFF                     | P1 (session/staff mgmt), Admin config | P1, P2, P6                          |
-| D2    | PROGRAM, ELIGIBILITY_RULE_SET                    | P2                                    | P2, P3, P4, P5                      |
-| D3    | STUDENT, ACADEMIC_RECORD                         | P3 only (import-only, see AS-01)      | P4, P8 (indirect), P13              |
-| D4    | ELIGIBILITY_EVALUATION                           | P4                                    | P5, P6 (indirect), P10              |
-| D5    | APPROVAL_POLICY                                  | Admin via P2-adjacent config process  | P6                                  |
-| D6    | CREDENTIAL_ISSUANCE_REQUEST, CREDENTIAL_APPROVAL | P5, P6, P7                            | P5, P6, P7, P10, P13                |
-| D7    | CREDENTIAL                                       | P7, P9, P10                           | P8, P9, P11, P12                    |
-| D8    | SHARE                                            | P11                                   | P11, P12                            |
-| D9    | VERIFICATION_EVENT                               | P12                                   | P13 (student/registrar audit views) |
+| Store | Entity/Entities (Data_Model.md)                  | Written by                           | Read by                             |
+| ----- | ------------------------------------------------ | ------------------------------------ | ----------------------------------- |
+| D1    | UNIVERSITY, UNIVERSITY_STAFF                     | P14 (staff CRUD), Admin config       | P1, P2, P6, P14                     |
+| D2    | PROGRAM, ELIGIBILITY_RULE_SET                    | P2                                   | P2, P3, P4, P5                      |
+| D3    | STUDENT, ACADEMIC_RECORD                         | P3 (import), P15 (wallet_id/status)  | P1, P4, P5, P7, P8, P14, P15, P13   |
+| D4    | ELIGIBILITY_EVALUATION                           | P4                                   | P5, P6 (indirect), P10              |
+| D5    | APPROVAL_POLICY                                  | Admin via P2-adjacent config process | P6                                  |
+| D6    | CREDENTIAL_ISSUANCE_REQUEST, CREDENTIAL_APPROVAL | P5, P6, P7                           | P5, P6, P7, P10, P13                |
+| D7    | CREDENTIAL                                       | P7, P9, P10                          | P8, P9, P11, P12                    |
+| D8    | SHARE                                            | P11                                  | P11, P12                            |
+| D9    | VERIFICATION_EVENT                               | P12                                  | P13 (student/registrar audit views) |
 
-This table is the DFD-side counterpart to the traceability chain in `Data_Model.md` §2 and SRS NFR-06: every data store here corresponds 1:1 to an ERD entity, and every write in §2–§5 above is one link in the chain _Academic Record Imported → Eligibility Evaluated → Issuance Requested → Approved → Issued (→ Revoked → Reissued) → Shared → Verified_.
+This table is the DFD-side counterpart to the traceability chain in `Data_Model.md` §2 and SRS NFR-06: every data store here corresponds 1:1 to an ERD entity, and every write in §2–§6 above is one link in the chain _Staff Setup → Academic Record Imported → Student Wallet Provisioned → Eligibility Evaluated → Issuance Requested → Approved → Issued (→ Revoked → Reissued) → Shared → Verified_.

@@ -1,12 +1,13 @@
 # Data Model
 
-**Version:** 2.0
+**Version:** 2.1
 
-Supports `docs/01-requirements/SRS.md` (v2.0) Section 7. Reflects three cumulative changes from the original draft:
+Supports `docs/01-requirements/SRS.md` (v2.1) Section 7. Reflects four cumulative architectural elements:
 
 1. **Single tenant.** `UNIVERSITY` is a singleton table (one row, seeded at deployment). No cross-university foreign keys exist anywhere else in the model.
-2. **Approval workflow.** Issuance goes through `CREDENTIAL_ISSUANCE_REQUEST` and `CREDENTIAL_APPROVAL` before a `CREDENTIAL` row is created, governed by `APPROVAL_POLICY`.
-3. **Academic record import & eligibility (new in v2.0).** `STUDENT` and `ACADEMIC_RECORD` are populated only from the external Academic Record Source (never hand-authored by a Registrar); each `PROGRAM` carries a versioned `ELIGIBILITY_RULE_SET`, and a student's `ELIGIBILITY_EVALUATION` against that rule set gates whether a `CREDENTIAL_ISSUANCE_REQUEST` can even be created.
+2. **User management.** `UNIVERSITY_STAFF` tracks administrative staff accounts with explicit roles (`REGISTRAR | APPROVER | ADMIN`) and `status` (`ACTIVE | INACTIVE`) managed by Platform Administrators.
+3. **Approval workflow.** Issuance goes through `CREDENTIAL_ISSUANCE_REQUEST` and `CREDENTIAL_APPROVAL` before a `CREDENTIAL` row is created, governed by `APPROVAL_POLICY`.
+4. **Academic record import, student wallet & eligibility.** `STUDENT` and `ACADEMIC_RECORD` are populated from the external Academic Record Source. A server-managed custodial wallet (`wallet_id`, `wallet_status`) is provisioned on walt.id. Each `PROGRAM` carries a versioned `ELIGIBILITY_RULE_SET`, and a student's `ELIGIBILITY_EVALUATION` against that rule set gates whether a `CREDENTIAL_ISSUANCE_REQUEST` can even be created.
 
 ---
 
@@ -56,7 +57,9 @@ erDiagram
         string email
         string password_hash
         string role "REGISTRAR | APPROVER | ADMIN"
+        string status "ACTIVE | INACTIVE"
         datetime created_at
+        datetime updated_at
     }
 
     PROGRAM {
@@ -83,9 +86,10 @@ erDiagram
         string student_number
         string name
         string email
-        string status
+        string status "ACTIVE | GRADUATED | INACTIVE"
         string source_record_ref "identifier from Academic Record Source"
-        string wallet_id "walt.id server-managed wallet identity, provisioned by the system — not student-controlled, see Architecture_Design.md §3a"
+        string wallet_id "walt.id server-managed wallet identity"
+        string wallet_status "PENDING | ACTIVE | FAILED"
         datetime imported_at
         datetime updated_at
     }
@@ -183,13 +187,14 @@ erDiagram
     }
 ```
 
-## 2. Notes on Changes from v1.0 → v2.1
+## 2. Notes on Entity Semantics & Lifecycle
 
-- **`STUDENT` and `ACADEMIC_RECORD` are import-only tables.** There is no Registrar-facing "create student" write path (see `API_Specification.md` Section 4) — every row traces back to a `source_record_ref` from the Academic Record Source, which is what makes AS-01 ("source data trusted as correct") an enforceable data-layer boundary rather than just a policy note. `ACADEMIC_RECORD` keeps `source_snapshot_at` separate from `imported_at` so the model distinguishes "when the source system asserted this was true" from "when UniDipVeri received it."
+- **`UNIVERSITY_STAFF` management:** Platform Administrators manage staff rows. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
+- **`STUDENT` and `ACADEMIC_RECORD` are import-only tables.** There is no Registrar-facing manual "create student" write path (see `API_Specification.md` Section 4) — every row traces back to a `source_record_ref` from the Academic Record Source, making AS-01 ("source data trusted as correct") an enforceable data-layer boundary. `ACADEMIC_RECORD` keeps `source_snapshot_at` separate from `imported_at` so the model distinguishes "when the source system asserted this was true" from "when UniDipVeri received it."
+- **Student Wallet lifecycle:** Each `STUDENT` carries `wallet_id` and `wallet_status` (`PENDING | ACTIVE | FAILED`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. Credential issuance requires `wallet_status = ACTIVE`.
 - **`ELIGIBILITY_RULE_SET` is versioned per program**, and `ELIGIBILITY_EVALUATION` stores a foreign key to the specific version it ran against (not just to `PROGRAM`). This directly implements FR-ELIG-10: editing a program's rules later does not retroactively change what an old evaluation (or a credential issued off it) meant.
-- **`CREDENTIAL_ISSUANCE_REQUEST.eligibility_evaluation_id` is a hard link, not just an audit trail entry.** The application layer must reject request creation (`API_Specification.md` Section 6) unless this links to an evaluation whose `result = ELIGIBLE`; the foreign key exists so that fact is also checkable directly from the data, not only through application logic.
-- **`UNIVERSITY` remains a singleton**, `CREDENTIAL_ISSUANCE_REQUEST`/`CREDENTIAL_APPROVAL`/`APPROVAL_POLICY` are unchanged from the v2.0 approval-workflow design — see prior notes, still valid.
-- **Full NFR-06 traceability chain is now:** `ACADEMIC_RECORD` (imported) → `ELIGIBILITY_EVALUATION` (computed) → `CREDENTIAL_ISSUANCE_REQUEST` (created only if eligible) → `CREDENTIAL_APPROVAL` (one or more) → `CREDENTIAL` (issued). Every arrow is a foreign key, so the chain is reconstructable with joins alone, without relying on a separately-maintained audit log agreeing with the transactional tables.
+- **`CREDENTIAL_ISSUANCE_REQUEST.eligibility_evaluation_id` is a hard link, not just an audit trail entry.** The application layer must reject request creation (`API_Specification.md` Section 6) unless this links to an evaluation whose `result = ELIGIBLE`.
+- **Full NFR-06 traceability chain:** `UNIVERSITY_STAFF` (configured) → `ACADEMIC_RECORD` (imported) → `STUDENT.wallet_id` (provisioned) → `ELIGIBILITY_EVALUATION` (computed) → `CREDENTIAL_ISSUANCE_REQUEST` (created only if eligible) → `CREDENTIAL_APPROVAL` (one or more) → `CREDENTIAL` (issued). Every arrow is a foreign key, so the chain is reconstructable with database joins alone.
 
 ## 3. Application-Level Credential Representation
 

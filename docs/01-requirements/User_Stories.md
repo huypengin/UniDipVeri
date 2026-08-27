@@ -1,8 +1,8 @@
 # User Stories
 
-**Version:** 2.0
+**Version:** 2.1
 
-Companion to `docs/01-requirements/SRS.md` (v2.0) and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
+Companion to `docs/01-requirements/SRS.md` (v2.1) and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
 ---
 
@@ -82,11 +82,11 @@ Companion to `docs/01-requirements/SRS.md` (v2.0) and `docs/01-requirements/Use_
 
 ## Epic E — Credential Issuance & Approval
 
-**US-E1.** As a Registrar, I want to request diploma issuance only for students who are currently eligible, so that ineligible students can never enter the issuance pipeline.
+**US-E1.** As a Registrar, I want to request diploma issuance only for students who are currently eligible and have an active wallet, so that ineligible or unprovisioned students can never enter the issuance pipeline.
 
 - _AC:_ Given a student's latest evaluation is `NOT_ELIGIBLE`, when I try to create an issuance request, then the system refuses and shows why.
-- _AC:_ Given a student is `ELIGIBLE`, when I create a request, then it enters `PENDING_APPROVAL` linked to that evaluation.
-- _Traces to:_ FR-APPR-01, FR-APPR-02
+- _AC:_ Given a student is `ELIGIBLE` and has an active wallet, when I create a request, then it enters `PENDING_APPROVAL` linked to that evaluation.
+- _Traces to:_ FR-APPR-01, FR-APPR-02, FR-WAL-04
 
 **US-E2.** As an Approver, I want to see all pending issuance requests, so that I can review and act on them.
 
@@ -110,10 +110,10 @@ Companion to `docs/01-requirements/SRS.md` (v2.0) and `docs/01-requirements/Use_
 - _AC:_ Given I set required approvals to a new value, when a new request is created afterward, then it uses the new threshold.
 - _Traces to:_ FR-APPR-10
 
-**US-E6.** As the system, I want to issue the VC through walt.id only after a request is fully approved, so that no credential ever exists without a recorded, eligible, approved request behind it.
+**US-E6.** As the system, I want to issue the VC through walt.id into the student's server-managed wallet only after a request is fully approved, so that no credential ever exists without a recorded, eligible, approved request behind it.
 
 - _AC:_ Given a request reaches its required approval count, when issuance runs, then a `CREDENTIAL` is created with status `VALID` and the request becomes `ISSUED`.
-- _Traces to:_ FR-CRED-01–06
+- _Traces to:_ FR-CRED-01–06, FR-WAL-04
 
 **US-E7.** As the system, I want to prevent duplicate issuance for the same diploma outside of an explicit reissuance, so that a student can't end up with two live credentials for the same award.
 
@@ -188,10 +188,10 @@ Companion to `docs/01-requirements/SRS.md` (v2.0) and `docs/01-requirements/Use_
 
 ## Epic I — Audit & Traceability
 
-**US-I1.** As a Registrar, I want a full, timestamped audit trail of import, evaluation, approval, issuance, and revocation events, so that any credential's history can be reconstructed for review.
+**US-I1.** As a Registrar, I want a full, timestamped audit trail of import, wallet provisioning, evaluation, approval, issuance, and revocation events, so that any credential's history can be reconstructed for review.
 
-- _AC:_ Given a credential exists, when I view its audit trail, then I can see the chain: record imported → eligibility evaluated → request created → approved/rejected → issued (and revoked/reissued, if applicable).
-- _Traces to:_ FR-AUD-01–08, NFR-06
+- _AC:_ Given a credential exists, when I view its audit trail, then I can see the chain: record imported → wallet provisioned → eligibility evaluated → request created → approved/rejected → issued (and revoked/reissued, if applicable).
+- _Traces to:_ FR-AUD-01–08, FR-AUD-10, NFR-06
 
 **US-I2.** As a Student, I want to see my own share and verification-event history, so that I know when and how my credentials were checked.
 
@@ -200,13 +200,54 @@ Companion to `docs/01-requirements/SRS.md` (v2.0) and `docs/01-requirements/Use_
 
 ---
 
+## Epic J — User Management (Staff & Students)
+
+**US-J1.** As a Platform Administrator, I want to create staff accounts and assign roles (`REGISTRAR`, `APPROVER`, `ADMIN`), so that staff members have appropriate access to their respective functions.
+
+- _AC:_ Given valid staff details and chosen role(s), when I create a staff user, then a new `UNIVERSITY_STAFF` record is stored with status `ACTIVE`.
+- _AC:_ Given an email that already exists, when I attempt creation, then the system rejects it.
+- _Traces to:_ FR-USER-01, FR-AUTH-01
+
+**US-J2.** As a Platform Administrator, I want to update staff details and role assignments, so that staff responsibilities can evolve.
+
+- _AC:_ Given an existing staff user, when I update their roles or profile, then the updated permissions take effect on subsequent operations.
+- _Traces to:_ FR-USER-02, FR-USER-03
+
+**US-J3.** As a Platform Administrator, I want to deactivate a staff account without deleting historical audit links, so that former staff cannot log in while their past actions remain traceable.
+
+- _AC:_ Given an active staff account, when I deactivate it, then the account cannot log in.
+- _AC:_ Given I attempt to deactivate the last remaining active Admin, when I submit, then the system refuses the action.
+- _Traces to:_ FR-USER-02, FR-USER-05, FR-AUD-09
+
+**US-J4.** As a Registrar or Administrator, I want to view student accounts, enrollment status, and wallet provisioning status in a consolidated list, so that I can oversee cohort readiness.
+
+- _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, enrollment status, and wallet status.
+- _Traces to:_ FR-USER-04, FR-STU-02, FR-WAL-03
+
+---
+
+## Epic K — Student Wallet Management
+
+**US-K1.** As the system, I want to automatically provision a server-managed custodial wallet on walt.id when a student record is imported, so that credentials can be issued immediately once approved.
+
+- _AC:_ Given a new student record is imported, when import succeeds, then the system calls walt.id Wallet API, obtains a `wallet_id`, and sets `wallet_status` to `ACTIVE`.
+- _AC:_ Given walt.id is temporarily unavailable during import, when the call fails, then the system sets `wallet_status` to `FAILED` and logs the error without aborting student record ingestion.
+- _Traces to:_ FR-WAL-01, FR-WAL-03, FR-AUD-10
+
+**US-K2.** As a Registrar or Platform Administrator, I want to manually re-provision or retry wallet creation for a student with a missing or failed wallet, so that any transient failure can be resolved before credential issuance.
+
+- _AC:_ Given a student with `FAILED` or `PENDING` wallet status, when I click "Retry Wallet Provisioning", then the system contacts walt.id, provisions the wallet, and updates status to `ACTIVE`.
+- _Traces to:_ FR-WAL-02, FR-WAL-03, FR-WAL-04
+
+---
+
 ## Backlog Prioritization (MVP Build Order)
 
-1. **Foundation:** US-A1–A3, US-C1 (auth + programs must exist before anything else)
-2. **Trust boundary:** US-B1–B3, US-C2–C3, US-D1–D2 (import + eligibility before any issuance is possible)
+1. **Foundation & Users:** US-A1–A3, US-J1–J3, US-C1 (auth, staff user management, programs must exist before anything else)
+2. **Trust boundary & Wallet:** US-B1–B3, US-K1–K2, US-J4, US-C2–C3, US-D1–D2 (import + wallet provisioning + eligibility before any issuance is possible)
 3. **Core workflow:** US-E1–E7 (the request/approval/issuance pipeline — this is the thesis's central contribution)
 4. **Graduate-facing value:** US-F1–F3, US-G1–G3 (credential lifecycle + sharing)
 5. **The payoff:** US-H1–H4 (public verification — this is what proves the research question)
 6. **Supporting:** US-I1–I2 (audit views — can be trimmed first if time is short, per Architecture_Design.md)
 
-This order intentionally puts eligibility and the request/approval chain before public verification, even though verification is the user-visible "wow" feature — without a trustworthy issuance pipeline behind it, the verification result has nothing credible to report.
+This order intentionally puts user management, wallet provisioning, eligibility, and the request/approval chain before public verification, ensuring that the entire issuance and identity pipeline is robust from the ground up.
