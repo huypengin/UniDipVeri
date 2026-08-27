@@ -85,6 +85,7 @@ erDiagram
         string email
         string status
         string source_record_ref "identifier from Academic Record Source"
+        string wallet_id "walt.id server-managed wallet identity, provisioned by the system — not student-controlled, see Architecture_Design.md §3a"
         datetime imported_at
         datetime updated_at
     }

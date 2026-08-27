@@ -1,15 +1,10 @@
 # Software Requirements Specification — UniDipVeri
 
 **Version:** 2.0
-
 **Project type:** Undergraduate thesis prototype
-
 **Institution:** Mekong International University (fictional)
-
 **Primary domain:** Academic credential issuance and verification
-
 **VC infrastructure:** walt.id Community Stack (see Architecture_Design.md)
-
 **Deployment model:** Single university, single tenant
 
 **Companion documents** (not part of this SRS):
@@ -135,7 +130,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - Enterprise SSO.
 - Production-grade high availability.
 - Full academic transcript management (course-level records).
-- OID4VP as the primary verification workflow (candidate future work).
+- **Student-facing, holder-interactive OID4VP** (student's own wallet app, QR-scan/consent-tap flow) as the primary verification workflow — candidate future work. Note: walt.id's OID4VCI/OID4VP protocols are still used _internally_ by the system (see Architecture_Design.md §3a), driven entirely server-side against a server-managed wallet; what's out of scope here is exposing that protocol's interactive steps to the student or verifier.
 - Approval policies more complex than "N of M approvers" (e.g., role-weighted or sequential approval chains) — the MVP implements only N=1.
 
 ---

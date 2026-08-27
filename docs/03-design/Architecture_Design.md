@@ -2,7 +2,7 @@
 
 **Version:** 2.0
 
-This document contains architectural and design decisions that support the requirements in `repo/docs/01-requirements/SRS.md` (v2.0). It is not part of the SRS: it describes _how_ the system is built, not _what_ it must do.
+This document contains architectural and design decisions that support the requirements in `docs/01-requirements/SRS.md` (v2.0). It is not part of the SRS: it describes _how_ the system is built, not _what_ it must do.
 
 **Updated for v2.0:** the SRS now models academic records as arriving from an external, trusted Academic Record Source, and inserts a graduation-eligibility evaluation step before a credential can be requested. This document adds the components that implement that.
 
@@ -69,13 +69,14 @@ VCService
 ├── verifyCredential()
 ├── revokeCredential()
 └── getCredentialStatus()
+...
 ```
 
 Not exposed as a public API endpoint. This is the seam where a different VC provider could be substituted.
 
 ## 3a. walt.id Integration Model (custody & protocol choice)
 
-walt.id's Community Stack exposes issuance and verification only through the standard OID4VCI (issuance) and OID4VP (presentation/verification) protocols — there is no non-protocol shortcut. Both protocols are designed around a *holder-interactive* exchange (a QR code or deep link, a wallet app opening, the holder tapping to consent). UniDipVeri's constraint is not "avoid these protocols" but "never surface their interactive steps to a human" — the backend completes both flows itself, automatically, against a **server-managed wallet identity** rather than a student-held wallet app. All of this happens exclusively through `WaltIdVCService` — never called by any frontend, and never requiring action from the student or verifier:
+walt.id's Community Stack exposes issuance and verification only through the standard OID4VCI (issuance) and OID4VP (presentation/verification) protocols — there is no non-protocol shortcut. Both protocols are designed around a _holder-interactive_ exchange (a QR code or deep link, a wallet app opening, the holder tapping to consent). UniDipVeri's constraint is not "avoid these protocols" but "never surface their interactive steps to a human" — the backend completes both flows itself, automatically, against a **server-managed wallet identity** rather than a student-held wallet app. All of this happens exclusively through `WaltIdVCService` — never called by any frontend, and never requiring action from the student or verifier:
 
 - **Wallet API (custodial, server-managed)** — each student is associated with a server-side wallet identity (`wallet_id`) provisioned by UniDipVeri, not chosen or installed by the student. There is no wallet app and no student-controlled identity to set up.
 - **Issuer API + OID4VCI, driven server-side** — when `Domain services → Credential Management` completes an approved request, `WaltIdVCService` itself acts as the "holder" side of the OID4VCI exchange, using the student's `wallet_id` to accept the offered credential automatically. No QR code or wallet-app redirect ever reaches the student; "receiving" a credential requires zero student interaction. The resulting wallet entry's identifier is stored as `Credential.vc_reference` (Data_Model.md) — not the raw VC document. This is what makes SRS §2.6's "no custom wallet" constraint concrete: UniDipVeri builds no wallet UX because the OID4VCI holder role is played by the backend, not by the student.
