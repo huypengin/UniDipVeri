@@ -1,10 +1,15 @@
 # Software Requirements Specification — UniDipVeri
 
 **Version:** 2.0
+
 **Project type:** Undergraduate thesis prototype
+
 **Institution:** Mekong International University (fictional)
+
 **Primary domain:** Academic credential issuance and verification
+
 **VC infrastructure:** walt.id Community Stack (see Architecture_Design.md)
+
 **Deployment model:** Single university, single tenant
 
 **Companion documents** (not part of this SRS):
