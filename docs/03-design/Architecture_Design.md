@@ -56,7 +56,7 @@ Design intent:
 ## 3. VC & Wallet Adapter
 
 ```
-Your application
+UniDipVeri
        │
        ▼
 VCService (interface)
