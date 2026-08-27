@@ -1,0 +1,62 @@
+site_name: Project Documentation
+site_description: Project requirements, analysis, design, UX, API, and testing documentation
+
+theme:
+    name: material
+    language: en
+
+    features:
+        - navigation.sections
+        - navigation.expand
+        - navigation.top
+        - search.suggest
+        - search.highlight
+        - content.code.copy
+
+    palette:
+        - media: "(prefers-color-scheme: light)"
+          scheme: default
+          toggle:
+              icon: material/weather-sunny
+              name: Switch to dark mode
+
+        - media: "(prefers-color-scheme: dark)"
+          scheme: slate
+          toggle:
+              icon: material/weather-night
+              name: Switch to light mode
+
+markdown_extensions:
+    - admonition
+    - attr_list
+    - md_in_html
+    - pymdownx.details
+    - pymdownx.superfences:
+          custom_fences:
+              - name: mermaid
+                class: mermaid
+                format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+    - Home: index.md
+
+    - Requirements:
+          - SRS: 01-requirements/SRS.md
+          - Use Cases: 01-requirements/Use_Cases.md
+          - User Stories: 01-requirements/User_Stories.md
+
+    - Analysis:
+          - Overview: 02-analysis/index.md
+
+    - Design:
+          - Architecture Design: 03-design/Architecture_Design.md
+          - Data Model: 03-design/Data_Model.md
+
+    - UX:
+          - Overview: 04-ux/index.md
+
+    - API:
+          - API Specification: 05-api/API_Specification.md
+
+    - Testing:
+          - Overview: 06-testing/index.md
