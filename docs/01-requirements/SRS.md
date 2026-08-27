@@ -1,17 +1,22 @@
 # Software Requirements Specification — UniDipVeri
 
 **Version:** 2.0
+
 **Project type:** Undergraduate thesis prototype
+
 **Institution:** Mekong International University (fictional)
+
 **Primary domain:** Academic credential issuance and verification
+
 **VC infrastructure:** walt.id Community Stack (see Architecture_Design.md)
+
 **Deployment model:** Single university, single tenant
 
 **Companion documents** (not part of this SRS):
 
-- `repo/docs/03-design/Architecture_Design.md` — system architecture, layering, VC adapter, system boundary
-- `repo/docs/03-design/Data_Model.md` — ERD and schema definitions
-- `repo/docs/05-api/API_Specification.md` — REST endpoint contracts
+- `docs/03-design/Architecture_Design.md` — system architecture, layering, VC adapter, system boundary
+- `docs/03-design/Data_Model.md` — ERD and schema definitions
+- `docs/05-api/API_Specification.md` — REST endpoint contracts
 
 ---
 

@@ -44,3 +44,7 @@ nav:
           - SRS: 01-requirements/SRS.md
           - Use Cases: 01-requirements/Use_Cases.md
           - User Stories: 01-requirements/User_Stories.md
+
+    - Analysis:
+          - Activity Diagrams: 02-analysis/Activity_Diagrams.md
+          - DFD: 02-analysis/DFD.md
