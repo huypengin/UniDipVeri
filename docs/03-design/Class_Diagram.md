@@ -2,7 +2,7 @@
 
 **Version:** 3.0
 
-Companion to `docs/01-requirements/SRS.md` (v2.2), `docs/03-design/Architecture_Design.md` (v3.0), `docs/03-design/Data_Model.md`, and `docs/05-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
+Companion to `docs/01-requirements/SRS.md` (v2.2), `docs/03-design/Architecture_Design.md` (v3.0), `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
 > **Change from v2.1:** The CQRS Command/Query/Handler classes and the `IMediator` dispatch layer have been removed. Each bounded area of the system is now implemented as a single **Application Service** class with plain methods, called directly by controllers. The Domain Layer (§2) and the Infrastructure Layer (§5) are unchanged — only the Application Layer's internal shape (§4) and how controllers reach it (§6) are different. See `Architecture_Design.md` §1.2 for the rationale.
 

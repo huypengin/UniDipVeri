@@ -26,6 +26,10 @@ theme:
               icon: material/weather-night
               name: Switch to light mode
 
+extra_javascript:
+    - https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.2/dist/svg-pan-zoom.min.js
+    - javascripts/mermaid-zoom.js
+
 markdown_extensions:
     - admonition
     - attr_list
@@ -54,3 +58,6 @@ nav:
           - Data Model: 03-design/Data_Model.md
           - Class Diagram: 03-design/Class_Diagram.md
           - Sequence Diagram: 03-design/Sequence_Diagram.md
+
+    - API:
+          - API Specification: 04-api/API_Specification.md

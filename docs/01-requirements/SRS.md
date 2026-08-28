@@ -16,7 +16,7 @@
 
 - `docs/03-design/Architecture_Design.md` — system architecture, layering, VC adapter, system boundary
 - `docs/03-design/Data_Model.md` — ERD and schema definitions
-- `docs/05-api/API_Specification.md` — REST endpoint contracts
+- `docs/04-api/API_Specification.md` — REST endpoint contracts
 
 ---
 
