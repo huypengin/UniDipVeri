@@ -1,30 +1,109 @@
-document$.subscribe(function () {
+/**
+ * Enables pan and zoom on Mermaid diagrams in Material for MkDocs.
+ */
+function initMermaidZoom() {
     if (typeof svgPanZoom === "undefined") {
-        console.warn("svgPanZoom is not loaded");
         return;
     }
 
-    document.querySelectorAll(".mermaid").forEach(function (container) {
-        const svg = container.querySelector("svg");
+    // Find all rendered Mermaid SVGs
+    const svgs = document.querySelectorAll(
+        ".mermaid svg, pre.mermaid svg, div.mermaid svg",
+    );
 
-        if (!svg || svg.dataset.panzoomInitialized) {
+    svgs.forEach((svg) => {
+        if (svg.dataset.zoomInitialized === "true") {
             return;
         }
 
-        svg.dataset.panzoomInitialized = "true";
+        // Ensure SVG has an ID for svgPanZoom
+        if (!svg.id) {
+            svg.id = "mermaid-" + Math.random().toString(36).substr(2, 9);
+        }
 
-        svgPanZoom(svg, {
-            zoomEnabled: true,
-            panEnabled: true,
-            controlIconsEnabled: true,
-            mouseWheelZoomEnabled: true,
+        svg.dataset.zoomInitialized = "true";
 
-            fit: true,
-            center: true,
+        // Wrap SVG in a zoom container with fixed/responsive height
+        const parent = svg.parentElement;
+        if (!parent.classList.contains("mermaid-zoom-container")) {
+            const container = document.createElement("div");
+            container.className = "mermaid-zoom-container";
+            parent.insertBefore(container, svg);
+            container.appendChild(svg);
 
-            minZoom: 0.5,
-            maxZoom: 10,
-            zoomScaleSensitivity: 0.5
-        });
+            // Initialize svg-pan-zoom
+            const panZoom = svgPanZoom(svg, {
+                zoomEnabled: true,
+                controlIconsEnabled: false, // We use custom styled HTML buttons
+                fit: true,
+                center: true,
+                minZoom: 0.2,
+                maxZoom: 10,
+                zoomScaleSensitivity: 0.3,
+                mouseWheelZoomEnabled: true,
+                preventMouseEventsDefault: true,
+            });
+
+            // Create floating control toolbar
+            const toolbar = document.createElement("div");
+            toolbar.className = "mermaid-zoom-toolbar";
+            toolbar.innerHTML = `
+                <button type="button" class="mermaid-zoom-btn zoom-in" title="Zoom In">+</button>
+                <button type="button" class="mermaid-zoom-btn zoom-out" title="Zoom Out">−</button>
+                <button type="button" class="mermaid-zoom-btn zoom-reset" title="Reset View">⟲</button>
+            `;
+
+            toolbar.querySelector(".zoom-in").addEventListener("click", (e) => {
+                e.preventDefault();
+                panZoom.zoomIn();
+            });
+
+            toolbar
+                .querySelector(".zoom-out")
+                .addEventListener("click", (e) => {
+                    e.preventDefault();
+                    panZoom.zoomOut();
+                });
+
+            toolbar
+                .querySelector(".zoom-reset")
+                .addEventListener("click", (e) => {
+                    e.preventDefault();
+                    panZoom.reset();
+                    panZoom.fit();
+                    panZoom.center();
+                });
+
+            container.appendChild(toolbar);
+
+            // Re-fit on container resize
+            window.addEventListener("resize", () => {
+                panZoom.resize();
+                panZoom.fit();
+                panZoom.center();
+            });
+        }
+    });
+}
+
+// Hook into Material for MkDocs instant navigation
+if (typeof document$ !== "undefined") {
+    document$.subscribe(() => {
+        // Run after DOM update
+        setTimeout(initMermaidZoom, 300);
+    });
+}
+
+// Fallback observer for async Mermaid rendering
+document.addEventListener("DOMContentLoaded", () => {
+    initMermaidZoom();
+
+    const observer = new MutationObserver(() => {
+        initMermaidZoom();
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
     });
 });

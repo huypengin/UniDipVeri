@@ -26,6 +26,9 @@ theme:
               icon: material/weather-night
               name: Switch to light mode
 
+extra_css:
+    - stylesheets/extra.css
+
 extra_javascript:
     - https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.2/dist/svg-pan-zoom.min.js
     - javascripts/mermaid-zoom.js
