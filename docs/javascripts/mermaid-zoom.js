@@ -1,42 +1,30 @@
-function enableMermaidZoom() {
+document$.subscribe(function () {
     if (typeof svgPanZoom === "undefined") {
+        console.warn("svgPanZoom is not loaded");
         return;
     }
 
-    document.querySelectorAll(".mermaid svg").forEach(function (svg) {
-        if (svg.dataset.zoomEnabled === "true") {
+    document.querySelectorAll(".mermaid").forEach(function (container) {
+        const svg = container.querySelector("svg");
+
+        if (!svg || svg.dataset.panzoomInitialized) {
             return;
         }
 
-        svg.dataset.zoomEnabled = "true";
+        svg.dataset.panzoomInitialized = "true";
 
         svgPanZoom(svg, {
             zoomEnabled: true,
             panEnabled: true,
             controlIconsEnabled: true,
+            mouseWheelZoomEnabled: true,
 
             fit: true,
             center: true,
 
             minZoom: 0.5,
             maxZoom: 10,
-
-            zoomScaleSensitivity: 0.5,
-            mouseWheelZoomEnabled: true,
+            zoomScaleSensitivity: 0.5
         });
-    });
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-    enableMermaidZoom();
-
-    // Mermaid may render after the initial page load.
-    const observer = new MutationObserver(function () {
-        enableMermaidZoom();
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
     });
 });
