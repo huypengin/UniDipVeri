@@ -28,7 +28,12 @@ theme:
               name: Switch to light mode
 
 plugins:
-    - panzoom
+    - panzoom:
+          key: none
+          initial_zoom_level: 1.0
+          full_screen: true
+          always_show_hint: true
+
     - search
 
 markdown_extensions:
