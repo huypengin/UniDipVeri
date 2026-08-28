@@ -1,5 +1,6 @@
 site_name: Project Documentation
 site_description: Project requirements, analysis, design, UX, API, and testing documentation
+site_url: https://huypengin.github.io/UniDipVeri/
 
 theme:
     name: material
@@ -26,12 +27,9 @@ theme:
               icon: material/weather-night
               name: Switch to light mode
 
-extra_css:
-    - stylesheets/extra.css
-
-extra_javascript:
-    - https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.2/dist/svg-pan-zoom.min.js
-    - javascripts/mermaid-zoom.js
+plugins:
+    - panzoom
+    - search
 
 markdown_extensions:
     - admonition
