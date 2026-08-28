@@ -2,7 +2,7 @@
 
 **Version:** 2.1
 
-Supports `docs/01-requirements/SRS.md` (v2.1) Section 7. Reflects four cumulative architectural elements:
+Supports `docs/01-requirements/SRS.md` (v2.2) Section 7. Reflects four cumulative architectural elements:
 
 1. **Single tenant.** `UNIVERSITY` is a singleton table (one row, seeded at deployment). No cross-university foreign keys exist anywhere else in the model.
 2. **User management.** `UNIVERSITY_STAFF` tracks administrative staff accounts with explicit roles (`REGISTRAR | APPROVER | ADMIN`) and `status` (`ACTIVE | INACTIVE`) managed by Platform Administrators.
@@ -200,24 +200,25 @@ erDiagram
 
 Unchanged from v1 — the schema referenced by `CREDENTIAL_SCHEMA` (`MIUAcademicDiplomaCredential/v1`):
 
-```
-AcademicDiplomaCredential
-│
-├── issuer
-│   ├── id
-│   └── name
-│
-├── credentialSubject
-│   ├── id
-│   ├── name
-│   ├── studentNumber
-│   ├── degree
-│   ├── program
-│   ├── fieldOfStudy
-│   ├── degreeLevel
-│   └── awardDate
-│
-└── credentialStatus
+```mermaid
+flowchart TD
+    Root["AcademicDiplomaCredential"]
+
+    Root --> Issuer["issuer"]
+    Issuer --> IssuerId["id"]
+    Issuer --> IssuerName["name"]
+
+    Root --> Subject["credentialSubject"]
+    Subject --> SubId["id"]
+    Subject --> SubName["name"]
+    Subject --> SubStudentNumber["studentNumber"]
+    Subject --> SubDegree["degree"]
+    Subject --> SubProgram["program"]
+    Subject --> SubField["fieldOfStudy"]
+    Subject --> SubDegreeLevel["degreeLevel"]
+    Subject --> SubAwardDate["awardDate"]
+
+    Root --> Status["credentialStatus"]
 ```
 
 ```json

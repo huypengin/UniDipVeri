@@ -1,6 +1,6 @@
 # Software Requirements Specification — UniDipVeri
 
-**Version:** 2.1
+**Version:** 2.2
 
 **Project type:** Undergraduate thesis prototype
 
@@ -140,6 +140,19 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - Full academic transcript management (course-level records).
 - **Student-facing, holder-interactive OID4VP** (student's own wallet app, QR-scan/consent-tap flow) as the primary verification workflow — candidate future work. Note: walt.id's OID4VCI/OID4VP protocols are still used _internally_ by the system (see Architecture_Design.md §3a), driven entirely server-side against a server-managed wallet; what's out of scope here is exposing that protocol's interactive steps to the student or verifier.
 - Approval policies more complex than "N of M approvers" (e.g., role-weighted or sequential approval chains) — the MVP implements only N=1.
+- Integration with a specific production Student Information System (SIS). The MVP shall use the designated academic record source through the defined academic-record ingestion boundary; implementing a live integration with a specific university SIS is reserved for Future Work.
+
+### 3.3 Thesis Contribution Boundary
+
+The thesis contribution is the design and implementation of the UniDipVeri application layer and its associated user-facing workflows for academic credential issuance and verification. This contribution includes university staff and role management; server-managed student wallet orchestration; academic-record ingestion and graduation-eligibility evaluation; eligibility-gated and approval-gated credential issuance; credential lifecycle management including issuance, revocation, and reissuance; short-lived credential sharing; public credential verification; audit logging; and evaluation of the resulting workflow.
+
+The authoritative academic record source is an external dependency and is outside the implementation scope of this thesis. UniDipVeri assumes that academic records received from the designated source are authentic and correct at the point of import, as defined in AS-01. The system does not independently authenticate individual grades, courses, enrollment records, or other underlying academic claims.
+
+walt.id is an external VC infrastructure dependency. It provides the underlying wallet, credential issuance, cryptographic signing, and verification mechanisms used by UniDipVeri. UniDipVeri is responsible for orchestrating these capabilities through its own application interfaces and domain model; the thesis does not implement custom cryptographic primitives or replace walt.id's VC infrastructure.
+
+The MVP scope is intentionally limited to a single university and a server-managed, self-service verification workflow. Multi-university support, student-facing holder-interactive OID4VP, multi-step or sequential approval chains, batch academic-record processing, batch eligibility evaluation, batch approval, and integration with a specific production Student Information System (SIS) are outside the MVP scope and are reserved for Future Work.
+
+This boundary is frozen for the MVP. These exclusions are scope decisions rather than implementation deficiencies and shall not be treated as missing MVP requirements.
 
 ---
 
