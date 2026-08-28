@@ -52,3 +52,5 @@ nav:
     - Design:
           - Architecture Design: 03-design/Architecture_Design.md
           - Data Model: 03-design/Data_Model.md
+          - Class Diagram: 03-design/Class_Diagram.md
+          - Sequence Diagram: 03-design/Sequence_Diagram.md
