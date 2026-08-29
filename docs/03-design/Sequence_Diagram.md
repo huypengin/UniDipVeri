@@ -1,14 +1,14 @@
 # Sequence Diagrams — UniDipVeri
 
-**Version:** 1.0
+**Version:** 0.1.0
 
-Companion to `docs/01-requirements/SRS.md` (v2.2), `docs/01-requirements/Use_Cases.md`, `docs/02-analysis/DFD.md`, `docs/03-design/Architecture_Design.md` (v3.0), and `docs/03-design/Class_Diagram.md` (v3.0). Where the Activity Diagrams show control flow and decision points, these diagrams show **object interaction over time** — which layer calls which, in what order, and what each call returns — down to the Application Service, Repository Port, and Adapter names used in the class diagram. All diagrams are Mermaid `sequenceDiagram`s.
+Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/02-analysis/DFD.md`, `docs/03-design/Architecture_Design.md`, and `docs/03-design/Class_Diagram.md`. Where the Activity Diagrams show control flow and decision points, these diagrams show **object interaction over time** — which layer calls which, in what order, and what each call returns — down to the Application Service, Repository Port, and Adapter names used in the class diagram. All diagrams are Mermaid `sequenceDiagram`s.
 
 **Participant conventions used throughout:**
 
 - `actor` blocks are human/external actors (Registrar, Approver, Admin, Student, Verifier, Academic Record Source).
 - `Controller` participants are thin Presentation-layer classes (§6 of `Class_Diagram.md`).
-- Application Service participants (`StaffService`, `StudentWalletService`, `AcademicRecordService`, `EligibilityService`, `IssuanceRequestService`, `CredentialService`, `ShareService`, `VerificationService`, `AuditService`) match §4 of `Class_Diagram.md` v3.0.
+- Application Service participants (`StaffService`, `StudentWalletService`, `AcademicRecordService`, `EligibilityService`, `IssuanceRequestService`, `CredentialService`, `ShareService`, `VerificationService`, `AuditService`) match §4 of `Class_Diagram.md`.
 - Repository/Port participants (`IStaffRepository`, `IStudentRepository`, etc.) represent calls through the Application Port interface; the concrete `Postgres*Repository` implementation is what actually runs, per §5.
 - `WaltIdWalletAdapter` and `WaltIdVCAdapter` represent calls through `IWalletAdapter`/`IVCAdapter` to the `walt.id` infrastructure.
 - **`AuthService`** is a small cross-cutting Application Service (not shown as a bounded-area box in `Class_Diagram.md` §4, since it has no domain state of its own) that implements FR-AUTH-01–04 for both staff and student sessions. It is called by every controller's authorization check but is only drawn explicitly in Diagrams 1 and 2.

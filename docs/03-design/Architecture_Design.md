@@ -1,10 +1,8 @@
 # Architecture & Design
 
-**Version:** 3.0
+**Version:** 0.1.0
 
-This document contains architectural and design decisions supporting `docs/01-requirements/SRS.md` (v2.2). It specifies the technical organization of UniDipVeri using **Clean Architecture**: a small set of layers with dependencies pointing strictly inward, keeping the domain core free of framework, database, and external-API concerns.
-
-> **Change from v2.1:** The previous design layered a CQRS Command/Query split and per-feature Vertical Slices on top of Clean Architecture, dispatched through an in-memory Mediator. That structure has been removed. UniDipVeri now uses the minimum architecture that satisfies Clean Architecture's actual requirements — inward dependencies and a pure domain core — via a small set of **Application Services**, one per bounded area of the system. See §1.2 for the rationale.
+This document contains architectural and design decisions supporting `docs/01-requirements/SRS.md`. It specifies the technical organization of UniDipVeri using **Clean Architecture**: a small set of layers with dependencies pointing strictly inward, keeping the domain core free of framework, database, and external-API concerns.
 
 ---
 
@@ -61,15 +59,15 @@ flowchart TB
 - The **Infrastructure Layer** (PostgreSQL, `walt.id`, external source connectors) lives on the outside and implements the application ports.
 - The **Presentation Layer** contains thin controllers whose sole responsibility is mapping HTTP payloads to a method call on the relevant Application Service, and mapping the result back to an HTTP response.
 
-### 1.2 Why not CQRS / Vertical Slices / a Mediator?
+### 1.2 Design Rationale & Simplifications
 
-For a single-tenant prototype of this size, a full CQRS split (one Command/Query class plus one Handler class per operation, dispatched through an in-memory Mediator) and per-feature vertical-slice folders add indirection without a matching benefit: there is no separate read model, no event sourcing, and no need to scale reads and writes independently. UniDipVeri instead uses the **minimum viable form of Clean Architecture**:
+For a single-tenant prototype of this size, UniDipVeri uses the **minimum viable form of Clean Architecture**:
 
 - **One Application Service class per bounded area**, grouping its related operations as plain methods, instead of one Command/Query class and one Handler class per operation.
-- **Controllers call Application Services directly** via constructor/DI injection, instead of routing through an `IMediator`.
+- **Controllers call Application Services directly** via constructor/DI injection, instead of routing through an in-memory mediator.
 - Read-only operations (e.g. `listStudents`, `getEligibilityResult`) and state-changing operations (e.g. `approve`, `issue`) live on the same service, since they share the same repository ports and domain rules. The read/write distinction is documented per method (see §4) rather than enforced through parallel class hierarchies.
 
-This preserves the property that actually matters — **domain purity and dependency inversion** — while removing structure that wasn't earning its cost at this scale. Nothing about the domain model, ports, data model, or external endpoints changes as a result of this simplification; only the internal shape of the Application Layer does.
+This preserves the essential properties of Clean Architecture — **domain purity and dependency inversion** — while avoiding unnecessary indirection.
 
 ---
 
@@ -121,7 +119,7 @@ public interface IAcademicRecordSourceAdapter {
 }
 ```
 
-### 3a. walt.id Protocol Integration, Custody Model & Credential Status
+### 3a. walt.id Profile PreConfiguration, Protocol Integration, Custody Model & Credential Status
 
 `walt.id` provides issuance and verification via OID4VCI and OID4VP. In UniDipVeri, these protocols run **entirely server-side** without interactive holder prompts:
 

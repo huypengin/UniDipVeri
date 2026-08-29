@@ -1,6 +1,6 @@
 # Software Requirements Specification — UniDipVeri
 
-**Version:** 2.2
+**Version:** 0.1.0
 
 **Project type:** Undergraduate thesis prototype
 
@@ -84,7 +84,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 
 - **AS-01 — Source academic record trust:** Academic records received from the designated academic source system are assumed to be authentic and correct at the time of import. UniDipVeri does not independently verify the authenticity of individual grades, courses, or transcript entries. It verifies that a credential was issued by MIU and has not been revoked or altered, not that the underlying academic claim is true. Correctness of source data is the responsibility of the Registrar/University, not the system.
 - **AS-02 — Single tenant:** The system is built and deployed for exactly one university (MIU). It is not designed to support multiple issuing institutions in the MVP (see 3.2).
-- **AS-03 — VC Infrastructure Preconfiguration & Status Hosting:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. Because the walt.id Community Stack does not include a managed credential status list service, UniDipVeri manages credential status in its own database and hosts the W3C Bitstring Status List endpoint, passing status list references to walt.id during issuance.
+- **AS-03 — VC Infrastructure Preconfiguration & Status Hosting:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. UniDipVeri references these preconfigured profile IDs at runtime rather than creating or modifying cryptographic profiles dynamically through an in-app admin UI. Because the walt.id Community Stack does not include a managed credential status list service, UniDipVeri manages credential status in its own database and hosts the W3C Bitstring Status List endpoint, passing status list references to walt.id during issuance.
 - **AS-04 — Modern Browser Access:** Users access the system over a modern browser with JavaScript enabled.
 - **AS-05 — Eligibility rules:** Graduation eligibility rules configured for each academic program are assumed to accurately represent the university's graduation requirements.
 

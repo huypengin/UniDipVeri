@@ -1,8 +1,8 @@
 # User Stories
 
-**Version:** 2.1
+**Version:** 0.1.0
 
-Companion to `docs/01-requirements/SRS.md` (v2.2) and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
+Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
 ---
 

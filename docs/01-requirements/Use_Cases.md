@@ -1,8 +1,8 @@
 # Use Cases
 
-**Version:** 2.1
+**Version:** 0.1.0
 
-Companion to `docs/01-requirements/SRS.md` (v2.2). Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
+Companion to `docs/01-requirements/SRS.md`. Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
 
 ---
 

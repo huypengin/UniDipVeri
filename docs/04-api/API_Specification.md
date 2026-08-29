@@ -1,8 +1,8 @@
 # API Specification
 
-**Version:** 3.0
+**Version:** 0.1.0
 
-Implements the HTTP interface required by `docs/01-requirements/SRS.md` (v2.2) Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` (v3.0) and `docs/03-design/Class_Diagram.md` (v3.0). Single tenant: there is no `{universityId}` path segment anywhere.
+Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` and `docs/03-design/Class_Diagram.md`. Single tenant: there is no `{universityId}` path segment anywhere.
 
 ---
 

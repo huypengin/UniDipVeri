@@ -1,8 +1,8 @@
 # Data Model
 
-**Version:** 2.2
+**Version:** 0.1.0
 
-Supports `docs/01-requirements/SRS.md` (v2.2) Section 7. Reflects four cumulative architectural elements:
+Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
 1. **Single tenant.** `UNIVERSITY` is a singleton table (one row, seeded at deployment). No cross-university foreign keys exist anywhere else in the model.
 2. **User management.** `UNIVERSITY_STAFF` tracks administrative staff accounts with explicit roles (`REGISTRAR | APPROVER | ADMIN`) and `status` (`ACTIVE | INACTIVE`) managed by Platform Administrators.

@@ -1,16 +1,14 @@
 # Class Diagram
 
-**Version:** 3.0
+**Version:** 0.1.0
 
-Companion to `docs/01-requirements/SRS.md` (v2.2), `docs/03-design/Architecture_Design.md` (v3.0), `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
-
-> **Change from v2.1:** The CQRS Command/Query/Handler classes and the `IMediator` dispatch layer have been removed. Each bounded area of the system is now implemented as a single **Application Service** class with plain methods, called directly by controllers. The Domain Layer (§2) and the Infrastructure Layer (§5) are unchanged — only the Application Layer's internal shape (§4) and how controllers reach it (§6) are different. See `Architecture_Design.md` §1.2 for the rationale.
+Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
 ---
 
 ## 1. Architectural Strategy: Clean Architecture
 
-UniDipVeri structures its codebase into four layers with strict, inward-pointing dependencies and no unnecessary indirection (no separate read databases, no event sourcing, no CQRS split, no mediator, no per-feature slice folders):
+UniDipVeri structures its codebase into four layers with strict, inward-pointing dependencies and no unnecessary indirection:
 
 1. **Domain Layer (Core):** Pure enterprise entities, value objects, business rules, domain exceptions, and domain events. Has **zero dependencies** on application services, DTOs, databases, ORMs, or external APIs.
 2. **Application Layer (Services & Ports):** One **Application Service** per bounded area (Staff, Student & Wallet, Academic Records, Eligibility, Issuance Requests, Credentials, Sharing, Verification, Audit), each exposing the plain methods needed for that area's use cases, plus their DTOs. Application ports (repository interfaces and external-service interfaces) also reside here. Services orchestrate workflows by calling their own injected ports, or by calling another Application Service directly, with no intermediate dispatch mechanism.
@@ -49,7 +47,7 @@ flowchart TB
 
 ## 2. Domain Layer (Pure Enterprise Core)
 
-The domain core holds enterprise entities, business rules, domain events, and enumerations. It contains no DTOs, no repository interfaces, and no external references. **Unchanged from v2.1** — the simplification affects only the Application Layer above it.
+The domain core holds enterprise entities, business rules, domain events, and enumerations. It contains no DTOs, no repository interfaces, and no external references.
 
 ```mermaid
 classDiagram
@@ -345,7 +343,7 @@ classDiagram
 
 ## 3. Application Layer Ports (Abstract Interfaces)
 
-The Application Layer defines abstract repository interfaces and external service ports. Application Services depend solely on these ports; the Infrastructure layer provides concrete implementations. **Unchanged from v2.1.**
+The Application Layer defines abstract repository interfaces and external service ports. Application Services depend solely on these ports; the Infrastructure layer provides concrete implementations.
 
 ```mermaid
 classDiagram
@@ -561,7 +559,7 @@ Note on read vs. write: methods that only read state (`listStaff`, `getStudent`,
 
 ## 5. Infrastructure Layer (PostgreSQL & External Adapters)
 
-The infrastructure layer resides outside the core and implements all application repository and adapter ports. A single PostgreSQL database is used for persistence. **Unchanged from v2.1.**
+The infrastructure layer resides outside the core and implements all application repository and adapter ports. A single PostgreSQL database is used for persistence.
 
 ```mermaid
 classDiagram
@@ -697,7 +695,7 @@ classDiagram
 
 ## 6. Presentation Layer (Controllers to Application Services)
 
-Controllers are thin HTTP entry points that map web requests directly into calls on the relevant Application Service — no `IMediator` in between.
+Controllers are thin HTTP entry points that map web requests directly into calls on the relevant Application Service.
 
 ```mermaid
 classDiagram
@@ -780,15 +778,15 @@ classDiagram
 
 ---
 
-## 7. Architectural Comparison & Design Benefits
+## 7. Architectural Summary & Design Benefits
 
-| Architectural Dimension    | Traditional Layered Architecture                                                                    | Clean Architecture, simplified (UniDipVeri v3.0)                                                               |
+| Architectural Dimension    | Traditional Layered Architecture                                                                    | Clean Architecture (UniDipVeri)                                                                                |
 | :------------------------- | :-------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
 | **Domain Purity**          | Domain entities often contaminated with database attributes / ORM bindings                          | Domain core is completely independent, with zero dependencies on frameworks, DTOs, or services                 |
 | **Code Organization**      | Horizontal folders (`Controllers`, `Services`, `Repositories`)                                      | One Application Service class per bounded area (`StaffService`, `IssuanceRequestService`, `ShareService`, ...) |
 | **Coupling & Cohesion**    | High coupling across shared bloated services (e.g., one giant `CredentialService` doing everything) | Each service owns one bounded area; a change to share expiration only touches `ShareService`                   |
 | **Workflow Orchestration** | Hidden dependencies through excessive service-to-service calls                                      | Explicit, direct method calls between services and ports — visible in code, no dispatch table to trace         |
-| **Indirection**            | N/A                                                                                                 | No Command/Query classes, no Handler classes, no `IMediator` — the previous v2.1 CQRS/VSA layer is removed     |
+| **Indirection**            | N/A                                                                                                 | Direct method calls on Application Services without intermediate mediator layers                               |
 | **Lightweight Footprint**  | Complex event sourcing or multi-database read models                                                | A single PostgreSQL database with straightforward ports & adapters                                             |
 
-This is the **minimum structure that still satisfies Clean Architecture**: a pure domain core, dependency inversion at the Application/Infrastructure boundary, and a thin Presentation layer — without the additional CQRS/Mediator/Vertical-Slice machinery the v2.1 design carried.
+This architecture delivers a pure domain core, dependency inversion at the Application/Infrastructure boundary, and a thin Presentation layer.
