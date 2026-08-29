@@ -106,9 +106,9 @@ flowchart TD
 
 ```csharp
 public interface IVCAdapter {
-    Task<VCReferenceResult> IssueDiplomaVCAsync(string walletId, CredentialSubject subject);
+    Task<VCReferenceResult> IssueDiplomaVCAsync(string walletId, CredentialSubject subject, CredentialStatusDescriptor? statusDescriptor = null);
     Task<VerificationOutcome> VerifyDiplomaVCAsync(string vcReference);
-    Task<bool> RevokeDiplomaVCAsync(string vcReference, string reason);
+    Task<bool> UpdateStatusListAsync(string statusListId, int index, bool revoked);
 }
 
 public interface IWalletAdapter {
@@ -121,39 +121,44 @@ public interface IAcademicRecordSourceAdapter {
 }
 ```
 
-### 3a. walt.id Protocol Integration, Custody Model & Profile Configuration
+### 3a. walt.id Protocol Integration, Custody Model & Credential Status
 
 `walt.id` provides issuance and verification via OID4VCI and OID4VP. In UniDipVeri, these protocols run **entirely server-side** without interactive holder prompts:
 
 - **Deployment-Time Profile Preconfiguration (AS-03):** walt.id requires issuer profiles to be statically defined in `issuer2-profiles.conf` (e.g. `miuAcademicDiploma` declaring `credentialConfigurationId = "AcademicDiploma_jwt_vc_json"` and referencing MIU's issuer signing key / DID). These profiles act as issuance templates and are loaded when the walt.id service boots. UniDipVeri stores this identifier in `CREDENTIAL_SCHEMA.schema_uri` and passes it during issuance, eliminating any need for dynamic, runtime admin schema creation in walt.id.
 - **Custodial Server-Managed Wallets:** Students do not install wallet apps. The backend creates server-managed wallet identities via `IWalletAdapter` upon student ingestion.
-- **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` calls walt.id's issuance endpoint with the preconfigured `credentialConfigurationId` and dynamic subject claims, acting as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
-- **Server-Driven OID4VP (Verification):** In `VerificationService.verify(...)`, `WaltIdVCAdapter` triggers and completes the OID4VP presentation exchange internally against the server-managed wallet. Verifiers communicate strictly with UniDipVeri's `/api/public/shares/{token}/verify` endpoint, receiving clean JSON verification summaries.
+- **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` calls walt.id's issuance endpoint with the preconfigured `credentialConfigurationId`, dynamic subject claims, and `credentialStatus` runtime override, acting as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
+- **Self-Hosted Credential Status Lists (Revocation):** Because the walt.id Community Stack does not include a hosted status list service out-of-the-box, UniDipVeri manages revocation at two coordinated levels:
+    1. _Authoritative Application State:_ `CredentialService.revoke(...)` updates `CREDENTIAL.status = REVOKED`, `revoked_at`, and `revocation_reason` in PostgreSQL.
+    2. _W3C Bitstring Status List Hosting:_ UniDipVeri serves the W3C Bitstring Status List at `GET /api/status/{listId}`. During issuance, `WaltIdVCAdapter` injects a `BitstringStatusListEntry` (with index and URI) via walt.id's `runtimeOverrides.credentialStatus`. Upon revocation, the adapter flips the bit at the credential's allocated index.
+- **Application-Orchestrated Reissuance Lineage:** Reissuance is not an external cryptographic primitive, but a domain lifecycle workflow. `CredentialService.reissue(...)` initiates a new `CREDENTIAL_ISSUANCE_REQUEST` that references `supersedes_credential_id`. Once the new request passes the approval threshold, a fresh Verifiable Credential is issued via walt.id, and PostgreSQL records the lineage in `CREDENTIAL.supersedes_id`.
+- **Server-Driven OID4VP (Verification):** In `VerificationService.verify(...)`, `WaltIdVCAdapter` triggers and completes the OID4VP presentation exchange internally against the server-managed wallet. `VerificationService` evaluates both cryptographic validity (signature + status list) and internal database state. Verifiers communicate strictly with UniDipVeri's `/api/public/shares/{token}/verify` endpoint, receiving clean JSON verification summaries.
 
 ---
 
 ## 4. Application Services & Infrastructure Mapping
 
-| HTTP Endpoint                                                           | Application Service      | Method                            | Infrastructure Adapter                                                             |
-| :---------------------------------------------------------------------- | :----------------------- | :-------------------------------- | :--------------------------------------------------------------------------------- |
-| `POST /api/staff`                                                       | `StaffService`           | `createStaff`                     | `PostgresStaffRepository`, `BcryptPasswordHasher`                                  |
-| `PATCH /api/staff/{id}`                                                 | `StaffService`           | `updateStaff` / `deactivateStaff` | `PostgresStaffRepository`                                                          |
-| `GET /api/staff`                                                        | `StaffService`           | `listStaff`                       | `PostgresStaffRepository`                                                          |
-| `POST /api/academic-records/import`                                     | `AcademicRecordService`  | `importRecord`                    | `PostgresStudentRepository`, `PostgresAcademicRecordRepository`                    |
-| `GET /api/students`, `GET /api/students/{id}`                           | `StudentWalletService`   | `listStudents` / `getStudent`     | `PostgresStudentRepository`                                                        |
-| `POST /api/students/{id}/wallet/provision`                              | `StudentWalletService`   | `provisionWallet`                 | `WaltIdWalletAdapter`, `PostgresStudentRepository`                                 |
-| `POST /api/students/{id}/eligibility/evaluate`                          | `EligibilityService`     | `evaluate`                        | `PostgresEligibilityRepository`                                                    |
-| `POST /api/credential-requests`                                         | `IssuanceRequestService` | `createRequest`                   | `PostgresCredentialRequestRepository`                                              |
-| `GET /api/credential-requests/pending`                                  | `IssuanceRequestService` | `listPending`                     | `PostgresCredentialRequestRepository`                                              |
-| `POST /api/credential-requests/{id}/approve`                            | `IssuanceRequestService` | `approve`                         | `PostgresCredentialRequestRepository`, `PostgresApprovalPolicyRepository`          |
-| `POST /api/credential-requests/{id}/reject`                             | `IssuanceRequestService` | `reject`                          | `PostgresCredentialRequestRepository`                                              |
-| `Internal Issuance Trigger` (called by `approve` once threshold is met) | `CredentialService`      | `issue`                           | `WaltIdVCAdapter`, `PostgresCredentialRepository`                                  |
-| `POST /api/credentials/{id}/revoke`                                     | `CredentialService`      | `revoke`                          | `WaltIdVCAdapter`, `PostgresCredentialRepository`                                  |
-| `POST /api/credentials/{id}/reissue`                                    | `CredentialService`      | `reissue`                         | `PostgresCredentialRepository` (delegates re-approval to `IssuanceRequestService`) |
-| `POST /api/credentials/{id}/shares`                                     | `ShareService`           | `createShare`                     | `PostgresShareRepository`, `CryptoTokenGenerator`                                  |
-| `POST /api/shares/{id}/revoke`                                          | `ShareService`           | `revokeShare`                     | `PostgresShareRepository`                                                          |
-| `POST /api/public/shares/{token}/verify`                                | `VerificationService`    | `verify`                          | `WaltIdVCAdapter`, `PostgresVerificationEventRepository`                           |
-| `GET /api/audit`                                                        | `AuditService`           | `getAuditHistory`                 | `PostgresAuditRepository`                                                          |
+| HTTP Endpoint                                                           | Application Service      | Method                            | Infrastructure Adapter                                                                         |
+| :---------------------------------------------------------------------- | :----------------------- | :-------------------------------- | :--------------------------------------------------------------------------------------------- |
+| `POST /api/staff`                                                       | `StaffService`           | `createStaff`                     | `PostgresStaffRepository`, `BcryptPasswordHasher`                                              |
+| `PATCH /api/staff/{id}`                                                 | `StaffService`           | `updateStaff` / `deactivateStaff` | `PostgresStaffRepository`                                                                      |
+| `GET /api/staff`                                                        | `StaffService`           | `listStaff`                       | `PostgresStaffRepository`                                                                      |
+| `POST /api/academic-records/import`                                     | `AcademicRecordService`  | `importRecord`                    | `PostgresStudentRepository`, `PostgresAcademicRecordRepository`                                |
+| `GET /api/students`, `GET /api/students/{id}`                           | `StudentWalletService`   | `listStudents` / `getStudent`     | `PostgresStudentRepository`                                                                    |
+| `POST /api/students/{id}/wallet/provision`                              | `StudentWalletService`   | `provisionWallet`                 | `WaltIdWalletAdapter`, `PostgresStudentRepository`                                             |
+| `POST /api/students/{id}/eligibility/evaluate`                          | `EligibilityService`     | `evaluate`                        | `PostgresEligibilityRepository`                                                                |
+| `POST /api/credential-requests`                                         | `IssuanceRequestService` | `createRequest`                   | `PostgresCredentialRequestRepository`                                                          |
+| `GET /api/credential-requests/pending`                                  | `IssuanceRequestService` | `listPending`                     | `PostgresCredentialRequestRepository`                                                          |
+| `POST /api/credential-requests/{id}/approve`                            | `IssuanceRequestService` | `approve`                         | `PostgresCredentialRequestRepository`, `PostgresApprovalPolicyRepository`                      |
+| `POST /api/credential-requests/{id}/reject`                             | `IssuanceRequestService` | `reject`                          | `PostgresCredentialRequestRepository`                                                          |
+| `Internal Issuance Trigger` (called by `approve` once threshold is met) | `CredentialService`      | `issue`                           | `WaltIdVCAdapter`, `PostgresCredentialRepository`                                              |
+| `POST /api/credentials/{id}/revoke`                                     | `CredentialService`      | `revoke`                          | `WaltIdVCAdapter` (updates status list), `PostgresCredentialRepository` (marks `REVOKED`)      |
+| `POST /api/credentials/{id}/reissue`                                    | `CredentialService`      | `reissue`                         | `PostgresCredentialRepository` (creates new request with lineage via `IssuanceRequestService`) |
+| `POST /api/credentials/{id}/shares`                                     | `ShareService`           | `createShare`                     | `PostgresShareRepository`, `CryptoTokenGenerator`                                              |
+| `POST /api/shares/{id}/revoke`                                          | `ShareService`           | `revokeShare`                     | `PostgresShareRepository`                                                                      |
+| `POST /api/public/shares/{token}/verify`                                | `VerificationService`    | `verify`                          | `WaltIdVCAdapter`, `PostgresVerificationEventRepository`                                       |
+| `GET /api/status/{listId}`                                              | `CredentialService`      | `getStatusList`                   | `PostgresCredentialRepository` (serves W3C Bitstring Status List)                              |
+| `GET /api/audit`                                                        | `AuditService`           | `getAuditHistory`                 | `PostgresAuditRepository`                                                                      |
 
 `IssuanceRequestService.approve(...)` calls `CredentialService.issue(...)` directly once the approval threshold is met — a plain method call across two Application Services, not an event or a mediator dispatch.
 

@@ -30,8 +30,9 @@ All endpoints are implemented as thin HTTP controllers delegating directly to do
 | `POST /api/credential-requests/{id}/reject`    | `IssuanceRequestService` | `reject`          | Updates `CREDENTIAL_ISSUANCE_REQUEST.status = REJECTED`                        |
 | `GET /api/credentials`                         | `CredentialService`      | `listCredentials` | None (Read-only)                                                               |
 | `GET /api/credentials/{id}`                    | `CredentialService`      | `getDetails`      | None (Read-only)                                                               |
-| `POST /api/credentials/{id}/revoke`            | `CredentialService`      | `revoke`          | Calls `IVCAdapter`, sets `CREDENTIAL.status = REVOKED`                         |
+| `POST /api/credentials/{id}/revoke`            | `CredentialService`      | `revoke`          | Updates status list & sets `CREDENTIAL.status = REVOKED`                       |
 | `POST /api/credentials/{id}/reissue`           | `CredentialService`      | `reissue`         | Creates superseding `CREDENTIAL_ISSUANCE_REQUEST`                              |
+| `GET /api/status/{listId}`                     | `CredentialService`      | `getStatusList`   | None (Serves public W3C Bitstring Status List)                                 |
 | `POST /api/credentials/{id}/shares`            | `ShareService`           | `createShare`     | Persists `SHARE` with hashed opaque token                                      |
 | `GET /api/credentials/{id}/shares`             | `ShareService`           | `listShares`      | None (Read-only)                                                               |
 | `POST /api/shares/{id}/revoke`                 | `ShareService`           | `revokeShare`     | Sets `SHARE.revoked_at`                                                        |
@@ -323,7 +324,7 @@ POST /api/credential-requests/{requestId}/approve
 }
 ```
 
-When `approvalsReceived` reaches `requiredApprovals` (1 in the MVP), the service automatically calls `CredentialService.issue()`, invoking `IVCAdapter.issueDiplomaVC()` into the student's server-managed wallet (Section 10), and the request's terminal state becomes `ISSUED`.
+When `approvalsReceived` reaches `requiredApprovals` (1 in the MVP), the service automatically calls `CredentialService.issue()`, invoking `IVCAdapter.issueDiplomaVC()` with status list metadata into the student's server-managed wallet (Section 10), and the request's terminal state becomes `ISSUED`.
 
 **Reject (`IssuanceRequestService.reject`):**
 
@@ -342,10 +343,10 @@ Issuance is internal, triggered automatically when a request satisfies the appro
 
 ```
 1. Request fully approved (implies passing eligibility evaluation and active wallet)
-2. Load schema configuration
+2. Load preconfigured schema configuration & status list index
 3. Build credential subject
-4. Call walt.id Issuer (via IVCAdapter) targeting student's wallet_id
-5. Store credential metadata in PostgreSQL
+4. Call walt.id Issuer (via IVCAdapter) targeting student's wallet_id with credentialStatus runtime override
+5. Store credential metadata and vc_reference in PostgreSQL
 6. Mark request ISSUED, credential status VALID
 ```
 
@@ -364,6 +365,8 @@ POST /api/credentials/{credentialId}/revoke
   "reason": "Incorrect graduate information"
 }
 ```
+
+This updates `CREDENTIAL.status = REVOKED` and `revocation_reason` in PostgreSQL and marks the credential's entry in the self-hosted W3C Bitstring Status List as revoked.
 
 **Reissue (`CredentialService.reissue`):** creates a new `CredentialIssuanceRequest` linked via `supersedesCredentialId`. It is re-evaluated for eligibility and re-enters the full approval workflow:
 
@@ -470,7 +473,38 @@ Response:
 
 ---
 
-## 14. Audit
+## 14. Public Credential Status List
+
+Publicly accessible endpoint serving the W3C Bitstring Status List for cryptographic credential status checks (consumed by external verifiers and walt.id):
+
+```
+GET /api/status/{listId}
+```
+
+Response:
+
+```json
+{
+    "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://w3id.org/vc/status-list/2021/v1"
+    ],
+    "id": "https://verify.miu.example/api/status/1",
+    "type": ["VerifiableCredential", "StatusList2021Credential"],
+    "issuer": "did:jwk:...",
+    "issuanceDate": "2026-08-20T00:00:00Z",
+    "credentialSubject": {
+        "id": "https://verify.miu.example/api/status/1#list",
+        "type": "StatusList2021",
+        "statusPurpose": "revocation",
+        "encodedList": "H4sIC..."
+    }
+}
+```
+
+---
+
+## 15. Audit
 
 Registrar/Approver/Admin (`AuditService.getAuditHistory`):
 

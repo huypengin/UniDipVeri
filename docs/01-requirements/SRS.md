@@ -84,7 +84,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 
 - **AS-01 — Source academic record trust:** Academic records received from the designated academic source system are assumed to be authentic and correct at the time of import. UniDipVeri does not independently verify the authenticity of individual grades, courses, or transcript entries. It verifies that a credential was issued by MIU and has not been revoked or altered, not that the underlying academic claim is true. Correctness of source data is the responsibility of the Registrar/University, not the system.
 - **AS-02 — Single tenant:** The system is built and deployed for exactly one university (MIU). It is not designed to support multiple issuing institutions in the MVP (see 3.2).
-- **AS-03 — VC Infrastructure Preconfiguration:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. UniDipVeri references these preconfigured profile IDs at runtime rather than creating or modifying cryptographic profiles dynamically through an in-app admin UI.
+- **AS-03 — VC Infrastructure Preconfiguration & Status Hosting:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. Because the walt.id Community Stack does not include a managed credential status list service, UniDipVeri manages credential status in its own database and hosts the W3C Bitstring Status List endpoint, passing status list references to walt.id during issuance.
 - **AS-04 — Modern Browser Access:** Users access the system over a modern browser with JavaScript enabled.
 - **AS-05 — Eligibility rules:** Graduation eligibility rules configured for each academic program are assumed to accurately represent the university's graduation requirements.
 
@@ -149,7 +149,7 @@ The thesis contribution is the design and implementation of the UniDipVeri appli
 
 The authoritative academic record source is an external dependency and is outside the implementation scope of this thesis. UniDipVeri assumes that academic records received from the designated source are authentic and correct at the point of import, as defined in AS-01. The system does not independently authenticate individual grades, courses, enrollment records, or other underlying academic claims.
 
-walt.id is an external VC infrastructure dependency. It provides the underlying wallet, credential issuance, cryptographic signing, and verification mechanisms used by UniDipVeri. UniDipVeri is responsible for orchestrating these capabilities through its own application interfaces and domain model; the thesis does not implement custom cryptographic primitives or replace walt.id's VC infrastructure.
+walt.id is an external VC infrastructure dependency. It provides the underlying wallet, credential issuance, cryptographic signing, and verification mechanisms used by UniDipVeri. UniDipVeri is responsible for orchestrating these capabilities through its own application interfaces and domain model; the thesis does not implement custom cryptographic primitives or replace walt.id's VC infrastructure. Because walt.id Community Stack does not include a hosted revocation list service out of the box, UniDipVeri manages credential revocation status in its domain store and hosts the W3C status list endpoint consumed by verifiers.
 
 The MVP scope is intentionally limited to a single university and a server-managed, self-service verification workflow. Multi-university support, student-facing holder-interactive OID4VP, multi-step or sequential approval chains, batch academic-record processing, batch eligibility evaluation, batch approval, and integration with a specific production Student Information System (SIS) are outside the MVP scope and are reserved for Future Work.
 
@@ -231,13 +231,13 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.9 Credential Revocation
 
 - **FR-CRED-09** Authorized Registrar users shall be able to revoke a credential.
-- **FR-CRED-10** A revoked credential shall no longer be presented as valid by any verification.
+- **FR-CRED-10** A revoked credential shall immediately be recorded as `REVOKED` in the application store and marked revoked in the self-hosted status list, and shall no longer be presented as valid by any verification.
 - **FR-CRED-11** The system shall record: revocation timestamp, revoking user, revocation reason.
 
 ### 4.10 Credential Reissuance
 
-- **FR-CRED-12** The system shall support issuing a corrected credential after revocation, subject to the same approval workflow as a new issuance (4.6).
-- **FR-CRED-13** The new credential shall reference the credential it supersedes.
+- **FR-CRED-12** The system shall support issuing a corrected credential after revocation via an application-managed lifecycle workflow, subject to the same approval workflow as a new issuance (4.6).
+- **FR-CRED-13** The new credential shall be issued as a distinct Verifiable Credential and shall explicitly reference the superseded credential in the application domain.
 
 ### 4.11 Credential Sharing
 
@@ -256,7 +256,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-VER-03** The system shall retrieve the credential associated with a valid share.
 - **FR-VER-04** The system shall perform VC verification through the VC infrastructure.
 - **FR-VER-05** The system shall verify the credential's issuer.
-- **FR-VER-06** The system shall verify credential status.
+- **FR-VER-06** The system shall verify credential status (both cryptographic status list integrity and application revocation state).
 - **FR-VER-07** The system shall return one of the following results in a human-readable form: `VERIFIED`, `REVOKED`, `EXPIRED_SHARE`, `INVALID_CREDENTIAL`, `UNKNOWN_ISSUER`, `VERIFICATION_ERROR`.
 - **FR-VER-08** The public verification result shall present a plain-language summary, not the raw VC, as the default UI.
 

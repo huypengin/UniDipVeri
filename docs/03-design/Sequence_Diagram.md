@@ -497,15 +497,15 @@ sequenceDiagram
     participant CS as CredentialService
     participant CRepo as ICredentialRepository
     participant VC as WaltIdVCAdapter
-    participant Walt as walt.id Issuer / Status Registry
+    participant DB as Postgres (Status List Store)
 
     Reg->>CC: POST /api/credentials/{id}/revoke {reason}
     CC->>CS: revoke(credentialId, reason, staffId)
     CS->>CRepo: findById(credentialId)
     CRepo-->>CS: Credential(VALID)
     CS->>VC: revokeDiplomaVC(vc_reference, reason)
-    VC->>Walt: update credential status
-    Walt-->>VC: acknowledged
+    VC->>DB: toggle bit in W3C Bitstring Status List (self-hosted)
+    DB-->>VC: acknowledged
     VC-->>CS: success
     CS->>CRepo: update status = REVOKED, revoked_at, revocation_reason, actor
     CS->>CS: log revocation audit event (FR-AUD-03)
