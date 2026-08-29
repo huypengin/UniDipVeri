@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UniDipVeri.Application/UniDipVeri.Application.csproj" />
+    <Project Path="src/UniDipVeri.Domain/UniDipVeri.Domain.csproj" />
+    <Project Path="src/UniDipVeri.Infrastructure/UniDipVeri.Infrastructure.csproj" />
+    <Project Path="src/UniDipVeri.WebApi/UniDipVeri.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/UniDipVeri.UnitTests/UniDipVeri.UnitTests.csproj" />
+  </Folder>
+</Solution>

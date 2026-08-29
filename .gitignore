@@ -8,3 +8,41 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+# .NET Build artifacts
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# User-specific files & Visual Studio / Rider
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Documentation / Python artifacts
+site/
+__pycache__/
+*.pyc
+.venv/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
