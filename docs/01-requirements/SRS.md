@@ -84,8 +84,8 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 
 - **AS-01 — Source academic record trust:** Academic records received from the designated academic source system are assumed to be authentic and correct at the time of import. UniDipVeri does not independently verify the authenticity of individual grades, courses, or transcript entries. It verifies that a credential was issued by MIU and has not been revoked or altered, not that the underlying academic claim is true. Correctness of source data is the responsibility of the Registrar/University, not the system.
 - **AS-02 — Single tenant:** The system is built and deployed for exactly one university (MIU). It is not designed to support multiple issuing institutions in the MVP (see 3.2).
-- **AS-03** — walt.id's issuer, wallet, and verifier services are available and correctly configured with MIU's issuer identity/keys before any issuance, wallet provisioning, or verification can occur.
-- **AS-04** — Users access the system over a modern browser with JavaScript enabled.
+- **AS-03 — VC Infrastructure Preconfiguration:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. UniDipVeri references these preconfigured profile IDs at runtime rather than creating or modifying cryptographic profiles dynamically through an in-app admin UI.
+- **AS-04 — Modern Browser Access:** Users access the system over a modern browser with JavaScript enabled.
 - **AS-05 — Eligibility rules:** Graduation eligibility rules configured for each academic program are assumed to accurately represent the university's graduation requirements.
 
 ### 2.6 Constraints
@@ -128,6 +128,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - Batch/bulk academic record import (multi-record upload, CSV/file-based ingestion). The MVP import path (FR-STU-01) handles one record per call; batching is an efficiency concern for large graduating cohorts, not a functional gap.
 - Batch eligibility evaluation across a cohort in a single operation.
 - Batch/bulk approval of multiple issuance requests in a single action.
+- Dynamic in-app walt.id profile/schema administration (e.g., runtime UI for editing `issuer2-profiles.conf` or uploading signing keys). The credential profile is preconfigured at deployment time (see AS-03).
 - Blockchain of any kind.
 - Custom cryptographic algorithms.
 - Custom client-side wallet apps installed on student mobile devices.
@@ -216,7 +217,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.7 Credential Issuance
 
 - **FR-CRED-01** Upon meeting the approval policy, the system shall issue an academic diploma credential for the associated student.
-- **FR-CRED-02** The system shall generate the credential using the configured academic credential schema (see Data_Model.md).
+- **FR-CRED-02** The system shall generate the credential referencing the preconfigured academic credential schema/profile (see Data_Model.md).
 - **FR-CRED-03** The system shall use walt.id as the VC infrastructure for credential issuance into the student's server-managed wallet (see Architecture_Design.md).
 - **FR-CRED-04** The application shall maintain its own credential identifier independent of the walt.id credential identifier.
 - **FR-CRED-05** A successfully issued credential shall have status `VALID`.

@@ -121,12 +121,13 @@ public interface IAcademicRecordSourceAdapter {
 }
 ```
 
-### 3a. walt.id Protocol Integration & Custody Model
+### 3a. walt.id Protocol Integration, Custody Model & Profile Configuration
 
 `walt.id` provides issuance and verification via OID4VCI and OID4VP. In UniDipVeri, these protocols run **entirely server-side** without interactive holder prompts:
 
+- **Deployment-Time Profile Preconfiguration (AS-03):** walt.id requires issuer profiles to be statically defined in `issuer2-profiles.conf` (e.g. `miuAcademicDiploma` declaring `credentialConfigurationId = "AcademicDiploma_jwt_vc_json"` and referencing MIU's issuer signing key / DID). These profiles act as issuance templates and are loaded when the walt.id service boots. UniDipVeri stores this identifier in `CREDENTIAL_SCHEMA.schema_uri` and passes it during issuance, eliminating any need for dynamic, runtime admin schema creation in walt.id.
 - **Custodial Server-Managed Wallets:** Students do not install wallet apps. The backend creates server-managed wallet identities via `IWalletAdapter` upon student ingestion.
-- **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` acts as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
+- **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` calls walt.id's issuance endpoint with the preconfigured `credentialConfigurationId` and dynamic subject claims, acting as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
 - **Server-Driven OID4VP (Verification):** In `VerificationService.verify(...)`, `WaltIdVCAdapter` triggers and completes the OID4VP presentation exchange internally against the server-managed wallet. Verifiers communicate strictly with UniDipVeri's `/api/public/shares/{token}/verify` endpoint, receiving clean JSON verification summaries.
 
 ---
