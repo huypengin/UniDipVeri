@@ -1,8 +1,7 @@
 # UI/UX Design Specification
 
-**UniDipVeri — University Diploma Verification System**  
-**Document Version:** 0.1.0  
-**Status:** Approved  
+**Version:** 0.1.0
+
 **Companion Documents:** `docs/01-requirements/SRS.md` · `docs/01-requirements/Use_Cases.md` · `docs/01-requirements/User_Stories.md` · `docs/04-api/API_Specification.md`
 
 ---
