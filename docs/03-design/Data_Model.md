@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
@@ -67,7 +67,6 @@ erDiagram
         uuid university_id FK
         string name
         string degree_level
-        string field_of_study
         string status
     }
 
@@ -192,6 +191,7 @@ erDiagram
 - **`UNIVERSITY_STAFF` management:** Platform Administrators manage staff rows. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
 - **`STUDENT` and `ACADEMIC_RECORD` are import-only tables.** There is no Registrar-facing manual "create student" write path (see `API_Specification.md` Section 4) — every row traces back to a `source_record_ref` from the Academic Record Source, making AS-01 ("source data trusted as correct") an enforceable data-layer boundary. `ACADEMIC_RECORD` keeps `source_snapshot_at` separate from `imported_at` so the model distinguishes "when the source system asserted this was true" from "when UniDipVeri received it."
 - **Student Wallet lifecycle:** Each `STUDENT` carries `wallet_id` and `wallet_status` (`PENDING | ACTIVE | FAILED`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. Credential issuance requires `wallet_status = ACTIVE`.
+- **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a *share link* stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.
 - **`CREDENTIAL_SCHEMA` and walt.id Profile Binding:** `CREDENTIAL_SCHEMA.schema_uri` holds the identifier of the preconfigured profile defined in walt.id's `issuer2-profiles.conf` (e.g. `AcademicDiploma_jwt_vc_json`). UniDipVeri does not generate or push cryptographic schemas into walt.id dynamically at runtime; it passes this preconfigured identifier during the OID4VCI issuance call (`WaltIdVCAdapter`).
 - **`ELIGIBILITY_RULE_SET` is versioned per program**, and `ELIGIBILITY_EVALUATION` stores a foreign key to the specific version it ran against (not just to `PROGRAM`). This directly implements FR-ELIG-10: editing a program's rules later does not retroactively change what an old evaluation (or a credential issued off it) meant.
 - **`CREDENTIAL_ISSUANCE_REQUEST.eligibility_evaluation_id` is a hard link, not just an audit trail entry.** The application layer must reject request creation (`API_Specification.md` Section 6) unless this links to an evaluation whose `result = ELIGIBLE`.
@@ -215,7 +215,6 @@ flowchart TD
     Subject --> SubStudentNumber["studentNumber"]
     Subject --> SubDegree["degree"]
     Subject --> SubProgram["program"]
-    Subject --> SubField["fieldOfStudy"]
     Subject --> SubDegreeLevel["degreeLevel"]
     Subject --> SubAwardDate["awardDate"]
 
@@ -232,7 +231,6 @@ flowchart TD
         "studentNumber": "MIU2026-001",
         "degree": "Bachelor of Computer Science",
         "program": "Computer Science",
-        "fieldOfStudy": "Computer Science",
         "degreeLevel": "Bachelor",
         "awardDate": "2026-06-15"
     }

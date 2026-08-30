@@ -1,6 +1,6 @@
 # Software Requirements Specification — UniDipVeri
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Project type:** Undergraduate thesis prototype
 
@@ -87,6 +87,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - **AS-03 — VC Infrastructure Preconfiguration & Status Hosting:** walt.id services (Issuer, Wallet, Verifier) are deployed and statically preconfigured by the developer/DevOps before the system starts. This includes loading the issuer profile in walt.id's `issuer2-profiles.conf` (e.g., `AcademicDiploma_jwt_vc_json`), registering MIU's issuer signing key material (JWK/DID), and configuring issuer metadata. UniDipVeri references these preconfigured profile IDs at runtime rather than creating or modifying cryptographic profiles dynamically through an in-app admin UI. Because the walt.id Community Stack does not include a managed credential status list service, UniDipVeri manages credential status in its own database and hosts the W3C Bitstring Status List endpoint, passing status list references to walt.id during issuance.
 - **AS-04 — Modern Browser Access:** Users access the system over a modern browser with JavaScript enabled.
 - **AS-05 — Eligibility rules:** Graduation eligibility rules configured for each academic program are assumed to accurately represent the university's graduation requirements.
+- **AS-06 — Credentials do not expire:** An issued academic diploma credential (`Credential`) has no validity window or expiration date of its own; once issued, it remains `VALID` indefinitely unless explicitly revoked via `CredentialService.revoke()` (FR-CRED-09–11). This reflects the real-world nature of an academic diploma, which does not lapse over time the way a certification or license might. Expiration in this system applies only to **share links** (`Share.expires_at`, FR-SHARE-04–05, `EXPIRED_SHARE` result) — never to the credential itself. A future extension requiring time-bound credentials (e.g., provisional or conditional diplomas) would need a new `Credential.expires_at` field and a corresponding `EXPIRED` status, which is explicitly out of scope for the MVP.
 
 ### 2.6 Constraints
 
@@ -176,7 +177,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.3 Program Management
 
 - **FR-PROG-01** Registrar users shall be able to create academic programs.
-- **FR-PROG-02** A program shall contain: name, degree level, field of study.
+- **FR-PROG-02** A program shall contain: name, degree level.
 - **FR-PROG-03** A program shall have associated graduation eligibility rules.
 - **FR-PROG-04** Registrar users shall be able to configure the graduation eligibility rules for a program.
 
@@ -226,7 +227,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.8 Credential Viewing
 
 - **FR-CRED-07** Students shall be able to view their issued credentials.
-- **FR-CRED-08** Credential details shall include: graduate name, degree, program, field of study, university, award date, and credential status.
+- **FR-CRED-08** Credential details shall include: graduate name, degree, program, university, award date, and credential status.
 
 ### 4.9 Credential Revocation
 
@@ -252,13 +253,14 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.12 Public Verification
 
 - **FR-VER-01** The system shall allow an unauthenticated verifier to access a valid share URL.
-- **FR-VER-02** The system shall determine whether the referenced share is valid, expired, or revoked.
+- **FR-VER-02** The system shall determine whether the referenced share exists, is valid, expired, or revoked.
 - **FR-VER-03** The system shall retrieve the credential associated with a valid share.
 - **FR-VER-04** The system shall perform VC verification through the VC infrastructure.
 - **FR-VER-05** The system shall verify the credential's issuer.
 - **FR-VER-06** The system shall verify credential status (both cryptographic status list integrity and application revocation state).
-- **FR-VER-07** The system shall return one of the following results in a human-readable form: `VERIFIED`, `REVOKED`, `EXPIRED_SHARE`, `INVALID_CREDENTIAL`, `UNKNOWN_ISSUER`, `VERIFICATION_ERROR`.
+- **FR-VER-07** The system shall return one of the following results in a human-readable form: `VERIFIED`, `REVOKED`, `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, `REVOKED_SHARE`, `INVALID_CREDENTIAL`, `UNKNOWN_ISSUER`, `VERIFICATION_ERROR`.
 - **FR-VER-08** The public verification result shall present a plain-language summary, not the raw VC, as the default UI.
+- **FR-VER-09** The system shall not persist a `VERIFICATION_EVENT` for an attempt against a share that is missing/not found, expired, or revoked (`NOT_FOUND_SHARE`, `EXPIRED_SHARE`, `REVOKED_SHARE`), since no resolvable share or credential exists to attribute the event to and such attempts are frequently automated (dead links, bot crawls, stale bookmarks). A `VERIFICATION_EVENT` shall be persisted for every other outcome (`VERIFIED`, `REVOKED`, `UNKNOWN_ISSUER`, `INVALID_CREDENTIAL`, `VERIFICATION_ERROR`), since each of those resolves to a real share/credential worth tracking.
 
 ### 4.13 Audit Logging
 
@@ -267,6 +269,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-AUD-03** The system shall record credential revocation events.
 - **FR-AUD-04** The system shall record share creation and revocation.
 - **FR-AUD-05** The system shall record verification attempts.
+- **FR-AUD-05a** The student-facing verification history shall group verification events by share, presenting one entry per share with its most recent result, a total attempt count, and the most recent verification timestamp — rather than one row per raw event. (See FR-VER-09 for which outcomes are recorded at all.)
 - **FR-AUD-06** All audit records shall include timestamps and the acting user (or "anonymous" for verifier events).
 - **FR-AUD-07** The system shall record academic record import events.
 - **FR-AUD-08** The system shall record eligibility evaluation events, including the student, evaluated program/rule set, result, and timestamp.
@@ -323,6 +326,9 @@ Every credential issuance shall be traceable to the academic record evaluation, 
 **NFR-07 — Data trust and verification boundary**
 The system shall distinguish among (1) academic records trusted as authentic when received from the designated academic source, (2) graduation eligibility determined by applying configured business rules to those records, and (3) cryptographic credential authenticity and status guaranteed through VC verification. The verification result shall not imply that UniDipVeri independently authenticated the underlying academic records.
 
+**NFR-08 — Verification event noise control**
+Raw verification attempts shall be logged in full for audit completeness (FR-AUD-05), but the student-facing verification history (`GET /api/me/verification-events`) shall present a deduplicated, human-readable summary rather than a raw event-by-event log, so that repeated automated checks (e.g. link-preview bots, page refreshes, retries) do not obscure genuine verification activity. The registrar/system-wide audit view (UC-17) is unaffected and continues to reflect the raw event trail.
+
 ---
 
 ## 7. Data Requirements
@@ -342,7 +348,7 @@ The entity model (University, UniversityStaff, Program, Student, AcademicRecord,
 - **AC-07 — Share.** Given an active credential, when the student creates a share, then the system generates an opaque public URL with an expiration time.
 - **AC-08 — Verification.** Given an active share, when an unauthenticated verifier opens it, then the system verifies the credential and displays the relevant information.
 - **AC-09 — Revocation.** Given a revoked credential, when a verifier attempts verification, then the system displays `REVOKED`.
-- **AC-10 — Expired share.** Given an expired share, when a verifier opens it, then credential information is not displayed and the system reports `EXPIRED_SHARE`.
+- **AC-10 — Missing, expired, or revoked share.** Given a non-existent, expired, or revoked share, when a verifier opens it, then credential information is not displayed and the system reports `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, or `REVOKED_SHARE` respectively.
 - **AC-11 — Reissue.** Given a revoked credential requiring correction, when the Registrar requests reissuance and it is approved, then a new valid credential is created and linked to the previous credential.
 - **AC-12 — Single tenant.** The system does not expose any function for creating or switching between universities.
 - **AC-13 — Trust boundary.** The verification result never implies that UniDipVeri independently re-checked the graduate's academic performance; it only attests to credential authenticity and status.

@@ -1,6 +1,6 @@
 # User Stories
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
@@ -50,7 +50,7 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-C1.** As a Registrar, I want to create and edit academic programs, so that students and credentials can be organized by program.
 
-- _AC:_ Given I submit a program name, degree level, and field of study, when I save, then the program appears in the program list under MIU.
+- _AC:_ Given I submit a program name and degree level, when I save, then the program appears in the program list under MIU.
 - _Traces to:_ FR-PROG-01, FR-PROG-02
 
 **US-C2.** As a Registrar, I want to define graduation eligibility rules for a program (minimum credits, minimum GPA, required courses), so that eligibility can be checked automatically instead of manually.
@@ -126,7 +126,7 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-F1.** As a Student, I want to view my issued credentials with full details, so that I can confirm what was issued to me.
 
-- _AC:_ Given I have an issued credential, when I open my credential list, then I see graduate name, degree, program, field of study, university, award date, and status.
+- _AC:_ Given I have an issued credential, when I open my credential list, then I see graduate name, degree, program, university, award date, and status.
 - _Traces to:_ FR-CRED-07, FR-CRED-08
 
 **US-F2.** As a Registrar, I want to revoke a credential with a reason, so that incorrect or invalidated diplomas stop verifying as valid.
@@ -173,9 +173,11 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 - _AC:_ Given a valid credential behind an active share, when I verify it, then I see a `VERIFIED` result with graduate name, degree, program, institution, and award date — not the raw VC.
 - _Traces to:_ FR-VER-04–08
 
-**US-H3.** As a Verifier, I want distinct, understandable outcomes for expired links and revoked credentials, so that I know why a check didn't succeed.
+**US-H3.** As a Verifier, I want distinct, understandable outcomes for missing, expired, or revoked links and revoked credentials, so that I know why a check didn't succeed.
 
+- _AC:_ Given a non-existent share link, when I attempt verification, then I see `NOT_FOUND_SHARE` and no credential details.
 - _AC:_ Given an expired share, when I attempt verification, then I see `EXPIRED_SHARE` and no credential details.
+- _AC:_ Given a revoked share, when I attempt verification, then I see `REVOKED_SHARE` and no credential details.
 - _AC:_ Given a revoked credential, when I attempt verification, then I see `REVOKED`.
 - _Traces to:_ FR-VER-02, FR-VER-07
 

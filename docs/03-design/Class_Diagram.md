@@ -1,6 +1,6 @@
 # Class Diagram
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
@@ -96,7 +96,6 @@ classDiagram
         +UUID universityId
         +string name
         +string degreeLevel
-        +string fieldOfStudy
         +string status
     }
 
@@ -283,7 +282,9 @@ classDiagram
         <<enumeration>>
         VERIFIED
         REVOKED
+        NOT_FOUND_SHARE
         EXPIRED_SHARE
+        REVOKED_SHARE
         INVALID_CREDENTIAL
         UNKNOWN_ISSUER
         VERIFICATION_ERROR
@@ -530,6 +531,7 @@ classDiagram
         +revokeShare(UUID shareId, UUID studentId) ShareResultDTO
         +listShares(UUID studentId) List~ShareDTO~
         +resolveShare(string token) ShareStatusDTO
+        listVerificationSummary(UUID studentId) List~ShareVerificationSummaryDTO~
     }
 
     class VerificationService {
@@ -541,7 +543,14 @@ classDiagram
     }
 
     class AuditService {
-        -IVerificationEventRepository eventRepo
+        -IStaffRepository staffRepo
+        -IStudentRepository studentRepo
+        -IAcademicRecordRepository recordRepo
+        -IEligibilityRepository eligibilityRepo
+        -ICredentialRequestRepository requestRepo
+        -ICredentialRepository credentialRepo
+        -IShareRepository shareRepo
+        -IVerificationEventRepository verificationEventRepo
         +getAuditHistory(AuditScopeDTO scope) List~AuditEventDTO~
     }
 
@@ -554,6 +563,10 @@ classDiagram
 ```
 
 Note on read vs. write: methods that only read state (`listStaff`, `getStudent`, `getLatestResult`, `listPending`, `getDetails`, `listShares`, `resolveShare`, `getAuditHistory`) never mutate a repository or call an external adapter that changes state; methods that do mutate state are documented as such above. This is enforced by code review and unit tests rather than by a separate Query class hierarchy.
+
+Note on share: `listVerificationSummary` reads via `IVerificationEventRepository` (injected alongside AuditService's copy — both services depend on the same port; no duplication of the store itself) and groups results by `share_id` within a configurable time window before returning, per **NFR-08**. It never mutates state.
+
+Note: `ShareVerificationSummaryDTO = {shareId, credentialId, credentialType, latestResult, attemptCount, lastVerifiedAt}`, sourced by `IVerificationEventRepository.listByShareId` grouped/aggregated per share the student owns (via `IShareRepository`). Still read-only, no state mutation.
 
 ---
 

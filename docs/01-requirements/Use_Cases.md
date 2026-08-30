@@ -1,6 +1,6 @@
 # Use Cases
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md`. Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
 
@@ -279,7 +279,7 @@ flowchart LR
 
 1. Student logs in (UC-02).
 2. Student opens their credential list.
-3. System displays credential details (graduate name, degree, program, field, university, award date, status).
+3. System displays credential details (graduate name, degree, program, university, award date, status).
 
 **Related requirements:** FR-CRED-07, FR-CRED-08, FR-STU-04
 
@@ -322,20 +322,21 @@ flowchart LR
 **Main success scenario:**
 
 1. Verifier opens the share URL.
-2. System checks the share is active and unexpired.
+2. System checks the share exists, is active, and is unexpired.
 3. System retrieves the associated credential.
 4. System calls walt.id to verify issuer authenticity, integrity, and status against the server-managed wallet entry.
 5. System returns a plain-language result (`VERIFIED`, with credential summary fields).
 
 **Extensions:**
 
-- 2a. Share is expired → system returns `EXPIRED_SHARE`.
-- 2b. Share is revoked → system treats it as invalid and returns `EXPIRED_SHARE`/an equivalent "not available" result rather than exposing why.
+- 2a. Share token not found / invalid → system quick-exits and returns `NOT_FOUND_SHARE`.
+- 2b. Share is expired → system returns `EXPIRED_SHARE`.
+- 2c. Share is revoked → system returns `REVOKED_SHARE`.
 - 3a. Underlying credential is `REVOKED` → system returns `REVOKED`.
 - 4a. walt.id cannot confirm issuer or integrity → system returns `UNKNOWN_ISSUER` or `INVALID_CREDENTIAL` as applicable.
 - 4b. walt.id call fails (timeout, error) → system returns `VERIFICATION_ERROR`.
 
-**Postconditions:** A `VERIFICATION_EVENT` is recorded regardless of outcome.
+**Postconditions:** A `VERIFICATION_EVENT` is recorded for every outcome except `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, and `REVOKED_SHARE` (missing, expired, or revoked share — see FR-VER-09), since that case has no resolvable share or credential to attribute the event to.
 
 **Related requirements:** FR-VER-01–08, FR-AUD-05
 
@@ -405,7 +406,7 @@ flowchart LR
 
 **Main success scenario:**
 
-1. Registrar creates or edits a program (name, degree level, field of study).
+1. Registrar creates or edits a program (name, degree level).
 2. System stores the program under the single university.
 
 **Related requirements:** FR-PROG-01, FR-PROG-02, FR-UNI-02

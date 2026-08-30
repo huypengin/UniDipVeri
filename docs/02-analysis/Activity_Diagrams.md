@@ -1,6 +1,6 @@
 # Activity Diagrams — UniDipVeri
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, and `docs/02-analysis/DFD.md`. Where the DFD shows data at rest and in motion, these diagrams show control flow and decision points over time for the workflows that matter most to the thesis's central contribution (the eligibility-gated, approval-gated issuance pipeline), its user and wallet foundation, and its payoff (public verification). Swimlanes are actors/system components; diamonds are decisions; each diagram is traced back to the use case(s) and requirement(s) it implements.
 
@@ -216,8 +216,8 @@ flowchart TD
     end
 
     subgraph SysVerify["UniDipVeri — Verification Service"]
-        C1{Share active\nand unexpired?}
-        C2[Return EXPIRED_SHARE\nno credential details]
+        C1{Share exists, active,\nand unexpired?}
+        C2[Return NOT_FOUND_SHARE /\nEXPIRED_SHARE /\nREVOKED_SHARE\nno credential details;\nno event recorded]
         C3[Load associated\ncredential]
         C4{Credential status\n= REVOKED?}
         C5[Return REVOKED]
@@ -227,7 +227,7 @@ flowchart TD
         C9{Issuer/integrity\nconfirmed?}
         C10[Return UNKNOWN_ISSUER /\nINVALID_CREDENTIAL]
         C11[Return VERIFIED +\nplain-language summary\n— not raw VC]
-        C12[Record VERIFICATION_EVENT\nregardless of outcome]
+        C12[Record VERIFICATION_EVENT]
     end
 
     A1 --> A2 --> A3
@@ -239,7 +239,7 @@ flowchart TD
     A8 -- no, later --> A10
 
     V1 --> V2 --> C1
-    C1 -- no --> C2 --> C12
+    C1 -- no --> C2 --> V2end2
     C1 -- yes --> C3 --> C4
     C4 -- yes --> C5 --> C12
     C4 -- no --> C6 --> C7

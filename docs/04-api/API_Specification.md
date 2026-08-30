@@ -1,6 +1,6 @@
 # API Specification
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` and `docs/03-design/Class_Diagram.md`. Single tenant: there is no `{universityId}` path segment anywhere.
 
@@ -77,7 +77,7 @@ POST   /api/staff/{staffId}/deactivate
 POST /api/staff
 {
   "name": "Nguyen Anh Minh",
-  "email": "minh.nguyen@miu.example",
+  "email": "minh.nguyen@staff.miu.example",
   "password": "SecurePassword123!",
   "role": "REGISTRAR"
 }
@@ -89,7 +89,7 @@ Response:
 {
     "staffId": "staff-uuid-1",
     "name": "Nguyen Anh Minh",
-    "email": "minh.nguyen@miu.example",
+    "email": "minh.nguyen@staff.miu.example",
     "role": "REGISTRAR",
     "status": "ACTIVE",
     "createdAt": "2026-08-27T10:00:00Z"
@@ -148,7 +148,7 @@ Response:
             "studentId": "student-uuid-1",
             "studentNumber": "MIU2026-001",
             "name": "Nguyen Minh Anh",
-            "email": "anh.nguyen@miu.example",
+            "email": "anh.nguyen@student.miu.example",
             "programId": "program-uuid",
             "programName": "Computer Science",
             "status": "ACTIVE",
@@ -224,7 +224,7 @@ POST /api/academic-records/import
 {
   "studentNumber": "MIU2026-001",
   "name": "Nguyen Minh Anh",
-  "email": "anh.nguyen@miu.example",
+  "email": "anh.nguyen@student.miu.example",
   "programId": "program-uuid",
   "credits": 128,
   "gpa": 3.6,
@@ -385,6 +385,25 @@ GET /api/me/shares
 GET /api/me/verification-events
 ```
 
+**Verification events (`GET /api/me/verification-events`):** Returns a deduplicated summary, not the raw audit trail — verification attempts against the same share within a short time window (NFR-08, SRS FR-AUD-05a) are grouped into a single entry.
+
+```json
+{
+    "events": [
+        {
+            "shareId": "share-uuid",
+            "credentialId": "cred-uuid",
+            "credentialType": "AcademicDiploma",
+            "latestResult": "VERIFIED",
+            "attemptCount": 5,
+            "lastVerifiedAt": "2026-08-28T09:12:40Z"
+        }
+    ]
+}
+```
+
+Grouped by `shareId`, one entry per share the student has created. Each entry shows the **latest** result (not a full history of results), a total attempt count, and the most recent verification timestamp. `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, and `REVOKED_SHARE` attempts are never included, since they are not persisted at all (FR-VER-09) — a share that nobody has successfully resolved simply doesn't appear here yet. The full, ungrouped event log remains available to Registrars via `GET /api/audit/...` (§15) for audit completeness.
+
 ---
 
 ## 12. Student Shares
@@ -469,7 +488,7 @@ Response:
 }
 ```
 
-`result` is one of: `VERIFIED`, `REVOKED`, `EXPIRED_SHARE`, `INVALID_CREDENTIAL`, `UNKNOWN_ISSUER`, `VERIFICATION_ERROR` (SRS FR-VER-07).
+`result` is one of: `VERIFIED`, `REVOKED`, `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, `REVOKED_SHARE`, `INVALID_CREDENTIAL`, `UNKNOWN_ISSUER`, `VERIFICATION_ERROR` (SRS FR-VER-07).
 
 ---
 

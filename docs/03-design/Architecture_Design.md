@@ -1,6 +1,6 @@
 # Architecture & Design
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 This document contains architectural and design decisions supporting `docs/01-requirements/SRS.md`. It specifies the technical organization of UniDipVeri using **Clean Architecture**: a small set of layers with dependencies pointing strictly inward, keeping the domain core free of framework, database, and external-API concerns.
 
@@ -281,3 +281,5 @@ flowchart TB
     - _Tier 1 (Source Facts):_ Ingested via `IAcademicRecordSourceAdapter` and trusted as input.
     - _Tier 2 (Eligibility Claims):_ Computed strictly by `EligibilityService` against versioned domain rules.
     - _Tier 3 (Cryptographic Trust):_ Handled via `IVCAdapter` and backed by `walt.id`.
+7. **No Credential Expiry by Design:** `Credential.status` is a two-state lifecycle (`VALID` → `REVOKED`), not a time-bound one — there is no `expires_at` on `Credential` and no `EXPIRED` credential status. This is a deliberate scope decision (SRS AS-06), not an oversight: expiration semantics exist only for `Share` (short-lived access links), which is why `VerificationResult` has `EXPIRED_SHARE` (and `REVOKED_SHARE`) but no analogous `EXPIRED` value for the credential itself.
+8. **Noise Control at Write Time, Aggregation at Read Time:** `VerificationService.verify(...)` never persists a `VERIFICATION_EVENT` for a `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, or `REVOKED_SHARE` outcome (FR-VER-09) — a missing, expired, or revoked share has no resolvable identity worth tracking, and this path is the one most exposed to dead links, bookmarks, and automated crawlers. Every other outcome is persisted in full for the Registrar-facing audit view (NFR-06). The student-facing summary (`GET /api/me/verification-events`) further aggregates this by grouping per share and surfacing only the latest result, a total count, and the last-verified timestamp — full per-attempt detail remains available only to Registrars via the audit endpoints.

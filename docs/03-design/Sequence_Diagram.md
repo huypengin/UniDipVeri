@@ -1,6 +1,6 @@
 # Sequence Diagrams — UniDipVeri
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/02-analysis/DFD.md`, `docs/03-design/Architecture_Design.md`, and `docs/03-design/Class_Diagram.md`. Where the Activity Diagrams show control flow and decision points, these diagrams show **object interaction over time** — which layer calls which, in what order, and what each call returns — down to the Application Service, Repository Port, and Adapter names used in the class diagram. All diagrams are Mermaid `sequenceDiagram`s.
 
@@ -342,7 +342,7 @@ sequenceDiagram
     CS->>CRepo: findByStudentId(studentId)
     CRepo-->>CS: List<Credential>
     CS-->>CC: List<CredentialDTO>
-    CC-->>Student: 200 OK — name, degree, program, field, university, awardDate, status
+    CC-->>Student: 200 OK — name, degree, program, university, awardDate, status
 ```
 
 ---
@@ -442,10 +442,15 @@ sequenceDiagram
     VS->>SHRepo: findByTokenHash(hash(token))
     SHRepo-->>VS: Share | null
 
-    alt share missing, expired, or revoked
-        VS->>ERepo: save VerificationEvent(EXPIRED_SHARE)
+    alt share not found
+        VS-->>PVC: NOT_FOUND_SHARE
+        PVC-->>Verifier: 200 OK {result: NOT_FOUND_SHARE}
+    else share expired
         VS-->>PVC: EXPIRED_SHARE
         PVC-->>Verifier: 200 OK {result: EXPIRED_SHARE}
+    else share revoked
+        VS-->>PVC: REVOKED_SHARE
+        PVC-->>Verifier: 200 OK {result: REVOKED_SHARE}
     else share active and unexpired
         VS->>CRepo: findById(share.credentialId)
         CRepo-->>VS: Credential
@@ -483,6 +488,8 @@ sequenceDiagram
 ```
 
 **Note (NFR-07 / trust boundary):** Nothing in this sequence re-checks grades, courses, or the eligibility decision — `VerificationService` only ever queries `Credential` and calls `IVCAdapter`, never `IEligibilityRepository` or `IAcademicRecordRepository`.
+
+**Note (FR-VER-09 / noise control):** `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, and `REVOKED_SHARE` (missing, expired, or revoked share) are the outcomes that are never persisted as a `VERIFICATION_EVENT` — there is no resolvable active share or credential to attribute them to, and this path is the most likely to be hit by dead links, bookmarks, or automated crawlers. Every other outcome (`VERIFIED`, `REVOKED`, `UNKNOWN_ISSUER`, `INVALID_CREDENTIAL`, `VERIFICATION_ERROR`) resolves to a real share and is logged.
 
 ---
 
@@ -558,13 +565,14 @@ sequenceDiagram
     actor A as Registrar / Student
     participant AC as AuditController
     participant AS as AuditService
-    participant ERepo as IVerificationEventRepository
+    participant Repos as Staff/Student/Record/Eligibility/Request/Credential/Share/VerificationEvent Repositories
 
     A->>AC: GET /api/audit?scope=...
     AC->>AS: getAuditHistory(scope)
     AS->>AS: authorize scope — system-wide for Registrar, own-records-only for Student
-    AS->>ERepo: fetch chronological events for scope
-    ERepo-->>AS: import, wallet, evaluation, approval/rejection, issuance, revocation, share, and verification events
+    AS->>Repos: fetch events scoped to authorized entities (import, wallet, evaluation, approval/rejection, issuance, revocation, share, verification)
+    Repos-->>AS: raw event data per bounded area
+    AS->>AS: merge and sort into a single chronological timeline
     AS-->>AC: List<AuditEventDTO>
     AC-->>A: 200 OK — scoped, chronological
 ```

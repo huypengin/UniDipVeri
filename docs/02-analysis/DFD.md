@@ -1,6 +1,6 @@
 # Data Flow Diagrams — UniDipVeri
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/03-design/Data_Model.md`, and `docs/03-design/Architecture_Design.md`. This document shows _what data moves where_, complementing the use cases (interaction detail) and the architecture doc (component/layering detail). Notation: external entities are rectangles, processes are rounded/circular nodes numbered `P<n>`, data stores are open-ended boxes numbered `D<n>`, and arrows are labeled data flows. It does not introduce any process, store, or flow that isn't implied by the SRS functional requirements.
 
@@ -372,7 +372,7 @@ flowchart TB
 
     Verifier -->|share token| P12_1
     P12_1 -->|lookup| D8
-    P12_1 -->|"expired/revoked: EXPIRED_SHARE"| P12_4
+    P12_1 -->|"missing: NOT_FOUND_SHARE / expired: EXPIRED_SHARE / revoked: REVOKED_SHARE (no event logged)"| P12_4
     P12_1 -->|active| P12_2
     P12_2 -->|read| D7
     P12_2 -->|"credential REVOKED: skip walt.id"| P12_4
@@ -380,7 +380,7 @@ flowchart TB
     P12_3 -->|verifyCredential| Walt
     Walt -->|issuer/integrity/status| P12_3
     P12_3 -->|raw result| P12_4
-    P12_4 -->|VERIFIED / REVOKED / EXPIRED_SHARE /\nUNKNOWN_ISSUER / INVALID_CREDENTIAL /\nVERIFICATION_ERROR| Verifier
+    P12_4 -->|VERIFIED / REVOKED / NOT_FOUND_SHARE / EXPIRED_SHARE / REVOKED_SHARE /\nUNKNOWN_ISSUER / INVALID_CREDENTIAL /\nVERIFICATION_ERROR| Verifier
     P12_4 -->|"write event (regardless of outcome)"| D9
 ```
 

@@ -67,3 +67,6 @@ nav:
 
     - API:
           - API Specification: 04-api/API_Specification.md
+
+    - UX:
+          - UI/UX Design: 05-ux/UI_UX_Design.md
