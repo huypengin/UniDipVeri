@@ -1,6 +1,6 @@
 # Activity Diagrams — UniDipVeri
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, and `docs/02-analysis/DFD.md`. Where the DFD shows data at rest and in motion, these diagrams show control flow and decision points over time for the workflows that matter most to the thesis's central contribution (the eligibility-gated, approval-gated issuance pipeline), its user and wallet foundation, and its payoff (public verification). Swimlanes are actors/system components; diamonds are decisions; each diagram is traced back to the use case(s) and requirement(s) it implements.
 
@@ -20,7 +20,7 @@ flowchart TD
     subgraph Sys["UniDipVeri — Academic Record Adapter / Wallet / Eligibility Services"]
         B1{Program ID known?}
         B2[Reject import;\nnotify source]
-        B3[Create/update STUDENT\n& ACADEMIC_RECORD]
+        B3[Create/update STUDENT\n(account: PENDING_ACTIVATION,\ngraduation: NOT_STARTED)\n& ACADEMIC_RECORD]
         B4[Log import event]
         BW1{Student has active\nwallet_id?}
         BW2[Call walt.id Wallet API\nprovision server wallet]
@@ -30,13 +30,13 @@ flowchart TD
         B5[Trigger eligibility evaluation]
         B6[Load active rule set\nfor program]
         B7{All mandatory\nrules satisfied?}
-        B8[Record ELIGIBLE]
-        B9[Record NOT_ELIGIBLE +\nfailed requirements list]
+        B8[Record ELIGIBLE;\nset graduation_status = ELIGIBLE]
+        B9[Record NOT_ELIGIBLE +\nfailed requirements list;\nset graduation_status = PENDING_REVIEW]
         B10[Log evaluation event]
     end
 
     subgraph Reg["Registrar"]
-        C1[View student record,\nwallet status & eligibility]
+        C1[View student profile\n(account, graduation\n& wallet status)]
         C2([End])
     end
 
@@ -321,7 +321,7 @@ flowchart TD
     end
 
     subgraph Staff["Registrar / Admin UI"]
-        S1([Status visible in Student List:\nACTIVE, PENDING, or FAILED])
+        S1([Status visible in Student List:\nACTIVE, PENDING, FAILED, or INACTIVE])
     end
 
     T1 --> W1 --> W2

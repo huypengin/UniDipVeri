@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
@@ -85,10 +85,11 @@ erDiagram
         string student_number
         string name
         string email
-        string status "ACTIVE | GRADUATED | INACTIVE"
+        string account_status "PENDING_ACTIVATION | ACTIVE | INACTIVE (default: PENDING_ACTIVATION)"
+        string graduation_status "NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED (default: NOT_STARTED)"
         string source_record_ref "identifier from Academic Record Source"
         string wallet_id "walt.id server-managed wallet identity"
-        string wallet_status "PENDING | ACTIVE | FAILED"
+        string wallet_status "PENDING | ACTIVE | FAILED | INACTIVE"
         datetime imported_at
         datetime updated_at
     }
@@ -190,7 +191,7 @@ erDiagram
 
 - **`UNIVERSITY_STAFF` management:** Platform Administrators manage staff rows. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
 - **`STUDENT` and `ACADEMIC_RECORD` are import-only tables.** There is no Registrar-facing manual "create student" write path (see `API_Specification.md` Section 4) — every row traces back to a `source_record_ref` from the Academic Record Source, making AS-01 ("source data trusted as correct") an enforceable data-layer boundary. `ACADEMIC_RECORD` keeps `source_snapshot_at` separate from `imported_at` so the model distinguishes "when the source system asserted this was true" from "when UniDipVeri received it."
-- **Student Wallet lifecycle:** Each `STUDENT` carries `wallet_id` and `wallet_status` (`PENDING | ACTIVE | FAILED`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. Credential issuance requires `wallet_status = ACTIVE`.
+- **Student Account, Graduation & Wallet lifecycle:** Each `STUDENT` carries `account_status` (`PENDING_ACTIVATION | ACTIVE | INACTIVE`, default `PENDING_ACTIVATION` for newly imported data), `graduation_status` (`NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED`, default `NOT_STARTED`), and `wallet_id` / `wallet_status` (`PENDING | ACTIVE | FAILED | INACTIVE`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. When a student account is deactivated (`INACTIVE`), its `wallet_status` is also transitioned to `INACTIVE`. Credential issuance requires `wallet_status = ACTIVE` and `graduation_status = ELIGIBLE` (or passing evaluation).
 - **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a *share link* stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.
 - **`CREDENTIAL_SCHEMA` and walt.id Profile Binding:** `CREDENTIAL_SCHEMA.schema_uri` holds the identifier of the preconfigured profile defined in walt.id's `issuer2-profiles.conf` (e.g. `AcademicDiploma_jwt_vc_json`). UniDipVeri does not generate or push cryptographic schemas into walt.id dynamically at runtime; it passes this preconfigured identifier during the OID4VCI issuance call (`WaltIdVCAdapter`).
 - **`ELIGIBILITY_RULE_SET` is versioned per program**, and `ELIGIBILITY_EVALUATION` stores a foreign key to the specific version it ran against (not just to `PROGRAM`). This directly implements FR-ELIG-10: editing a program's rules later does not retroactively change what an old evaluation (or a credential issued off it) meant.

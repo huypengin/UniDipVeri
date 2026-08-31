@@ -1,6 +1,6 @@
 # User Stories
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
@@ -221,9 +221,9 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 - _AC:_ Given I attempt to deactivate the last remaining active Admin, when I submit, then the system refuses the action.
 - _Traces to:_ FR-USER-02, FR-USER-05, FR-AUD-09
 
-**US-J4.** As a Registrar or Administrator, I want to view student accounts, enrollment status, and wallet provisioning status in a consolidated list, so that I can oversee cohort readiness.
+**US-J4.** As a Registrar or Administrator, I want to view student accounts, account status, graduation status, and wallet provisioning status in a consolidated list, so that I can oversee cohort readiness.
 
-- _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, enrollment status, and wallet status.
+- _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, account status, graduation status, and wallet status.
 - _Traces to:_ FR-USER-04, FR-STU-02, FR-WAL-03
 
 ---
@@ -238,8 +238,13 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-K2.** As a Registrar or Platform Administrator, I want to manually re-provision or retry wallet creation for a student with a missing or failed wallet, so that any transient failure can be resolved before credential issuance.
 
-- _AC:_ Given a student with `FAILED` or `PENDING` wallet status, when I click "Retry Wallet Provisioning", then the system contacts walt.id, provisions the wallet, and updates status to `ACTIVE`.
+- _AC:_ Given a student with `FAILED`, `PENDING` or `INACTIVE` wallet status, when I click "Retry Wallet Provisioning", then the system contacts walt.id, provisions the wallet, and updates status to `ACTIVE`.
 - _Traces to:_ FR-WAL-02, FR-WAL-03, FR-WAL-04
+
+**US-K3.** As the system, I want to set a student's wallet status to INACTIVE when their student account is deactivated, so that inactive student accounts cannot receive newly issued credentials.
+
+- _AC:_ Given an active student with an active wallet, when their account is deactivated, then their `wallet_status` is automatically transitioned to `INACTIVE`.
+- _Traces to:_ FR-WAL-03, FR-WAL-05, FR-USER-04
 
 ---
 

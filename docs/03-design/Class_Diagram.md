@@ -1,6 +1,6 @@
 # Class Diagram
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
@@ -123,11 +123,20 @@ classDiagram
         REQUIRED_COURSE
     }
 
-    class StudentStatus {
+    class StudentAccountStatus {
         <<enumeration>>
+        PENDING_ACTIVATION
         ACTIVE
-        GRADUATED
         INACTIVE
+    }
+
+    class GraduationStatus {
+        <<enumeration>>
+        NOT_STARTED
+        PENDING_REVIEW
+        ELIGIBLE
+        GRADUATED
+        REJECTED
     }
 
     class WalletStatus {
@@ -135,6 +144,7 @@ classDiagram
         PENDING
         ACTIVE
         FAILED
+        INACTIVE
     }
 
     class Student {
@@ -143,13 +153,19 @@ classDiagram
         +string studentNumber
         +string name
         +string email
-        +StudentStatus status
+        +StudentAccountStatus accountStatus
+        +GraduationStatus graduationStatus
         +string sourceRecordRef
         +string walletId
         +WalletStatus walletStatus
         +DateTime importedAt
         +DateTime updatedAt
         +bool isWalletReady()
+        +bool isAccountActive()
+        +void activateAccount()
+        +void deactivateAccount()
+        +void deactivateWallet()
+        +void updateGraduationStatus(GraduationStatus newStatus)
         +void assignWallet(string walletId)
         +void markWalletFailed()
     }
@@ -331,7 +347,8 @@ classDiagram
 
     UniversityStaff ..> StaffRole
     UniversityStaff ..> StaffStatus
-    Student ..> StudentStatus
+    Student ..> StudentAccountStatus
+    Student ..> GraduationStatus
     Student ..> WalletStatus
     EligibilityEvaluation ..> EvaluationResult
     CredentialIssuanceRequest ..> RequestStatus

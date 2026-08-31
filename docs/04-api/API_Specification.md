@@ -1,6 +1,6 @@
 # API Specification
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` and `docs/03-design/Class_Diagram.md`. Single tenant: there is no `{universityId}` path segment anywhere.
 
@@ -151,7 +151,8 @@ Response:
             "email": "anh.nguyen@student.miu.example",
             "programId": "program-uuid",
             "programName": "Computer Science",
-            "status": "ACTIVE",
+            "accountStatus": "ACTIVE",
+            "graduationStatus": "GRADUATED",
             "walletStatus": "ACTIVE",
             "importedAt": "2026-08-20T08:30:00Z"
         }
