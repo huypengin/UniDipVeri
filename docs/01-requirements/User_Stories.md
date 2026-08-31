@@ -1,6 +1,6 @@
 # User Stories
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
@@ -50,7 +50,7 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-C1.** As a Registrar, I want to create and edit academic programs, so that students and credentials can be organized by program.
 
-- _AC:_ Given I submit a program name and degree level, when I save, then the program appears in the program list under MIU.
+- _AC:_ Given I submit a program name, full title, and degree level, when I save, then the program appears in the program list under MIU.
 - _Traces to:_ FR-PROG-01, FR-PROG-02
 
 **US-C2.** As a Registrar, I want to define graduation eligibility rules for a program (minimum credits, minimum GPA, required courses), so that eligibility can be checked automatically instead of manually.

@@ -1,6 +1,6 @@
 # Use Cases
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 Companion to `docs/01-requirements/SRS.md`. Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
 
@@ -406,7 +406,7 @@ flowchart LR
 
 **Main success scenario:**
 
-1. Registrar creates or edits a program (name, degree level).
+1. Registrar creates or edits a program (name, full title, degree level).
 2. System stores the program under the single university.
 
 **Related requirements:** FR-PROG-01, FR-PROG-02, FR-UNI-02

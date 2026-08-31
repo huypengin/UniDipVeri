@@ -1,6 +1,6 @@
 # Architecture & Design
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 
 This document contains architectural and design decisions supporting `docs/01-requirements/SRS.md`. It specifies the technical organization of UniDipVeri using **Clean Architecture**: a small set of layers with dependencies pointing strictly inward, keeping the domain core free of framework, database, and external-API concerns.
 
@@ -124,6 +124,7 @@ public interface IAcademicRecordSourceAdapter {
 `walt.id` provides issuance and verification via OID4VCI and OID4VP. In UniDipVeri, these protocols run **entirely server-side** without interactive holder prompts:
 
 - **Deployment-Time Profile Preconfiguration (AS-03):** walt.id requires issuer profiles to be statically defined in `issuer2-profiles.conf` (e.g. `miuAcademicDiploma` declaring `credentialConfigurationId = "AcademicDiploma_jwt_vc_json"` and referencing MIU's issuer signing key / DID). These profiles act as issuance templates and are loaded when the walt.id service boots. UniDipVeri stores this identifier in `CREDENTIAL_SCHEMA.schema_uri` and passes it during issuance, eliminating any need for dynamic, runtime admin schema creation in walt.id.
+- **Issuer Identity Binding & Verification Whitelisting (`University.issuer_id`):** While walt.id stores the private signing keys statically in its own KMS/configfile, PostgreSQL stores the institution's public DID in `UNIVERSITY.issuer_id`. This serves as the application's source of truth for (1) issuer authorization whitelisting in `VerificationService` (enforcing FR-VER-05 so that credentials signed by unapproved foreign DIDs return `UNKNOWN_ISSUER`), (2) UI diploma metadata rendering without hardcoded strings, and (3) clean environment pairing between database seeds and walt.id instances.
 - **Custodial Server-Managed Wallets:** Students do not install wallet apps. The backend creates server-managed wallet identities via `IWalletAdapter` upon student ingestion.
 - **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` calls walt.id's issuance endpoint with the preconfigured `credentialConfigurationId`, dynamic subject claims, and `credentialStatus` runtime override, acting as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
 - **Self-Hosted Credential Status Lists (Revocation):** Because the walt.id Community Stack does not include a hosted status list service out-of-the-box, UniDipVeri manages revocation at two coordinated levels:
@@ -283,3 +284,11 @@ flowchart TB
     - _Tier 3 (Cryptographic Trust):_ Handled via `IVCAdapter` and backed by `walt.id`.
 7. **No Credential Expiry by Design:** `Credential.status` is a two-state lifecycle (`VALID` → `REVOKED`), not a time-bound one — there is no `expires_at` on `Credential` and no `EXPIRED` credential status. This is a deliberate scope decision (SRS AS-06), not an oversight: expiration semantics exist only for `Share` (short-lived access links), which is why `VerificationResult` has `EXPIRED_SHARE` (and `REVOKED_SHARE`) but no analogous `EXPIRED` value for the credential itself.
 8. **Noise Control at Write Time, Aggregation at Read Time:** `VerificationService.verify(...)` never persists a `VERIFICATION_EVENT` for a `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, or `REVOKED_SHARE` outcome (FR-VER-09) — a missing, expired, or revoked share has no resolvable identity worth tracking, and this path is the one most exposed to dead links, bookmarks, and automated crawlers. Every other outcome is persisted in full for the Registrar-facing audit view (NFR-06). The student-facing summary (`GET /api/me/verification-events`) further aggregates this by grouping per share and surfacing only the latest result, a total count, and the last-verified timestamp — full per-attempt detail remains available only to Registrars via the audit endpoints.
+9. **Verification Privacy & Perimeter Abuse:** `VERIFICATION_EVENT` records strictly domain-relevant verification outcomes (`share_id`, `verified_at`, `result`, `verifier_context`) without capturing or persisting client IP addresses (`ip_hash`). This preserves privacy and prevents PII log pollution. Abuse prevention (such as token brute-force protection, bot crawling defenses, and request rate limiting) is handled at the network/middleware perimeter (e.g., reverse proxy / API Gateway rate limiters or ASP.NET Core RateLimiting middleware) rather than in core business domain tables.
+
+## 8. Architectural Decisions
+
+### Cross-Cutting Services: The Standalone AuthService
+**Decision:** `AuthService` is implemented as a standalone application service, not folded into `StaffService` or `StudentWalletService`.
+
+**Rationale:** Authentication is a cross-cutting concern consumed by all API controllers. Neither the Staff nor Student bounded contexts "own" the login process. By keeping `AuthService` standalone and dependent *only* on repository ports (e.g., `IStaffRepository`, `IStudentRepository`), we prevent circular dependencies, avoid leaking authentication concerns into domain logic, and maintain clear bounded context boundaries.

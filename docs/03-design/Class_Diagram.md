@@ -1,6 +1,6 @@
 # Class Diagram
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
@@ -53,13 +53,31 @@ The domain core holds enterprise entities, business rules, domain events, and en
 classDiagram
     direction TB
 
-    class University {
+    class BaseEntity {
+        <<abstract>>
         +UUID id
+        +DateTime createdAt
+        +DateTime updatedAt
+        +bool equals(object obj)
+        +int getHashCode()
+    }
+
+    class UniversityStatus {
+        <<enumeration>>
+        ACTIVE
+        INACTIVE
+    }
+
+    class University {
         +string name
         +string code
         +string issuerId
-        +string status
-        +DateTime createdAt
+        +UniversityStatus status
+        +static University create(name, code, issuerId, status, id)
+        +bool isActive()
+        +void updateDetails(name, code, issuerId)
+        +void deactivate()
+        +void activate()
     }
 
     class StaffRole {
@@ -76,36 +94,55 @@ classDiagram
     }
 
     class UniversityStaff {
-        +UUID id
         +UUID universityId
         +string name
         +string email
         +string passwordHash
         +StaffRole role
         +StaffStatus status
-        +DateTime createdAt
-        +DateTime updatedAt
+        +static UniversityStaff create(universityId, name, email, passwordHash, role, id)
         +bool isActive()
         +bool hasRole(StaffRole requiredRole)
         +void deactivate()
+        +void activate()
         +void updateRole(StaffRole newRole)
+        +void updateProfile(name, email)
+        +void setPassword(passwordHash)
+    }
+
+    class DegreeLevel {
+        <<enumeration>>
+        BACHELOR
+        MASTER
+        DOCTORATE
+        ASSOCIATE
+    }
+
+    class ProgramStatus {
+        <<enumeration>>
+        ACTIVE
+        INACTIVE
     }
 
     class Program {
-        +UUID id
         +UUID universityId
         +string name
-        +string degreeLevel
-        +string status
+        +string fullTitle
+        +DegreeLevel degreeLevel
+        +ProgramStatus status
+        +static Program create(universityId, name, fullTitle, degreeLevel, status, id)
+        +bool isActive()
+        +void updateDetails(name, fullTitle, degreeLevel)
+        +void deactivate()
+        +void activate()
     }
 
     class EligibilityRuleSet {
-        +UUID id
         +UUID programId
         +int version
         +List~RuleItem~ rules
-        +DateTime createdAt
         +UUID createdBy
+        +static EligibilityRuleSet create(programId, version, rules, createdBy, id)
     }
 
     class RuleItem {
@@ -148,18 +185,18 @@ classDiagram
     }
 
     class Student {
-        +UUID id
         +UUID programId
         +string studentNumber
         +string name
         +string email
+        +string passwordHash
         +StudentAccountStatus accountStatus
         +GraduationStatus graduationStatus
         +string sourceRecordRef
         +string walletId
         +WalletStatus walletStatus
         +DateTime importedAt
-        +DateTime updatedAt
+        +static Student create(programId, studentNumber, name, email, sourceRecordRef, passwordHash, id)
         +bool isWalletReady()
         +bool isAccountActive()
         +void activateAccount()
@@ -168,16 +205,20 @@ classDiagram
         +void updateGraduationStatus(GraduationStatus newStatus)
         +void assignWallet(string walletId)
         +void markWalletFailed()
+        +void setWalletPending()
+        +void setPassword(string passwordHash)
+        +void updateProfile(string name, string email)
     }
 
     class AcademicRecord {
-        +UUID id
         +UUID studentId
         +int creditsCompleted
         +float gpa
         +List~string~ completedCourses
         +DateTime sourceSnapshotAt
         +DateTime importedAt
+        +static AcademicRecord create(studentId, creditsCompleted, gpa, completedCourses, sourceSnapshotAt, id)
+        +void updateRecord(creditsCompleted, gpa, completedCourses, sourceSnapshotAt)
     }
 
     class EvaluationResult {
@@ -187,12 +228,12 @@ classDiagram
     }
 
     class EligibilityEvaluation {
-        +UUID id
         +UUID studentId
         +UUID ruleSetId
         +EvaluationResult result
         +List~FailedRequirement~ failedRequirements
         +DateTime evaluatedAt
+        +static EligibilityEvaluation create(studentId, ruleSetId, result, failedRequirements, id)
         +bool isEligible()
     }
 
@@ -203,10 +244,10 @@ classDiagram
     }
 
     class ApprovalPolicy {
-        +UUID id
         +UUID universityId
         +int requiredApprovals
-        +DateTime updatedAt
+        +static ApprovalPolicy create(universityId, requiredApprovals, id)
+        +void updateRequiredApprovals(int count)
     }
 
     class RequestStatus {
@@ -218,7 +259,6 @@ classDiagram
     }
 
     class CredentialIssuanceRequest {
-        +UUID id
         +UUID studentId
         +UUID programId
         +UUID schemaId
@@ -226,8 +266,8 @@ classDiagram
         +UUID requestedBy
         +UUID supersedesCredentialId
         +RequestStatus status
-        +DateTime createdAt
         +DateTime decidedAt
+        +static CredentialIssuanceRequest create(studentId, programId, schemaId, eligibilityEvaluationId, requestedBy, supersedesCredentialId, id)
         +bool isPending()
         +void approve(int currentApprovalCount, int requiredCount)
         +void reject()
@@ -241,22 +281,21 @@ classDiagram
     }
 
     class CredentialApproval {
-        +UUID id
         +UUID requestId
         +UUID approverId
         +ApprovalDecision decision
         +string comment
         +DateTime decidedAt
+        +static CredentialApproval create(requestId, approverId, decision, comment, id)
     }
 
     class CredentialSchema {
-        +UUID id
         +UUID universityId
         +string name
         +string version
         +string credentialType
         +string schemaUri
-        +DateTime createdAt
+        +static CredentialSchema create(universityId, name, version, credentialType, schemaUri, id)
     }
 
     class CredentialStatus {
@@ -266,7 +305,6 @@ classDiagram
     }
 
     class Credential {
-        +UUID id
         +UUID requestId
         +UUID studentId
         +UUID programId
@@ -278,18 +316,18 @@ classDiagram
         +DateTime issuedAt
         +DateTime revokedAt
         +string revocationReason
+        +static Credential create(requestId, studentId, programId, schemaId, credentialType, vcReference, supersedesId, id)
         +bool isValid()
         +void revoke(string reason)
     }
 
     class Share {
-        +UUID id
         +UUID credentialId
         +string tokenHash
         +string purpose
-        +DateTime createdAt
         +DateTime expiresAt
         +DateTime revokedAt
+        +static Share create(credentialId, tokenHash, expiresAt, purpose, id)
         +bool isActive()
         +void revoke()
     }
@@ -307,12 +345,11 @@ classDiagram
     }
 
     class VerificationEvent {
-        +UUID id
         +UUID shareId
         +DateTime verifiedAt
         +VerificationResult result
         +string verifierContext
-        +string ipHash
+        +static VerificationEvent create(shareId, result, verifierContext, id)
     }
 
     %% Relationships
@@ -345,6 +382,24 @@ classDiagram
     Credential "1" -- "0..*" Share : shares
     Share "1" -- "0..*" VerificationEvent : triggers
 
+    BaseEntity <|-- University
+    BaseEntity <|-- UniversityStaff
+    BaseEntity <|-- Program
+    BaseEntity <|-- Student
+    BaseEntity <|-- AcademicRecord
+    BaseEntity <|-- EligibilityRuleSet
+    BaseEntity <|-- EligibilityEvaluation
+    BaseEntity <|-- ApprovalPolicy
+    BaseEntity <|-- CredentialIssuanceRequest
+    BaseEntity <|-- CredentialApproval
+    BaseEntity <|-- CredentialSchema
+    BaseEntity <|-- Credential
+    BaseEntity <|-- Share
+    BaseEntity <|-- VerificationEvent
+
+    University ..> UniversityStatus
+    Program ..> ProgramStatus
+    Program ..> DegreeLevel
     UniversityStaff ..> StaffRole
     UniversityStaff ..> StaffStatus
     Student ..> StudentAccountStatus
