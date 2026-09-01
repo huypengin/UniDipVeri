@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD033 -->
+
 # UI/UX Design Specification
 
 **Version:** 0.1.0
@@ -173,6 +175,6 @@ When a student has explicitly revoked an active share link:
 | Account Management | `student-acc-manage.png` | `GET /api/me` | FR-STU-04 |
 | Verified Credential View | `verifier-verified.png` | `POST /api/public/shares/{token}/verify` | FR-VER-01–08 |
 | Revoked Credential View | `verifier-revoked.png` | `POST /api/public/shares/{token}/verify` | FR-VER-06, FR-VER-07 |
-| Missing Share Quick-Exit | `verifier-link-not-found.png`| `GET /api/public/shares/{token}` | FR-VER-02, FR-VER-07, FR-VER-09 |
+| Missing Share Quick-Exit | `verifier-link-not-found.png` | `GET /api/public/shares/{token}` | FR-VER-02, FR-VER-07, FR-VER-09 |
 | Expired Share View | `verifier-link-expired.png` | `POST /api/public/shares/{token}/verify` | FR-SHARE-05, FR-VER-07, FR-VER-09 |
 | Revoked Share View | `verifier-link-revoked.png` | `POST /api/public/shares/{token}/verify` | FR-SHARE-06, FR-VER-07, FR-VER-09 |

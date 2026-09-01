@@ -178,7 +178,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.3 Program Management
 
 - **FR-PROG-01** Registrar users shall be able to create academic programs.
-- **FR-PROG-02** A program shall contain: name, full title (e.g., *Bachelor of Science in Computer Science* or *Bachelor of Computer Science*), degree level.
+- **FR-PROG-02** A program shall contain: name, full title (e.g., _Bachelor of Science in Computer Science_ or _Bachelor of Computer Science_), degree level.
 - **FR-PROG-03** A program shall have associated graduation eligibility rules.
 - **FR-PROG-04** Registrar users shall be able to configure the graduation eligibility rules for a program.
 

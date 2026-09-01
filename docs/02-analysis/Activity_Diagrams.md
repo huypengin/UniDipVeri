@@ -6,7 +6,7 @@ Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`,
 
 ---
 
-## 1. Import Academic Record → Wallet Provisioning & Eligibility Evaluation
+## 1. Import Academic Record -> Wallet Provisioning & Eligibility Evaluation
 
 **Traces to:** UC-03, UC-05, UC-21 · FR-STU-01–03, FR-ELIG-01–08, FR-WAL-01, AS-01
 
@@ -53,15 +53,16 @@ flowchart TD
     B10 --> C1 --> C2
 ```
 
-**Notes**
+### Notes
 
-- This flow can also start from **Registrar → manual re-evaluate** (UC-05 primary actor note); in that case the swimlane entry point is `B6` directly, skipping `A1`–`B5`.
+- This flow can also start from **Registrar -> manual re-evaluate** (UC-05 primary actor note); in that case the swimlane entry point is `B6` directly, skipping `A1`–`B5`.
 - `B9`'s failed-requirements list is what US-D2 / FR-ELIG-09 surfaces to the Registrar in `C1`.
 - `BW2`–`BW5` provisions the server-managed custodial wallet identity automatically without blocking the import if walt.id is transiently unreachable.
 
 ---
 
-## 2. Credential Issuance Request → Approval → Issuance
+<!-- markdownlint-disable MD024 -->
+## 2. Credential Issuance Request -> Approval -> Issuance
 
 **Traces to:** UC-07, UC-08, UC-09, UC-10, UC-21 · FR-APPR-01–10, FR-CRED-01–06, FR-WAL-04
 
@@ -92,7 +93,7 @@ flowchart TD
         C8{Approvals ≥\nrequired policy count?}
         C9[Wait for more approvals]
         D1[Load schema; build\ncredential subject]
-        D2[Call VC Adapter → issue\ninto student wallet_id]
+        D2[Call VC Adapter -> issue\ninto student wallet_id]
         D3{walt.id call\nsucceeds?}
         D4[Log failure;\nrequest stays in last\napproved state; retryable]
         D5[Store CREDENTIAL VALID;\nmark request ISSUED]
@@ -134,16 +135,18 @@ flowchart TD
     D3 -- yes --> D5 --> F1
 ```
 
-**Notes**
+### Notes
 
 - `BW` enforces FR-WAL-04: an active custodial wallet must be provisioned before issuance can proceed.
 - `C4` implements FR-APPR-09 (no double-counting the same approver).
 - `D3`/`D4` implements UC-10's extension: a failed walt.id call does not corrupt request state — it stays at "fully approved, not yet issued" and can be retried.
 - The MVP policy (`B8`/`C8` threshold) is N = 1, but the flow is drawn generically since N is Admin-configurable (FR-APPR-10, US-E5).
+<!-- markdownlint-enable MD024 -->
 
 ---
 
-## 3. Credential Revocation → Reissuance
+<!-- markdownlint-disable MD024 -->
+## 3. Credential Revocation -> Reissuance
 
 **Traces to:** UC-15, UC-16 · FR-CRED-09–13, FR-ELIG-10
 
@@ -168,7 +171,7 @@ flowchart TD
     end
 
     subgraph Approve["Approval & Issuance\n(see Diagram 2)"]
-        C1[[Request enters\nPENDING_APPROVAL →\nfull approval workflow]]
+        C1[[Request enters\nPENDING_APPROVAL ->\nfull approval workflow]]
         C2[New CREDENTIAL VALID,\nreferences superseded credential]
     end
 
@@ -179,13 +182,14 @@ flowchart TD
     B5 -- yes --> B7 --> C1 --> C2
 ```
 
-**Notes**
+### Notes
 
 - `B4`/`B5` is the enforcement point for FR-ELIG-10 and the reissuance extension in UC-16: a student's _past_ eligibility never carries over automatically — reissuance is treated as a brand-new issuance request, re-evaluated and re-approved from scratch (folds into Diagram 2 at `C1`).
+<!-- markdownlint-enable MD024 -->
 
 ---
 
-## 4. Share Creation → Public Verification
+## 4. Share Creation -> Public Verification
 
 **Traces to:** UC-11, UC-12, UC-13, UC-14 · FR-SHARE-01–07, FR-VER-01–08, NFR-02, NFR-07
 

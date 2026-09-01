@@ -100,7 +100,7 @@ flowchart TB
     Admin -->|staff account CRUD & roles| P14
     P14 <-->|read/write staff data| D1
     Registrar -->|view student list| P14
-    P14 <-->|read student accounts (account, graduation, wallet status)| D3
+    P14 <-->|"read student accounts (account, graduation, wallet status)"| D3
     P14 -->|user event| P13
 
     %% Program & rules

@@ -289,6 +289,32 @@ flowchart TB
 ## 8. Architectural Decisions
 
 ### Cross-Cutting Services: The Standalone AuthService
+
 **Decision:** `AuthService` is implemented as a standalone application service, not folded into `StaffService` or `StudentWalletService`.
 
-**Rationale:** Authentication is a cross-cutting concern consumed by all API controllers. Neither the Staff nor Student bounded contexts "own" the login process. By keeping `AuthService` standalone and dependent *only* on repository ports (e.g., `IStaffRepository`, `IStudentRepository`), we prevent circular dependencies, avoid leaking authentication concerns into domain logic, and maintain clear bounded context boundaries.
+**Rationale:** Authentication is a cross-cutting concern consumed by all API controllers. Neither the Staff nor Student bounded contexts "own" the login process. By keeping `AuthService` standalone and dependent _only_ on repository ports (e.g., `IStaffRepository`, `IStudentRepository`), we prevent circular dependencies, avoid leaking authentication concerns into domain logic, and maintain clear bounded context boundaries.
+
+### Separate Tables for `UniversityStaff` and `Student` (vs. Shared `User` Table)
+
+**Decision:** `UniversityStaff` and `Student` are modeled as completely separate domain entities and database tables (`university_staff` and `students`), rather than inheriting from a single shared `User` table or using Single Table Inheritance (STI).
+
+**Rationale & Advantages over Common Patterns (e.g., Shared `User` Table):**
+
+1. **Foreign Key Integrity & Strict Security Boundaries:**
+   - Staff and students have radically different security clearances and relational associations.
+   - Separate tables allow PostgreSQL foreign keys to enforce hard structural security boundaries:
+     - `CREDENTIAL_APPROVAL.approver_id` and `ELIGIBILITY_RULE_SET.created_by` enforce `REFERENCES university_staff(id)`. It is structurally impossible at the database constraint level for a student `id` to approve a credential or create eligibility rules.
+     - `CREDENTIAL.student_id` and `ACADEMIC_RECORD.student_id` enforce `REFERENCES students(id)`, preventing administrative staff accounts from mistakenly receiving student credentials or transcript records.
+   - In a shared `User` table with a `role` discriminator column, relational foreign keys cannot distinguish between roles, creating risk of privilege escalation if application-level checks fail.
+2. **Distinct Lifecycle & Ingestion Pipelines (AS-01 Compliance):**
+   - `Student` records originate **exclusively via inbound batch ingestion** (`AcademicRecordService.importRecord` from the Academic Record Source) and carry `source_record_ref`, custodial `wallet_id`, `graduation_status`, and `account_status`. They have no manual UI write path.
+   - `UniversityStaff` records are provisioned **manually by Platform Administrators** with explicit institutional roles (`REGISTRAR`, `APPROVER`, `ADMIN`) and `StaffStatus`.
+   - Merging both into a single table blurs this foundational trust and ingestion boundary.
+3. **Elimination of Nullable Column Pollution:**
+   - In a unified table, over 60% of columns (`wallet_id`, `wallet_status`, `student_number`, `program_id`, `source_record_ref`, `graduation_status`, `account_status`, `role`) would be nullable depending on user type, degrading schema clarity and requiring complex check constraints.
+4. **Performance, Indexing & Scale Disparity:**
+   - The student population scales to hundreds of thousands of records with high-frequency batch imports and wallet operations.
+   - Staff accounts comprise a small, stable set of internal users (dozens of rows).
+   - Separate tables enable targeted indexing, isolate high-volume student write loads from staff administrative queries, and allow independent caching strategies.
+5. **Orthogonal Authentication via Standalone Service:**
+   - Shared authentication mechanics (password hashing and JWT issuance) are cleanly handled by `AuthService` via repository ports (`IStaffRepository`, `IStudentRepository`), achieving code reuse without schema or domain coupling.
