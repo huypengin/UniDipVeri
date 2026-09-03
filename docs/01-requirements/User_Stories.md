@@ -39,10 +39,11 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 - _AC:_ Given a record import succeeds, when it completes, then a new `ELIGIBILITY_EVALUATION` is produced for the affected student/program.
 - _Traces to:_ FR-ELIG-01–02
 
-**US-B3.** As a Registrar, I want imported student and academic data to be read-only to me, so that I never accidentally introduce data the system should be treating as trusted, external input.
+**US-B3.** As a Registrar, I want imported student academic profile and achievement data to be read-only to me in the UI, so that I never accidentally introduce or tamper with data that the system treats as authoritative external input.
 
-- _AC:_ Given I am a Registrar, when I look for a "create/edit academic record" action, then none exists — only import (US-B1) can create or change this data.
-- _Traces to:_ AS-01, Architecture_Design.md §2
+- _AC:_ Given I am a Registrar, when I look for a manual "create student" or "edit academic record" action in the UI, then none exists — only the external ingestion pipeline (US-B1) can initialize or synchronize this data.
+- _Note:_ While academic achievement data is read-only to human users, the `Student` entity maintains an internal system lifecycle whose operational state (custodial wallet provisioning, account activation/deactivation, and graduation review) is updated by backend domain workflows.
+- _Traces to:_ AS-01, FR-STU-01, Architecture_Design.md §2
 
 ---
 
@@ -225,6 +226,12 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 - _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, account status, graduation status, and wallet status.
 - _Traces to:_ FR-USER-04, FR-STU-02, FR-WAL-03
+
+**US-J5.** As a Registrar or Platform Administrator, I want to deactivate or reactivate a student account, so that inactive or suspended students cannot access the system or receive credential issuances.
+
+- _AC:_ Given an active student account, when I deactivate it, then its `account_status` becomes `INACTIVE` and its custodial `wallet_status` automatically transitions to `INACTIVE`.
+- _AC:_ Given an inactive student account, when I reactivate it, then its `account_status` transitions back to `ACTIVE`.
+- _Traces to:_ FR-USER-04, FR-WAL-05, FR-STU-02
 
 ---
 

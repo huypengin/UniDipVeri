@@ -85,7 +85,7 @@ flowchart TD
 
 Design intent:
 
-- **Strict Ingestion Boundary:** `IAcademicRecordSourceAdapter` is the only write path for `STUDENT` and `ACADEMIC_RECORD` entities. The Registrar UI is strictly read-only for academic achievement data, enforcing assumption `AS-01` ("source records are trusted as correct on import").
+- **Strict Ingestion & Creation Boundary:** `IAcademicRecordSourceAdapter` is the only creation/initialization write path for new `STUDENT` and `ACADEMIC_RECORD` records. The Registrar UI offers no manual "create student" or "edit grades" forms, enforcing assumption `AS-01` ("source records are trusted as correct on import"). However, `STUDENT` is a stateful domain aggregate whose operational lifecycle attributes (`wallet_id`, `wallet_status`, `account_status`, `graduation_status`, `password_hash`) are updated by backend domain workflows (wallet provisioning, account activation/deactivation, and graduation evaluation).
 - **Custodial Wallet Provisioning:** `StudentWalletService.provisionWallet(...)` invokes `IWalletAdapter.provisionCustodialWallet()` to create a server-managed custodial wallet on `walt.id`, storing `wallet_id` and setting `wallet_status = ACTIVE`. If `walt.id` is unreachable, `wallet_status` is set to `FAILED`, enabling manual retry via `POST /api/students/{id}/wallet/provision`.
 - **Decoupled Eligibility Calculation:** `EligibilityService.evaluate(...)` evaluates student records against `EligibilityRuleSet` entities purely in memory/domain logic, producing an `EligibilityEvaluation` (`ELIGIBLE` or `NOT_ELIGIBLE`). It never interacts with `walt.id`.
 
