@@ -1,6 +1,6 @@
 # Software Requirements Specification — UniDipVeri
 
-**Version:** 0.2.1
+**Version:** 0.3.1
 
 **Project type:** Undergraduate thesis prototype
 
@@ -178,7 +178,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 ### 4.3 Program Management
 
 - **FR-PROG-01** Registrar users shall be able to create academic programs.
-- **FR-PROG-02** A program shall contain: name, degree level.
+- **FR-PROG-02** A program shall contain: name, full title (e.g., _Bachelor of Science in Computer Science_ or _Bachelor of Computer Science_), degree level.
 - **FR-PROG-03** A program shall have associated graduation eligibility rules.
 - **FR-PROG-04** Registrar users shall be able to configure the graduation eligibility rules for a program.
 
@@ -186,7 +186,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 
 - **FR-STU-01** The system shall create or update student records from the designated academic source.
 - **FR-STU-02** Registrar and Platform Administrator users shall be able to view imported student records and profiles.
-- **FR-STU-03** A student record shall contain at minimum: student ID, name, email, program, enrollment/graduation status, and wallet reference.
+- **FR-STU-03** A student record shall contain at minimum: student ID, name, email, program, account status, graduation status, and wallet reference.
 - **FR-STU-04** Students shall only be able to view their own credentials and profile.
 - **FR-STU-05** The system shall treat all student data entered from the Academic Record Source as authoritative input (see AS-01); it shall not perform independent eligibility verification.
 
@@ -282,15 +282,18 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-USER-01** Platform Administrator users shall be able to create university staff accounts and assign one or more roles (`REGISTRAR`, `APPROVER`, `ADMIN`).
 - **FR-USER-02** Platform Administrator users shall be able to view, update profile details of, and deactivate staff accounts.
 - **FR-USER-03** Platform Administrator users shall be able to modify the assigned roles of existing staff accounts.
-- **FR-USER-04** Registrar and Platform Administrator users shall be able to list and view student user accounts and their current status (`ACTIVE`, `GRADUATED`, `INACTIVE`).
+- **FR-USER-04** The system shall allow Registrar and Platform Administrator users to list and view student profiles, displaying both their:
+  - **Account Status:** `PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE` (Default is `PENDING_ACTIVATION` for newly imported data).
+  - **Graduation Status:** `NOT_STARTED`, `PENDING_REVIEW`, `ELIGIBLE`, `GRADUATED`, `REJECTED` (Default is `NOT_STARTED`).
 - **FR-USER-05** The system shall prevent deactivation or role removal of the last active Platform Administrator account.
 
 ### 4.15 Student Wallet Management
 
 - **FR-WAL-01** The system shall automatically provision a server-managed custodial wallet (via walt.id Wallet API) for a student upon record import if no wallet exists for that student.
 - **FR-WAL-02** Platform Administrator and Registrar users shall be able to trigger manual wallet provisioning or re-provisioning for a student whose wallet is missing or in a failed state.
-- **FR-WAL-03** The system shall store the provisioned `wallet_id` and maintain wallet status (`PENDING`, `ACTIVE`, `FAILED`) on the student record.
+- **FR-WAL-03** The system shall store the provisioned `wallet_id` and maintain wallet status (`PENDING`, `ACTIVE`, `FAILED`, `INACTIVE`) on the student record.
 - **FR-WAL-04** The system shall require a student to have an active provisioned wallet before executing credential issuance (FR-CRED-01).
+- **FR-WAL-05** When a student account is deactivated (`AccountStatus = INACTIVE`), the student's wallet status shall also transition to `INACTIVE`. The system shall prevent credential issuance to any wallet whose status is not `ACTIVE`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Data Flow Diagrams — UniDipVeri
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/03-design/Data_Model.md`, and `docs/03-design/Architecture_Design.md`. This document shows _what data moves where_, complementing the use cases (interaction detail) and the architecture doc (component/layering detail). Notation: external entities are rectangles, processes are rounded/circular nodes numbered `P<n>`, data stores are open-ended boxes numbered `D<n>`, and arrows are labeled data flows. It does not introduce any process, store, or flow that isn't implied by the SRS functional requirements.
 
@@ -100,7 +100,7 @@ flowchart TB
     Admin -->|staff account CRUD & roles| P14
     P14 <-->|read/write staff data| D1
     Registrar -->|view student list| P14
-    P14 <-->|read student accounts| D3
+    P14 <-->|"read student accounts (account, graduation, wallet status)"| D3
     P14 -->|user event| P13
 
     %% Program & rules
@@ -211,7 +211,7 @@ flowchart TB
     P3_2(("P3.2\nUpsert Student &\nAcademic Record"))
     P15_1(("P15.1\nCheck Wallet State"))
     P15_2(("P15.2\nCall walt.id Wallet API"))
-    P15_3(("P15.3\nSave wallet_id &\nStatus (ACTIVE/FAILED)"))
+    P15_3(("P15.3\nSave wallet_id &\nStatus (ACTIVE/FAILED/INACTIVE)"))
     P4_1(("P4.1\nLoad Record +\nActive Rule Set"))
     P4_2(("P4.2\nCheck Rules\n(credits, GPA, courses)"))
     P4_3(("P4.3\nRecord Result"))
@@ -276,7 +276,7 @@ flowchart TB
 
     Registrar -->|query students| P14_4
     Admin -->|query students| P14_4
-    P14_4 -->|read student records & wallet states| D3
+    P14_4 -->|read student profiles (account, graduation, wallet status)| D3
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 0.2.0
+**Version:** 0.3.1
 
 Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
@@ -46,8 +46,9 @@ erDiagram
         string name
         string code
         string issuer_id
-        string status
+        string status "ACTIVE | INACTIVE"
         datetime created_at
+        datetime updated_at
     }
 
     UNIVERSITY_STAFF {
@@ -66,8 +67,11 @@ erDiagram
         uuid id PK
         uuid university_id FK
         string name
-        string degree_level
-        string status
+        string full_title
+        string degree_level "BACHELOR | MASTER | DOCTORATE | ASSOCIATE"
+        string status "ACTIVE | INACTIVE"
+        datetime created_at
+        datetime updated_at
     }
 
     ELIGIBILITY_RULE_SET {
@@ -85,10 +89,11 @@ erDiagram
         string student_number
         string name
         string email
-        string status "ACTIVE | GRADUATED | INACTIVE"
+        string account_status "PENDING_ACTIVATION | ACTIVE | INACTIVE (default: PENDING_ACTIVATION)"
+        string graduation_status "NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED (default: NOT_STARTED)"
         string source_record_ref "identifier from Academic Record Source"
         string wallet_id "walt.id server-managed wallet identity"
-        string wallet_status "PENDING | ACTIVE | FAILED"
+        string wallet_status "PENDING | ACTIVE | FAILED | INACTIVE"
         datetime imported_at
         datetime updated_at
     }
@@ -182,19 +187,22 @@ erDiagram
         datetime verified_at
         string result
         string verifier_context
-        string ip_hash
     }
 ```
 
 ## 2. Notes on Entity Semantics & Lifecycle
 
 - **`UNIVERSITY_STAFF` management:** Platform Administrators manage staff rows. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
-- **`STUDENT` and `ACADEMIC_RECORD` are import-only tables.** There is no Registrar-facing manual "create student" write path (see `API_Specification.md` Section 4) — every row traces back to a `source_record_ref` from the Academic Record Source, making AS-01 ("source data trusted as correct") an enforceable data-layer boundary. `ACADEMIC_RECORD` keeps `source_snapshot_at` separate from `imported_at` so the model distinguishes "when the source system asserted this was true" from "when UniDipVeri received it."
-- **Student Wallet lifecycle:** Each `STUDENT` carries `wallet_id` and `wallet_status` (`PENDING | ACTIVE | FAILED`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. Credential issuance requires `wallet_status = ACTIVE`.
+- **`STUDENT` and `ACADEMIC_RECORD` Ingestion vs. Lifecycle Boundary:** There is no Registrar-facing manual "create student" or "edit academic record" write path in the UI (enforcing `AS-01` "source data trusted as correct"). Student and transcript rows are initialized strictly via the inbound ingestion pipeline (`AcademicRecordService.importRecord`). However, while `ACADEMIC_RECORD` is an immutable snapshot, `STUDENT` is a stateful domain aggregate whose operational lifecycle fields (`account_status`, `graduation_status`, `wallet_id`, `wallet_status`, `password_hash`) are updated by internal system domain workflows (wallet provisioning, graduation evaluation, credential issuance, and account activation/deactivation). In addition, subsequent authoritative batch imports synchronize updated profile data (name, email) per `FR-STU-01`.
+- **Student Account, Graduation & Wallet lifecycle:** Each `STUDENT` carries `account_status` (`PENDING_ACTIVATION | ACTIVE | INACTIVE`, default `PENDING_ACTIVATION` for newly imported data), `graduation_status` (`NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED`, default `NOT_STARTED`), and `wallet_id` / `wallet_status` (`PENDING | ACTIVE | FAILED | INACTIVE`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. When a student account is deactivated (`INACTIVE`), its `wallet_status` is also transitioned to `INACTIVE`. Credential issuance requires `wallet_status = ACTIVE` and `graduation_status = ELIGIBLE` (or passing evaluation).
 - **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a *share link* stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.
 - **`CREDENTIAL_SCHEMA` and walt.id Profile Binding:** `CREDENTIAL_SCHEMA.schema_uri` holds the identifier of the preconfigured profile defined in walt.id's `issuer2-profiles.conf` (e.g. `AcademicDiploma_jwt_vc_json`). UniDipVeri does not generate or push cryptographic schemas into walt.id dynamically at runtime; it passes this preconfigured identifier during the OID4VCI issuance call (`WaltIdVCAdapter`).
+- **`UNIVERSITY.issuer_id` and Static walt.id Binding:** `UNIVERSITY.issuer_id` stores the institution's active public Decentralized Identifier (e.g. `did:web:miu.edu` or `did:jwk:...`). Because the walt.id Community Stack statically preconfigures private signing keys and issuer profiles via `issuer2-profiles.conf` at deployment/boot time (see AS-03/AS-04), `UNIVERSITY.issuer_id` does not feed KMS keys to walt.id dynamically at runtime. Instead, it serves as the application-level authoritative record for (1) issuer authorization whitelisting during public verification (`VerificationService` validates `credential.issuer.id == University.issuer_id` to prevent fraud and return `UNKNOWN_ISSUER` per FR-VER-05), (2) institutional metadata presentation on diploma cards and UI summaries without hardcoded DID strings, and (3) deterministic environment pairing between PostgreSQL test/staging/production seeds and their corresponding walt.id deployment profiles.
 - **`ELIGIBILITY_RULE_SET` is versioned per program**, and `ELIGIBILITY_EVALUATION` stores a foreign key to the specific version it ran against (not just to `PROGRAM`). This directly implements FR-ELIG-10: editing a program's rules later does not retroactively change what an old evaluation (or a credential issued off it) meant.
 - **`CREDENTIAL_ISSUANCE_REQUEST.eligibility_evaluation_id` is a hard link, not just an audit trail entry.** The application layer must reject request creation (`API_Specification.md` Section 6) unless this links to an evaluation whose `result = ELIGIBLE`.
+- **BaseEntity Architectural Foundation:** All 14 domain entities (`University`, `UniversityStaff`, `Program`, `Student`, `AcademicRecord`, `EligibilityRuleSet`, `EligibilityEvaluation`, `ApprovalPolicy`, `CredentialIssuanceRequest`, `CredentialApproval`, `CredentialSchema`, `Credential`, `Share`, `VerificationEvent`) inherit from the abstract `BaseEntity` in the Domain core. `BaseEntity` encapsulates identity (`UUID id`), timestamps (`created_at`, `updated_at`), and identity-based equality semantics (`Equals`, `GetHashCode`, `==`, `!=`). Furthermore, all domain entities enforce rich encapsulation (`private set` properties, protected parameterless constructors for EF Core, and static guarded `Create(...)` factory methods) to ensure domain invariants cannot be bypassed.
+- **Verification Event Privacy & Abuse Prevention:** Client IP addresses (`ip_hash`) are intentionally omitted from `VERIFICATION_EVENT` to uphold graduate privacy and avoid unnecessary PII storage in audit logs. For abuse prevention (e.g. brute-force token scans, bot crawling, or DDoS mitigation), rate limiting is handled at the network and middleware perimeter (such as reverse proxy / API Gateway rate-limiting policies or ASP.NET Core RateLimiter middleware) rather than in core business domain tables.
+- **Strict Relational Separation of `UNIVERSITY_STAFF` and `STUDENT` Tables:** `UNIVERSITY_STAFF` and `STUDENT` are intentionally isolated into distinct relational tables rather than unified under a polymorphic `USER` table. This design guarantees database-level foreign key security (e.g. `CREDENTIAL_APPROVAL.approver_id` strictly references `UNIVERSITY_STAFF`, making unauthorized student approval structurally impossible in PostgreSQL), prevents nullable column sprawl (avoiding nullable `wallet_id`, `student_number`, `graduation_status` on staff rows), maintains the import-only write boundary for students (`AS-01`), and optimizes indexing across vastly different data volumes. Common authentication is provided orthogonally by `AuthService`.
 - **Full NFR-06 traceability chain:** `UNIVERSITY_STAFF` (configured) → `ACADEMIC_RECORD` (imported) → `STUDENT.wallet_id` (provisioned) → `ELIGIBILITY_EVALUATION` (computed) → `CREDENTIAL_ISSUANCE_REQUEST` (created only if eligible) → `CREDENTIAL_APPROVAL` (one or more) → `CREDENTIAL` (issued). Every arrow is a foreign key, so the chain is reconstructable with database joins alone.
 
 ## 3. Application-Level Credential Representation
@@ -225,11 +233,13 @@ flowchart TD
 {
     "credentialType": "AcademicDiploma",
     "schemaVersion": "1.0",
+    "id": "did:web:miu.edu",
     "issuer": "Mekong International University",
     "subject": {
+        "id": "miu-bscs-2026-0348",
         "name": "Nguyen Minh Anh",
         "studentNumber": "MIU2026-001",
-        "degree": "Bachelor of Computer Science",
+        "degree": "Bachelor of Science in Computer Science",
         "program": "Computer Science",
         "degreeLevel": "Bachelor",
         "awardDate": "2026-06-15"
@@ -237,4 +247,4 @@ flowchart TD
 }
 ```
 
-Note what is deliberately _not_ in this payload: `ACADEMIC_RECORD` details (GPA, course list) and `ELIGIBILITY_EVALUATION` results. Those justify _why_ the credential was issued but are not part of the credential subject itself and are never sent to walt.id or exposed on the public verification page (SRS NFR-02, NFR-07).
+Note what is deliberately *not* in this payload: `ACADEMIC_RECORD` details (GPA, course list) and `ELIGIBILITY_EVALUATION` results. Those justify *why* the credential was issued but are not part of the credential subject itself and are never sent to walt.id or exposed on the public verification page (SRS NFR-02, NFR-07).

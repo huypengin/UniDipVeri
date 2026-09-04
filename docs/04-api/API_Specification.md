@@ -1,6 +1,6 @@
 # API Specification
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` and `docs/03-design/Class_Diagram.md`. Single tenant: there is no `{universityId}` path segment anywhere.
 
@@ -44,7 +44,7 @@ All endpoints are implemented as thin HTTP controllers delegating directly to do
 
 ## 2. Authentication
 
-```
+```http
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/auth/me
@@ -54,7 +54,7 @@ GET    /api/auth/me
 
 ## 3. University Configuration
 
-```
+```http
 GET    /api/university
 PATCH  /api/university
 ```
@@ -63,7 +63,7 @@ PATCH  /api/university
 
 ## 4. Staff User Management (Admin Only)
 
-```
+```http
 GET    /api/staff
 POST   /api/staff
 GET    /api/staff/{staffId}
@@ -126,7 +126,7 @@ Response:
 
 ## 5. Student Management & Wallet Provisioning
 
-```
+```http
 GET    /api/students
 GET    /api/students/{studentId}
 POST   /api/students/{studentId}/wallet/provision
@@ -151,7 +151,8 @@ Response:
             "email": "anh.nguyen@student.miu.example",
             "programId": "program-uuid",
             "programName": "Computer Science",
-            "status": "ACTIVE",
+            "accountStatus": "ACTIVE",
+            "graduationStatus": "GRADUATED",
             "walletStatus": "ACTIVE",
             "importedAt": "2026-08-20T08:30:00Z"
         }
@@ -183,7 +184,7 @@ Response:
 
 ## 6. Programs & Eligibility Rules
 
-```
+```http
 GET    /api/programs
 POST   /api/programs
 GET    /api/programs/{programId}
@@ -212,7 +213,7 @@ Each write creates a new rule-set version; existing `ELIGIBILITY_EVALUATION` rec
 
 ## 7. Academic Records (Inbound Ingestion)
 
-```
+```http
 POST   /api/academic-records/import
 GET    /api/students/{studentId}/academic-record
 ```
@@ -238,7 +239,7 @@ This creates or updates the `STUDENT` record, provisions a server-managed custod
 
 ## 8. Eligibility Evaluation
 
-```
+```http
 POST   /api/students/{studentId}/eligibility/evaluate
 GET    /api/students/{studentId}/eligibility
 ```
@@ -272,7 +273,7 @@ Response:
 
 ## 9. Credential Issuance Requests & Approval
 
-```
+```http
 POST   /api/credential-requests
 GET    /api/credential-requests
 GET    /api/credential-requests/{requestId}
@@ -341,7 +342,7 @@ POST /api/credential-requests/{requestId}/reject
 
 Issuance is internal, triggered automatically when a request satisfies the approval policy:
 
-```
+```md
 1. Request fully approved (implies passing eligibility evaluation and active wallet)
 2. Load preconfigured schema configuration & status list index
 3. Build credential subject
@@ -350,7 +351,7 @@ Issuance is internal, triggered automatically when a request satisfies the appro
 6. Mark request ISSUED, credential status VALID
 ```
 
-```
+```http
 GET    /api/credentials
 GET    /api/credentials/{credentialId}
 POST   /api/credentials/{credentialId}/revoke
@@ -370,7 +371,7 @@ This updates `CREDENTIAL.status = REVOKED` and `revocation_reason` in PostgreSQL
 
 **Reissue (`CredentialService.reissue`):** creates a new `CredentialIssuanceRequest` linked via `supersedesCredentialId`. It is re-evaluated for eligibility and re-enters the full approval workflow:
 
-```
+```http
 POST /api/credentials/{credentialId}/reissue
 ```
 
@@ -378,7 +379,7 @@ POST /api/credentials/{credentialId}/reissue
 
 ## 11. Student Portal
 
-```
+```http
 GET /api/me
 GET /api/me/credentials
 GET /api/me/shares
@@ -408,7 +409,7 @@ Grouped by `shareId`, one entry per share the student has created. Each entry sh
 
 ## 12. Student Shares
 
-```
+```http
 POST   /api/credentials/{credentialId}/shares
 GET    /api/credentials/{credentialId}/shares
 POST   /api/shares/{shareId}/revoke
@@ -442,7 +443,7 @@ No authentication required. Never returns internal identifiers, source academic-
 
 **Resolve share pre-check (`ShareService.resolveShare`):**
 
-```
+```http
 GET /api/public/shares/{token}
 ```
 
@@ -455,16 +456,16 @@ GET /api/public/shares/{token}
 
 **Verify (`VerificationService.verify`):**
 
-```
+```http
 POST /api/public/shares/{token}/verify
 ```
 
 Backend flow:
 
-```
-Share token → valid? → credential exists? → credential active?
-   → walt.id verifier (IVCAdapter) → issuer valid? → VC valid in wallet?
-   → log VERIFICATION_EVENT to PostgreSQL → return result
+```markdown
+Share token -> valid? -> credential exists? -> credential active?
+   -> walt.id verifier (IVCAdapter) -> issuer valid? -> VC valid in wallet?
+   -> log VERIFICATION_EVENT to PostgreSQL -> return result
 ```
 
 Response:
@@ -496,7 +497,7 @@ Response:
 
 Publicly accessible endpoint serving the W3C Bitstring Status List for cryptographic credential status checks (consumed by external verifiers and walt.id):
 
-```
+```http
 GET /api/status/{listId}
 ```
 
@@ -527,7 +528,7 @@ Response:
 
 Registrar/Approver/Admin (`AuditService.getAuditHistory`):
 
-```
+```http
 GET /api/audit
 GET /api/audit/academic-records
 GET /api/audit/eligibility-evaluations

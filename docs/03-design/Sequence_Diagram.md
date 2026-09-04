@@ -1,6 +1,6 @@
 # Sequence Diagrams — UniDipVeri
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/02-analysis/DFD.md`, `docs/03-design/Architecture_Design.md`, and `docs/03-design/Class_Diagram.md`. Where the Activity Diagrams show control flow and decision points, these diagrams show **object interaction over time** — which layer calls which, in what order, and what each call returns — down to the Application Service, Repository Port, and Adapter names used in the class diagram. All diagrams are Mermaid `sequenceDiagram`s.
 
@@ -169,7 +169,7 @@ sequenceDiagram
     alt wallet_status already ACTIVE
         WS-->>STC: WalletStatusDTO(ACTIVE) — no-op
         STC-->>Staff: 200 OK (already active)
-    else PENDING or FAILED
+    else PENDING, FAILED, or INACTIVE
         WS->>SRepo: set wallet_status = PENDING
         WS->>WA: provisionCustodialWallet(studentIdentifier)
         WA->>Walt: create server-managed wallet
@@ -653,7 +653,7 @@ sequenceDiagram
     WS->>Repo: listPaged(filter)
     Repo-->>WS: PagedList<Student>
     WS-->>STC: PagedResult<StudentDTO>
-    STC-->>Staff: 200 OK — student number, name, program, enrollment status, wallet status
+    STC-->>Staff: 200 OK — student number, name, program, account status, graduation status, wallet status
 
     Staff->>STC: GET /api/students/{id}
     STC->>WS: getStudent(studentId)

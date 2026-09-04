@@ -1,6 +1,6 @@
 # User Stories
 
-**Version:** 0.2.0
+**Version:** 0.3.1
 
 Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
@@ -39,10 +39,11 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 - _AC:_ Given a record import succeeds, when it completes, then a new `ELIGIBILITY_EVALUATION` is produced for the affected student/program.
 - _Traces to:_ FR-ELIG-01–02
 
-**US-B3.** As a Registrar, I want imported student and academic data to be read-only to me, so that I never accidentally introduce data the system should be treating as trusted, external input.
+**US-B3.** As a Registrar, I want imported student academic profile and achievement data to be read-only to me in the UI, so that I never accidentally introduce or tamper with data that the system treats as authoritative external input.
 
-- _AC:_ Given I am a Registrar, when I look for a "create/edit academic record" action, then none exists — only import (US-B1) can create or change this data.
-- _Traces to:_ AS-01, Architecture_Design.md §2
+- _AC:_ Given I am a Registrar, when I look for a manual "create student" or "edit academic record" action in the UI, then none exists — only the external ingestion pipeline (US-B1) can initialize or synchronize this data.
+- _Note:_ While academic achievement data is read-only to human users, the `Student` entity maintains an internal system lifecycle whose operational state (custodial wallet provisioning, account activation/deactivation, and graduation review) is updated by backend domain workflows.
+- _Traces to:_ AS-01, FR-STU-01, Architecture_Design.md §2
 
 ---
 
@@ -50,7 +51,7 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-C1.** As a Registrar, I want to create and edit academic programs, so that students and credentials can be organized by program.
 
-- _AC:_ Given I submit a program name and degree level, when I save, then the program appears in the program list under MIU.
+- _AC:_ Given I submit a program name, full title, and degree level, when I save, then the program appears in the program list under MIU.
 - _Traces to:_ FR-PROG-01, FR-PROG-02
 
 **US-C2.** As a Registrar, I want to define graduation eligibility rules for a program (minimum credits, minimum GPA, required courses), so that eligibility can be checked automatically instead of manually.
@@ -221,10 +222,16 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 - _AC:_ Given I attempt to deactivate the last remaining active Admin, when I submit, then the system refuses the action.
 - _Traces to:_ FR-USER-02, FR-USER-05, FR-AUD-09
 
-**US-J4.** As a Registrar or Administrator, I want to view student accounts, enrollment status, and wallet provisioning status in a consolidated list, so that I can oversee cohort readiness.
+**US-J4.** As a Registrar or Administrator, I want to view student accounts, account status, graduation status, and wallet provisioning status in a consolidated list, so that I can oversee cohort readiness.
 
-- _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, enrollment status, and wallet status.
+- _AC:_ Given students are registered/imported, when I open the student list, then I see student number, name, program, account status, graduation status, and wallet status.
 - _Traces to:_ FR-USER-04, FR-STU-02, FR-WAL-03
+
+**US-J5.** As a Registrar or Platform Administrator, I want to deactivate or reactivate a student account, so that inactive or suspended students cannot access the system or receive credential issuances.
+
+- _AC:_ Given an active student account, when I deactivate it, then its `account_status` becomes `INACTIVE` and its custodial `wallet_status` automatically transitions to `INACTIVE`.
+- _AC:_ Given an inactive student account, when I reactivate it, then its `account_status` transitions back to `ACTIVE`.
+- _Traces to:_ FR-USER-04, FR-WAL-05, FR-STU-02
 
 ---
 
@@ -238,8 +245,13 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 **US-K2.** As a Registrar or Platform Administrator, I want to manually re-provision or retry wallet creation for a student with a missing or failed wallet, so that any transient failure can be resolved before credential issuance.
 
-- _AC:_ Given a student with `FAILED` or `PENDING` wallet status, when I click "Retry Wallet Provisioning", then the system contacts walt.id, provisions the wallet, and updates status to `ACTIVE`.
+- _AC:_ Given a student with `FAILED`, `PENDING` or `INACTIVE` wallet status, when I click "Retry Wallet Provisioning", then the system contacts walt.id, provisions the wallet, and updates status to `ACTIVE`.
 - _Traces to:_ FR-WAL-02, FR-WAL-03, FR-WAL-04
+
+**US-K3.** As the system, I want to set a student's wallet status to INACTIVE when their student account is deactivated, so that inactive student accounts cannot receive newly issued credentials.
+
+- _AC:_ Given an active student with an active wallet, when their account is deactivated, then their `wallet_status` is automatically transitioned to `INACTIVE`.
+- _Traces to:_ FR-WAL-03, FR-WAL-05, FR-USER-04
 
 ---
 

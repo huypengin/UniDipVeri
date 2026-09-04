@@ -1,6 +1,6 @@
 # Use Cases
 
-**Version:** 0.2.0
+**Version:** 0.3.1
 
 Companion to `docs/01-requirements/SRS.md`. Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
 
@@ -208,7 +208,7 @@ flowchart LR
 **Extensions:**
 
 - 1a. Student's latest evaluation is `NOT_ELIGIBLE` → system refuses to create the request and shows the failed requirements.
-- 1b. Student has no active wallet (`PENDING` or `FAILED`) → system prompts Registrar to provision/retry student wallet.
+- 1b. Student has no active wallet (`PENDING`, `FAILED` or `INACTIVE`) → system prompts Registrar to provision/retry student wallet.
 - 1c. A pending or already-issued (non-superseded) request already exists for this student/credential type → system refuses duplicate creation.
 
 **Postconditions:** A request awaits approval, or was rejected at creation for ineligibility.
@@ -406,7 +406,7 @@ flowchart LR
 
 **Main success scenario:**
 
-1. Registrar creates or edits a program (name, degree level).
+1. Registrar creates or edits a program (name, full title, degree level).
 2. System stores the program under the single university.
 
 **Related requirements:** FR-PROG-01, FR-PROG-02, FR-UNI-02
@@ -465,7 +465,7 @@ flowchart LR
 **Main success scenario:**
 
 1. Staff user opens the Student Management list.
-2. System displays registered students, including student number, name, email, enrolled program, enrollment status (`ACTIVE`, `GRADUATED`, `INACTIVE`), and wallet status (`ACTIVE`, `PENDING`, `FAILED`).
+2. System displays registered students, including student number, name, email, enrolled program, account status (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`), graduation status (`NOT_STARTED`, `PENDING_REVIEW`, `ELIGIBLE`, `GRADUATED`, `REJECTED`), and wallet status (`ACTIVE`, `PENDING`, `FAILED`, `INACTIVE`).
 3. Staff user can filter/search students and view detailed student profiles, linked academic records, eligibility evaluations, and credentials.
 
 **Postconditions:** Staff user has full visibility into student account state and wallet readiness.
