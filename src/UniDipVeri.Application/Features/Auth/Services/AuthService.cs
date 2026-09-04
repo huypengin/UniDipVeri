@@ -24,9 +24,9 @@ public sealed class AuthService : IAuthService
         _sessionIssuer = sessionIssuer;
     }
 
-    public async Task<AuthResult> AuthenticateAsync(string email, string password, CancellationToken ct = default)
+    public async Task<AuthResult> AuthenticateStaffAsync(string email, string password, CancellationToken ct = default)
     {
-        // 1. Attempt to authenticate as Staff (includes Admins, Registrars, Approvers)
+        // Attempt to authenticate as Staff (includes Admins, Registrars, Approvers)
         var staff = await _staffRepository.GetByEmailAsync(email, ct);
         if (staff is not null)
         {
@@ -39,7 +39,12 @@ public sealed class AuthService : IAuthService
             return AuthResult.Success(token);
         }
 
-        // 2. Attempt to authenticate as Student
+        return AuthResult.Failure("Invalid email or password.");
+    }
+
+    public async Task<AuthResult> AuthenticateStudentAsync(string email, string password, CancellationToken ct = default)
+    {
+        // Attempt to authenticate as Student
         var student = await _studentRepository.GetByEmailAsync(email, ct);
         if (student is not null)
         {
@@ -52,7 +57,6 @@ public sealed class AuthService : IAuthService
             return AuthResult.Success(token);
         }
 
-        // 3. User not found (Return generic message to prevent username enumeration)
         return AuthResult.Failure("Invalid email or password.");
     }
 }

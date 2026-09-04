@@ -49,7 +49,7 @@ public class AuthServiceTests
             .Returns(new SessionToken("jwt-token-staff", DateTime.UtcNow.AddHours(1)));
 
         // Act
-        var result = await _authService.AuthenticateAsync("staff@test.com", "password123");
+        var result = await _authService.AuthenticateStaffAsync("staff@test.com", "password123");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -73,7 +73,7 @@ public class AuthServiceTests
             .ReturnsAsync(staff);
 
         // Act
-        var result = await _authService.AuthenticateAsync("staff@test.com", "password123");
+        var result = await _authService.AuthenticateStaffAsync("staff@test.com", "password123");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -95,8 +95,6 @@ public class AuthServiceTests
             id: studentId);
         student.ActivateAccount();
 
-        _staffRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UniversityStaff?)null);
         _studentRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(student);
         _hasherMock.Setup(h => h.VerifyPassword("studentpass", "hashed_pass"))
@@ -105,7 +103,7 @@ public class AuthServiceTests
             .Returns(new SessionToken("jwt-token-student", DateTime.UtcNow.AddHours(1)));
 
         // Act
-        var result = await _authService.AuthenticateAsync("student@test.com", "studentpass");
+        var result = await _authService.AuthenticateStudentAsync("student@test.com", "studentpass");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -125,13 +123,11 @@ public class AuthServiceTests
             "REF123",
             "hashed_pass");
 
-        _staffRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UniversityStaff?)null);
         _studentRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(student);
 
         // Act
-        var result = await _authService.AuthenticateAsync("student@test.com", "studentpass");
+        var result = await _authService.AuthenticateStudentAsync("student@test.com", "studentpass");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -151,13 +147,11 @@ public class AuthServiceTests
             "hashed_pass");
         student.DeactivateAccount();
 
-        _staffRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UniversityStaff?)null);
         _studentRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(student);
 
         // Act
-        var result = await _authService.AuthenticateAsync("student@test.com", "studentpass");
+        var result = await _authService.AuthenticateStudentAsync("student@test.com", "studentpass");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -174,7 +168,14 @@ public class AuthServiceTests
             .ReturnsAsync((Student?)null);
 
         // Act
-        var result = await _authService.AuthenticateAsync("unknown@test.com", "pass");
+        var result = await _authService.AuthenticateStaffAsync("unknown@test.com", "pass");
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be("Invalid email or password.");
+
+        // Act
+        result = await _authService.AuthenticateStudentAsync("unknown@test.com", "pass");
 
         // Assert
         result.IsSuccess.Should().BeFalse();
