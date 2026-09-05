@@ -424,20 +424,23 @@ classDiagram
 
     class IStaffRepository {
         <<interface>>
-        +findById(UUID id) UniversityStaff
-        +findByEmail(string email) UniversityStaff
+        +getById(UUID id) UniversityStaff
+        +getByEmail(string email) UniversityStaff
         +countActiveAdmins() int
         +listAll() List~UniversityStaff~
-        +save(UniversityStaff staff) void
+        +add(UniversityStaff staff) void
         +update(UniversityStaff staff) void
     }
 
     class IStudentRepository {
         <<interface>>
-        +findById(UUID id) Student
-        +findByStudentNumber(string number) Student
+        +getById(UUID id) Student
+        +getByEmail(string email) Student
+        +getByStudentNumber(string number) Student
+        +getBySourceRecordRef(string ref) Student
         +listPaged(StudentFilter filter) PagedList~Student~
-        +save(Student student) void
+        +listAll() List~Student~
+        +add(Student student) void
         +update(Student student) void
     }
 
@@ -526,6 +529,20 @@ classDiagram
         <<interface>>
         +generateOpaqueToken() string
         +hashToken(string token) string
+    }
+
+    class ISessionIssuer {
+        <<interface>>
+        +issueStaffSession(UUID staffId, string role) SessionToken
+        +issueStudentSession(UUID studentId, string studentNumber) SessionToken
+        +validateToken(string token) ClaimsPrincipal
+    }
+
+    class IAuthService {
+        <<interface>>
+        +authenticateStaff(string email, string password) AuthResult
+        +authenticateStudent(string email, string password) AuthResult
+        +requireRole(ClaimsPrincipal principal, StaffRole requiredRole) bool
     }
 ```
 
@@ -626,6 +643,19 @@ classDiagram
         +getAuditHistory(AuditScopeDTO scope) List~AuditEventDTO~
     }
 
+    class AuthService {
+        -IStaffRepository staffRepo
+        -IStudentRepository studentRepo
+        -IPasswordHasher passwordHasher
+        -ISessionIssuer sessionIssuer
+        +authenticateStaff(string email, string password) AuthResult
+        +authenticateStudent(string email, string password) AuthResult
+        +requireRole(ClaimsPrincipal principal, StaffRole requiredRole) bool
+    }
+
+    %% Service -> Port realization
+    AuthService ..|> IAuthService
+
     %% Cross-service orchestration (direct calls, no mediator)
     AcademicRecordService ..> StudentWalletService : triggers provisionWallet()
     AcademicRecordService ..> EligibilityService : triggers evaluate()
@@ -651,21 +681,24 @@ classDiagram
     direction TB
 
     class PostgresStaffRepository {
-        -NpgsqlConnection dbConnection
-        +findById(UUID id) UniversityStaff
-        +findByEmail(string email) UniversityStaff
+        -UniDipVeriDbContext dbContext
+        +getById(UUID id) UniversityStaff
+        +getByEmail(string email) UniversityStaff
         +countActiveAdmins() int
         +listAll() List~UniversityStaff~
-        +save(UniversityStaff staff) void
+        +add(UniversityStaff staff) void
         +update(UniversityStaff staff) void
     }
 
     class PostgresStudentRepository {
-        -NpgsqlConnection dbConnection
-        +findById(UUID id) Student
-        +findByStudentNumber(string number) Student
+        -UniDipVeriDbContext dbContext
+        +getById(UUID id) Student
+        +getByEmail(string email) Student
+        +getByStudentNumber(string number) Student
+        +getBySourceRecordRef(string ref) Student
         +listPaged(StudentFilter filter) PagedList~Student~
-        +save(Student student) void
+        +listAll() List~Student~
+        +add(Student student) void
         +update(Student student) void
     }
 
@@ -758,6 +791,13 @@ classDiagram
         +hashToken(string token) string
     }
 
+    class JwtSessionIssuer {
+        -JwtSettings settings
+        +issueStaffSession(UUID staffId, string role) SessionToken
+        +issueStudentSession(UUID studentId, string studentNumber) SessionToken
+        +validateToken(string token) ClaimsPrincipal
+    }
+
     %% Interface Realizations
     PostgresStaffRepository ..|> IStaffRepository
     PostgresStudentRepository ..|> IStudentRepository
@@ -774,6 +814,7 @@ classDiagram
     HttpAcademicRecordSourceAdapter ..|> IAcademicRecordSourceAdapter
     BcryptPasswordHasher ..|> IPasswordHasher
     CryptoTokenGenerator ..|> ITokenGenerator
+    JwtSessionIssuer ..|> ISessionIssuer
 ```
 
 ---
@@ -787,7 +828,9 @@ classDiagram
     direction TB
 
     class StaffController {
+        -IAuthService authService
         -StaffService staffService
+        +login(LoginRequest req) ActionResult
         +createStaff(StaffCreateDTO req) ActionResult
         +updateStaff(UUID staffId, StaffUpdateDTO req) ActionResult
         +deactivateStaff(UUID staffId) ActionResult
@@ -795,9 +838,11 @@ classDiagram
     }
 
     class StudentController {
+        -IAuthService authService
         -StudentWalletService studentWalletService
-        +listStudents(int page, int limit) ActionResult
+        +login(LoginRequest req) ActionResult
         +getStudent(UUID studentId) ActionResult
+        +listStudents(int page, int limit) ActionResult
         +provisionWallet(UUID studentId) ActionResult
     }
 
@@ -849,7 +894,9 @@ classDiagram
     }
 
     %% Controller -> Service linkage
+    StaffController --> IAuthService : calls
     StaffController --> StaffService : calls
+    StudentController --> IAuthService : calls
     StudentController --> StudentWalletService : calls
     AcademicRecordController --> AcademicRecordService : calls
     EligibilityController --> EligibilityService : calls

@@ -22,4 +22,8 @@
     <ProjectReference Include="..\UniDipVeri.Domain\UniDipVeri.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="UniDipVeri.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

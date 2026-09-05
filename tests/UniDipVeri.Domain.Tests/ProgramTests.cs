@@ -2,7 +2,7 @@ using FluentAssertions;
 using UniDipVeri.Domain.Enums;
 using ProgramEntity = UniDipVeri.Domain.Entities.Program;
 
-namespace UniDipVeri.UnitTests.Domain;
+namespace UniDipVeri.Domain.Tests;
 
 public class ProgramTests
 {

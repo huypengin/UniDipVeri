@@ -6,6 +6,10 @@
     <Project Path="src/UniDipVeri.WebApi/UniDipVeri.WebApi.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/UniDipVeri.UnitTests/UniDipVeri.UnitTests.csproj" />
+    <Project Path="tests/UniDipVeri.Application.Tests/UniDipVeri.Application.Tests.csproj" />
+    <Project Path="tests/UniDipVeri.Domain.Tests/UniDipVeri.Domain.Tests.csproj" />
+    <Project Path="tests/UniDipVeri.Infrastructure.Tests/UniDipVeri.Infrastructure.Tests.csproj" />
+    <Project Path="tests/UniDipVeri.IntegrationTests/UniDipVeri.IntegrationTests.csproj" />
+    <Project Path="tests/UniDipVeri.WebApi.Tests/UniDipVeri.WebApi.Tests.csproj" />
   </Folder>
 </Solution>

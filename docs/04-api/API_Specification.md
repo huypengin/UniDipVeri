@@ -10,45 +10,109 @@ Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 
 
 All endpoints are implemented as thin HTTP controllers delegating directly to domain-aligned **Application Services** via dependency injection:
 
-| HTTP Method & Path                             | Application Service      | Method            | Side Effects / Persisted State                                                 |
-| :--------------------------------------------- | :----------------------- | :---------------- | :----------------------------------------------------------------------------- |
-| `POST /api/auth/login`                         | `AuthService`            | `login`           | Generates JWT session token                                                    |
-| `POST /api/staff`                              | `StaffService`           | `createStaff`     | Persists `UNIVERSITY_STAFF`                                                    |
-| `PATCH /api/staff/{id}`                        | `StaffService`           | `updateStaff`     | Updates `UNIVERSITY_STAFF`                                                     |
-| `POST /api/staff/{id}/deactivate`              | `StaffService`           | `deactivateStaff` | Sets `UNIVERSITY_STAFF.status = INACTIVE`                                      |
-| `GET /api/staff`                               | `StaffService`           | `listStaff`       | None (Read-only)                                                               |
-| `GET /api/students`                            | `StudentWalletService`   | `listStudents`    | None (Read-only)                                                               |
-| `GET /api/students/{id}`                       | `StudentWalletService`   | `getStudent`      | None (Read-only)                                                               |
-| `POST /api/students/{id}/wallet/provision`     | `StudentWalletService`   | `provisionWallet` | Calls `IWalletAdapter`, updates `STUDENT.wallet_id`                            |
-| `POST /api/academic-records/import`            | `AcademicRecordService`  | `importRecord`    | Persists `STUDENT` & `ACADEMIC_RECORD`, triggers wallet & eligibility          |
-| `GET /api/students/{id}/academic-record`       | `AcademicRecordService`  | `getRecord`       | None (Read-only)                                                               |
-| `POST /api/students/{id}/eligibility/evaluate` | `EligibilityService`     | `evaluate`        | Persists `ELIGIBILITY_EVALUATION`                                              |
-| `GET /api/students/{id}/eligibility`           | `EligibilityService`     | `getLatestResult` | None (Read-only)                                                               |
-| `POST /api/credential-requests`                | `IssuanceRequestService` | `createRequest`   | Persists `CREDENTIAL_ISSUANCE_REQUEST`                                         |
-| `GET /api/credential-requests`                 | `IssuanceRequestService` | `listPending`     | None (Read-only)                                                               |
-| `POST /api/credential-requests/{id}/approve`   | `IssuanceRequestService` | `approve`         | Persists `CREDENTIAL_APPROVAL`, calls `CredentialService.issue()` on threshold |
-| `POST /api/credential-requests/{id}/reject`    | `IssuanceRequestService` | `reject`          | Updates `CREDENTIAL_ISSUANCE_REQUEST.status = REJECTED`                        |
-| `GET /api/credentials`                         | `CredentialService`      | `listCredentials` | None (Read-only)                                                               |
-| `GET /api/credentials/{id}`                    | `CredentialService`      | `getDetails`      | None (Read-only)                                                               |
-| `POST /api/credentials/{id}/revoke`            | `CredentialService`      | `revoke`          | Updates status list & sets `CREDENTIAL.status = REVOKED`                       |
-| `POST /api/credentials/{id}/reissue`           | `CredentialService`      | `reissue`         | Creates superseding `CREDENTIAL_ISSUANCE_REQUEST`                              |
-| `GET /api/status/{listId}`                     | `CredentialService`      | `getStatusList`   | None (Serves public W3C Bitstring Status List)                                 |
-| `POST /api/credentials/{id}/shares`            | `ShareService`           | `createShare`     | Persists `SHARE` with hashed opaque token                                      |
-| `GET /api/credentials/{id}/shares`             | `ShareService`           | `listShares`      | None (Read-only)                                                               |
-| `POST /api/shares/{id}/revoke`                 | `ShareService`           | `revokeShare`     | Sets `SHARE.revoked_at`                                                        |
-| `GET /api/public/shares/{token}`               | `ShareService`           | `resolveShare`    | None (Read-only pre-check)                                                     |
-| `POST /api/public/shares/{token}/verify`       | `VerificationService`    | `verify`          | Calls `IVCAdapter`, persists `VERIFICATION_EVENT`                              |
-| `GET /api/audit/...`                           | `AuditService`           | `getAuditHistory` | None (Read-only)                                                               |
+| HTTP Method & Path                             | Application Service      | Method                     | Side Effects / Persisted State                                                 |
+| :--------------------------------------------- | :----------------------- | :------------------------- | :----------------------------------------------------------------------------- |
+| `POST /api/staffs/login`                       | `AuthService`            | `AuthenticateStaffAsync`   | Generates JWT staff session token                                              |
+| `POST /api/students/login`                     | `AuthService`            | `AuthenticateStudentAsync` | Generates JWT student session token                                            |
+| `POST /api/staffs`                             | `StaffService`           | `createStaff`              | Persists `UNIVERSITY_STAFF`                                                    |
+| `PATCH /api/staffs/{id}`                       | `StaffService`           | `updateStaff`              | Updates `UNIVERSITY_STAFF`                                                     |
+| `POST /api/staffs/{id}/deactivate`             | `StaffService`           | `deactivateStaff`          | Sets `UNIVERSITY_STAFF.status = INACTIVE`                                      |
+| `GET /api/staffs`                              | `StaffService`           | `listStaff`                | None (Read-only)                                                               |
+| `GET /api/students`                            | `StudentWalletService`   | `listStudents`             | None (Read-only)                                                               |
+| `GET /api/students/{id}`                       | `StudentWalletService`   | `getStudent`               | None (Read-only)                                                               |
+| `POST /api/students/{id}/wallet/provision`     | `StudentWalletService`   | `provisionWallet`          | Calls `IWalletAdapter`, updates `STUDENT.wallet_id`                            |
+| `POST /api/academic-records/import`            | `AcademicRecordService`  | `importRecord`             | Persists `STUDENT` & `ACADEMIC_RECORD`, triggers wallet & eligibility          |
+| `GET /api/students/{id}/academic-record`       | `AcademicRecordService`  | `getRecord`                | None (Read-only)                                                               |
+| `POST /api/students/{id}/eligibility/evaluate` | `EligibilityService`     | `evaluate`                 | Persists `ELIGIBILITY_EVALUATION`                                              |
+| `GET /api/students/{id}/eligibility`           | `EligibilityService`     | `getLatestResult`          | None (Read-only)                                                               |
+| `POST /api/credential-requests`                | `IssuanceRequestService` | `createRequest`            | Persists `CREDENTIAL_ISSUANCE_REQUEST`                                         |
+| `GET /api/credential-requests`                 | `IssuanceRequestService` | `listPending`              | None (Read-only)                                                               |
+| `POST /api/credential-requests/{id}/approve`   | `IssuanceRequestService` | `approve`                  | Persists `CREDENTIAL_APPROVAL`, calls `CredentialService.issue()` on threshold |
+| `POST /api/credential-requests/{id}/reject`    | `IssuanceRequestService` | `reject`                   | Updates `CREDENTIAL_ISSUANCE_REQUEST.status = REJECTED`                        |
+| `GET /api/credentials`                         | `CredentialService`      | `listCredentials`          | None (Read-only)                                                               |
+| `GET /api/credentials/{id}`                    | `CredentialService`      | `getDetails`               | None (Read-only)                                                               |
+| `POST /api/credentials/{id}/revoke`            | `CredentialService`      | `revoke`                   | Updates status list & sets `CREDENTIAL.status = REVOKED`                       |
+| `POST /api/credentials/{id}/reissue`           | `CredentialService`      | `reissue`                  | Creates superseding `CREDENTIAL_ISSUANCE_REQUEST`                              |
+| `GET /api/status/{listId}`                     | `CredentialService`      | `getStatusList`            | None (Serves public W3C Bitstring Status List)                                 |
+| `POST /api/credentials/{id}/shares`            | `ShareService`           | `createShare`              | Persists `SHARE` with hashed opaque token                                      |
+| `GET /api/credentials/{id}/shares`             | `ShareService`           | `listShares`               | None (Read-only)                                                               |
+| `POST /api/shares/{id}/revoke`                 | `ShareService`           | `revokeShare`              | Sets `SHARE.revoked_at`                                                        |
+| `GET /api/public/shares/{token}`               | `ShareService`           | `resolveShare`             | None (Read-only pre-check)                                                     |
+| `POST /api/public/shares/{token}/verify`       | `VerificationService`    | `verify`                   | Calls `IVCAdapter`, persists `VERIFICATION_EVENT`                              |
+| `GET /api/audit/...`                           | `AuditService`           | `getAuditHistory`          | None (Read-only)                                                               |
 
 ---
 
 ## 2. Authentication
 
 ```http
-POST   /api/auth/login
+POST   /api/staffs/login
+POST   /api/students/login
 POST   /api/auth/logout
 GET    /api/auth/me
 ```
+
+**Staff Login (`StaffController.Login` / `AuthService.AuthenticateStaffAsync`):**
+
+```json
+POST /api/staffs/login
+{
+  "email": "minh.nguyen@staff.miu.example",
+  "password": "SecurePassword123!"
+}
+```
+
+Success Response (`200 OK`):
+
+```json
+{
+  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresAt": "2026-08-28T10:00:00Z"
+}
+```
+
+Failure Response (`401 Unauthorized`):
+
+```json
+{
+  "message": "Invalid email or password."
+}
+```
+
+**Student Login (`StudentController.Login` / `AuthService.AuthenticateStudentAsync`):**
+
+```json
+POST /api/students/login
+{
+  "email": "anh.nguyen@student.miu.example",
+  "password": "SecurePassword123!"
+}
+```
+
+Success Response (`200 OK`):
+
+```json
+{
+  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresAt": "2026-08-28T10:00:00Z"
+}
+```
+
+Failure Response (`401 Unauthorized`):
+
+```json
+{
+  "message": "Invalid email or password."
+}
+```
+
+**Role-Based Authorization Contract (`AuthService.RequireRole` / FR-AUTH-04):**
+
+In accordance with **FR-AUTH-04**, a valid session token does not imply authorization for every action. Privileged endpoints re-check the actor's role via `AuthService.RequireRole(session, role)` independently of session validity:
+
+- **Unauthenticated requests** (missing or invalid session): Return `401 Unauthorized`.
+- **Authenticated requests with mismatched role** (e.g. Registrar attempting an Approver-only action): Return `403 Forbidden`.
+- **Authenticated requests with matching role**: Proceed to business service execution.
 
 ---
 
@@ -64,17 +128,17 @@ PATCH  /api/university
 ## 4. Staff User Management (Admin Only)
 
 ```http
-GET    /api/staff
-POST   /api/staff
-GET    /api/staff/{staffId}
-PATCH  /api/staff/{staffId}
-POST   /api/staff/{staffId}/deactivate
+GET    /api/staffs
+POST   /api/staffs
+GET    /api/staffs/{staffId}
+PATCH  /api/staffs/{staffId}
+POST   /api/staffs/{staffId}/deactivate
 ```
 
 **Create staff user (`StaffService.createStaff`):**
 
 ```json
-POST /api/staff
+POST /api/staffs
 {
   "name": "Nguyen Anh Minh",
   "email": "minh.nguyen@staff.miu.example",
@@ -99,7 +163,7 @@ Response:
 **Update staff user / role (`StaffService.updateStaff`):**
 
 ```json
-PATCH /api/staff/{staffId}
+PATCH /api/staffs/{staffId}
 {
   "role": "APPROVER",
   "name": "Nguyen Anh Minh"
@@ -109,7 +173,7 @@ PATCH /api/staff/{staffId}
 **Deactivate staff user (`StaffService.deactivateStaff`):**
 
 ```json
-POST /api/staff/{staffId}/deactivate
+POST /api/staffs/{staffId}/deactivate
 ```
 
 Response:
@@ -161,6 +225,39 @@ Response:
     "page": 1,
     "limit": 20
 }
+```
+
+**Get student details (`StudentWalletService.getStudent`):**
+
+> **Authorization & Access Isolation (FR-STU-04):**
+> Staff roles (`REGISTRAR`, `ADMIN`) can access any student record.
+> Authenticated students are restricted to their own record (`studentId` matching the token session claim). Requesting another student's record returns `403 Forbidden`.
+
+```http
+GET /api/students/{studentId}
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "studentId": "student-uuid-1",
+  "studentNumber": "MIU2026-001",
+  "name": "Nguyen Minh Anh",
+  "email": "anh.nguyen@student.miu.example",
+  "programId": "program-uuid",
+  "programName": "Computer Science",
+  "accountStatus": "ACTIVE",
+  "graduationStatus": "GRADUATED",
+  "walletStatus": "ACTIVE",
+  "importedAt": "2026-08-20T08:30:00Z"
+}
+```
+
+Failure Response (`403 Forbidden` - cross-student access denied):
+
+```json
+403 Forbidden
 ```
 
 **Provision / Retry student wallet (`StudentWalletService.provisionWallet`):**
@@ -280,6 +377,14 @@ GET    /api/credential-requests/{requestId}
 POST   /api/credential-requests/{requestId}/approve
 POST   /api/credential-requests/{requestId}/reject
 ```
+
+> **Authorization & Role Checks (FR-AUTH-04 · US-A3):**
+> Privileged actions verify the actor's role via `AuthService.RequireRole` independently of session validity:
+>
+> - `POST /api/credential-requests`: Restricted to **Registrar** (`REGISTRAR`). Attempt by Approver or Student returns `403 Forbidden`.
+> - `GET /api/credential-requests` / `GET /api/credential-requests/{requestId}`: Accessible to **Registrar** and **Approver** (`REGISTRAR`, `APPROVER`).
+> - `POST /api/credential-requests/{requestId}/approve`: Restricted to **Approver** (`APPROVER`). Attempt by Registrar returns `403 Forbidden`.
+> - `POST /api/credential-requests/{requestId}/reject`: Restricted to **Approver** (`APPROVER`). Attempt by Registrar returns `403 Forbidden`.
 
 **Create a request (`IssuanceRequestService.createRequest`):**
 
