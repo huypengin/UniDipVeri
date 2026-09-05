@@ -5,12 +5,11 @@ using UniDipVeri.Application.Features.Auth.Models;
 namespace UniDipVeri.WebApi.Controllers;
 
 [ApiController]
-[Route("api/staff")]
+[Route("api/staffs")]
 public class StaffController(IAuthService authService) : ControllerBase
 {
     private readonly IAuthService _authService = authService;
 
-    [HttpPost("/api/auth/login")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest? request, CancellationToken ct = default)
     {

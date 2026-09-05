@@ -26,7 +26,7 @@ sequenceDiagram
     participant Auth as AuthService
     participant Repo as IStaffRepository
 
-    Staff->>SC: POST /api/auth/login {email, password}
+    Staff->>SC: POST /api/staffs/login {email, password}
     SC->>Auth: authenticateStaff(email, password)
     Auth->>Repo: getByEmail(email)
     Repo-->>Auth: UniversityStaff | null
@@ -62,7 +62,7 @@ sequenceDiagram
     participant Auth as AuthService
     participant Repo as IStudentRepository
 
-    Student->>SC: POST /api/auth/login {email, password}
+    Student->>SC: POST /api/students/login {email, password}
     SC->>Auth: authenticateStudent(email, password)
     Auth->>Repo: getByEmail(email)
     Repo-->>Auth: Student | null
@@ -591,7 +591,7 @@ sequenceDiagram
     participant Repo as IStaffRepository
     participant PH as BcryptPasswordHasher
 
-    Admin->>SC: POST /api/staff {name, email, password, role}
+    Admin->>SC: POST /api/staffs {name, email, password, role}
     SC->>SS: createStaff(name, email, password, role)
     SS->>Repo: getByEmail(email)
 
@@ -610,7 +610,7 @@ sequenceDiagram
         SC-->>Admin: 201 Created
     end
 
-    Admin->>SC: PATCH /api/staff/{id} {roles, profile}
+    Admin->>SC: PATCH /api/staffs/{id} {roles, profile}
     SC->>SS: updateStaff(staffId, profile, roles)
     SS->>Repo: getById(staffId)
     Repo-->>SS: UniversityStaff
@@ -619,7 +619,7 @@ sequenceDiagram
     SS-->>SC: StaffDTO
     SC-->>Admin: 200 OK
 
-    Admin->>SC: POST /api/staff/{id}/deactivate
+    Admin->>SC: POST /api/staffs/{id}/deactivate
     SC->>SS: deactivateStaff(staffId)
     SS->>Repo: countActiveAdmins()
     Repo-->>SS: count

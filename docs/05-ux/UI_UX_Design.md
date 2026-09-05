@@ -42,7 +42,7 @@ The primary sign-in interface serves as the universal entry point for both unive
 ![Unified Sign In](../assets/student-login.png)
 *Figure 2.1: Unified Sign-in Page (`student-login.png`)*
 
-- **Unified Authentication Endpoint (`POST /api/auth/login`):** Users enter their institutional email (`@student.miu.example` or `@staff.miu.example`) and password.
+- **Role-Specific Authentication Endpoints (`POST /api/staffs/login`, `POST /api/students/login`):** Users enter their institutional email (`@student.miu.example` or `@staff.miu.example`) and password, submitting to their respective controller endpoint.
 - **Automated Role Dispatching:** Upon successful credential verification, the standalone `AuthService` issues a signed JWT containing the user's role claims (`STUDENT`, `REGISTRAR`, `APPROVER`, or `ADMIN`). The frontend router automatically routes the user to their authorized destination:
   - `STUDENT` &rarr; Student Credentials Dashboard (`/credentials`)
   - `REGISTRAR` &rarr; Registrar Operations Console (`/operations`)
@@ -294,7 +294,7 @@ The following matrix maps every interface mockup to its corresponding system rou
 
 | Screen / Component | Asset File | Role Access | Route / Endpoint | Traces to Requirements |
 | :--- | :--- | :--- | :--- | :--- |
-| **Unified Sign In** | `student-login.png` | All Roles | `POST /api/auth/login` | FR-AUTH-01, FR-USER-04, FR-STU-04 |
+| **Unified Sign In** | `student-login.png` | All Roles | `POST /api/staffs/login`<br>`POST /api/students/login` | FR-AUTH-01, FR-USER-04, FR-STU-04 |
 | **Password Reset / Activation** | `student-reset-pass.png` | All Roles | `POST /api/auth/reset-password` | FR-AUTH-01, US-B1, US-J1 |
 | **Shared Account Management** | `student-acc-manage.png` | All Roles | `GET /api/me`<br>`POST /api/auth/change-password` | FR-STU-04, FR-USER-02 |
 | **Student Credentials Dashboard** | `student-dashboard.png` | Student | `GET /api/me/credentials` | FR-CRED-07, FR-CRED-08, US-F1 |
@@ -303,7 +303,7 @@ The following matrix maps every interface mockup to its corresponding system rou
 | **Registrar Operations Console** | `registrar-op.png` | Registrar | `GET /api/programs`<br>`POST /api/programs`<br>`POST /api/credential-requests` | FR-PROG-01–04, FR-ELIG-01–09, FR-APPR-01, US-C1–C2, US-D1 |
 | **Approver Issuance Queue** | `approver-op.png` | Approver | `GET /api/credential-requests`<br>`POST /api/credential-requests/{id}/approve`<br>`POST /api/credential-requests/{id}/reject` | FR-APPR-03–09, US-D2, US-D3 |
 | **Student Directory & Lifecycle** | `admin-student-acc-manage.png` | Registrar, Admin | `GET /api/students`<br>`POST /api/students/{id}/wallet/provision`<br>`PATCH /api/students/{id}/status` | FR-USER-04, FR-STU-01–03, FR-WAL-01–05, US-J4, US-J5, US-K2 |
-| **Staff Account Management** | `admin-staff-acc-manage.png` | Platform Admin | `GET /api/staff`<br>`POST /api/staff`<br>`PATCH /api/staff/{id}` | FR-USER-01–05, US-J1–J3 |
+| **Staff Account Management** | `admin-staff-acc-manage.png` | Platform Admin | `GET /api/staffs`<br>`POST /api/staffs`<br>`PATCH /api/staffs/{id}` | FR-USER-01–05, US-J1–J3 |
 | **System Settings & Policy** | `admin-system-conf.png` | Platform Admin | `GET /api/approval-policy`<br>`PUT /api/approval-policy`<br>`GET /api/university` | FR-UNI-01–02, FR-APPR-03, FR-SHARE-05, US-D1 |
 | **Verified Credential View** | `verifier-verified.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-VER-01–08, US-H1 |
 | **Revoked Credential View** | `verifier-revoked.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-VER-06, FR-VER-07, US-H2 |

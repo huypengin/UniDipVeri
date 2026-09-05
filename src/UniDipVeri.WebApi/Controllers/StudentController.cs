@@ -10,7 +10,6 @@ public class StudentController(IAuthService authService) : ControllerBase
 {
     private readonly IAuthService _authService = authService;
 
-    [HttpPost("/api/auth/login", Order = 2)]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest? request, CancellationToken ct = default)
     {
