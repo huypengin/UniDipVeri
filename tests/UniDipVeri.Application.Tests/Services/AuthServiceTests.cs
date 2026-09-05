@@ -321,46 +321,9 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public void RequireRole_SessionToken_ShouldReturnTrue_WhenTokenIsValidAndRoleMatches()
-    {
-        // Arrange
-        var tokenValue = "valid-approver-token";
-        var session = new SessionToken(tokenValue, DateTime.UtcNow.AddHours(1));
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.Role, "APPROVER"),
-            new Claim("user_type", "staff")
-        };
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
-
-        _issuerMock.Setup(i => i.ValidateToken(tokenValue))
-            .Returns(principal);
-
-        // Act & Assert
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeTrue();
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeFalse();
-    }
-
-    [Fact]
-    public void RequireRole_SessionToken_ShouldReturnFalse_WhenTokenIsInvalidOrNull()
-    {
-        _issuerMock.Setup(i => i.ValidateToken("invalid-token"))
-            .Returns((ClaimsPrincipal?)null);
-
-        _authService.RequireRole(new SessionToken("invalid-token", DateTime.UtcNow), StaffRole.APPROVER).Should().BeFalse();
-        _authService.RequireRole((SessionToken?)null, StaffRole.APPROVER).Should().BeFalse();
-        _authService.RequireRole((string?)null, StaffRole.APPROVER).Should().BeFalse();
-    }
-
-    [Fact]
     public void RequireRole_ShouldReject_GivenLoggedInRegistrarAttemptingApproverAction_EvenThoughSessionIsValid()
     {
         // Arrange: Given a logged-in Registrar with a valid authenticated session (FR-AUTH-04, UC-01, US-A3)
-        var registrarToken = "valid-registrar-jwt";
-        var session = new SessionToken(registrarToken, DateTime.UtcNow.AddHours(1));
-
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
@@ -369,15 +332,10 @@ public class AuthServiceTests
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
 
-        _issuerMock.Setup(i => i.ValidateToken(registrarToken))
-            .Returns(principal);
-
         // Act & Assert: When attempting an Approver-only action, the system rejects it even though the session is valid
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeFalse();
         _authService.RequireRole(principal, StaffRole.APPROVER).Should().BeFalse();
 
         // But allows Registrar-permitted action
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeTrue();
         _authService.RequireRole(principal, StaffRole.REGISTRAR).Should().BeTrue();
     }
 
@@ -385,9 +343,6 @@ public class AuthServiceTests
     public void RequireRole_ShouldReject_GivenLoggedInApproverAttemptingRegistrarAction_EvenThoughSessionIsValid()
     {
         // Arrange: Given a logged-in Approver with a valid authenticated session
-        var approverToken = "valid-approver-jwt";
-        var session = new SessionToken(approverToken, DateTime.UtcNow.AddHours(1));
-
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
@@ -396,15 +351,10 @@ public class AuthServiceTests
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
 
-        _issuerMock.Setup(i => i.ValidateToken(approverToken))
-            .Returns(principal);
-
         // Act & Assert: When attempting a Registrar-only action, the system rejects it
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeFalse();
         _authService.RequireRole(principal, StaffRole.REGISTRAR).Should().BeFalse();
 
         // But allows Approver-permitted action
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeTrue();
         _authService.RequireRole(principal, StaffRole.APPROVER).Should().BeTrue();
     }
 

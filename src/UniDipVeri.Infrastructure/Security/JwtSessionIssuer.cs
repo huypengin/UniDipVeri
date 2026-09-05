@@ -34,38 +34,6 @@ public sealed class JwtSessionIssuer(IOptions<JwtSettings> settings) : ISessionI
         return GenerateToken(claims);
     }
 
-    public ClaimsPrincipal? ValidateToken(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return null;
-        }
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_settings.SecretKey);
-
-        var validationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = true,
-            ValidIssuer = _settings.Issuer,
-            ValidateAudience = true,
-            ValidAudience = _settings.Audience,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-
-        try
-        {
-            return tokenHandler.ValidateToken(token, validationParameters, out _);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private SessionToken GenerateToken(Claim[] claims)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SecretKey));

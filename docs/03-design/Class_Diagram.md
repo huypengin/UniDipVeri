@@ -535,7 +535,6 @@ classDiagram
         <<interface>>
         +issueStaffSession(UUID staffId, string role) SessionToken
         +issueStudentSession(UUID studentId, string studentNumber) SessionToken
-        +validateToken(string token) ClaimsPrincipal
     }
 
     class IAuthService {
@@ -795,7 +794,6 @@ classDiagram
         -JwtSettings settings
         +issueStaffSession(UUID staffId, string role) SessionToken
         +issueStudentSession(UUID studentId, string studentNumber) SessionToken
-        +validateToken(string token) ClaimsPrincipal
     }
 
     %% Interface Realizations

@@ -90,20 +90,4 @@ public sealed class AuthService(
             principal.IsInRole(r.ToString()) ||
             userRoles.Any(ur => string.Equals(ur, r.ToString(), StringComparison.OrdinalIgnoreCase)));
     }
-
-    public bool RequireRole(SessionToken? session, StaffRole requiredRole)
-    {
-        return RequireRole(session?.Value, requiredRole);
-    }
-
-    public bool RequireRole(string? token, StaffRole requiredRole)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return false;
-        }
-
-        var principal = _sessionIssuer.ValidateToken(token);
-        return RequireRole(principal, requiredRole);
-    }
 }
