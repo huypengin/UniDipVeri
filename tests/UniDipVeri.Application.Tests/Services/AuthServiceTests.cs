@@ -63,7 +63,7 @@ public class AuthServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Token.Should().NotBeNull();
-        result.Token!.Value.Should().Be($"jwt-token-{expectedRoleClaim.ToLower()}");
+        result.Token!.AccessToken.Should().Be($"jwt-token-{expectedRoleClaim.ToLower()}");
         _issuerMock.Verify(i => i.IssueStaffSession(staffId, expectedRoleClaim), Times.Once);
     }
 
@@ -163,7 +163,7 @@ public class AuthServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Token.Should().NotBeNull();
-        result.Token!.Value.Should().Be("jwt-token-student");
+        result.Token!.AccessToken.Should().Be("jwt-token-student");
     }
 
     [Fact]

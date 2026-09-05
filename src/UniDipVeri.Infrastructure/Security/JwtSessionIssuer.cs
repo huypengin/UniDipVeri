@@ -48,7 +48,7 @@ public sealed class JwtSessionIssuer(IOptions<JwtSettings> settings) : ISessionI
             signingCredentials: credentials);
 
         return new SessionToken(
-            Value: new JwtSecurityTokenHandler().WriteToken(token),
+            AccessToken: new JwtSecurityTokenHandler().WriteToken(token),
             ExpiresAt: expires);
     }
 }

@@ -83,7 +83,7 @@ public class AuthenticationIntegrationTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var token = await response.Content.ReadFromJsonAsync<SessionToken>(JsonOptions);
         token.Should().NotBeNull();
-        token!.Value.Should().NotBeNullOrWhiteSpace();
+        token!.AccessToken.Should().NotBeNullOrWhiteSpace();
         token.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
 
@@ -100,7 +100,7 @@ public class AuthenticationIntegrationTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var token = await response.Content.ReadFromJsonAsync<SessionToken>(JsonOptions);
         token.Should().NotBeNull();
-        token!.Value.Should().NotBeNullOrWhiteSpace();
+        token!.AccessToken.Should().NotBeNullOrWhiteSpace();
         token.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
 

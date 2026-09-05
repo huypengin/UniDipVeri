@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace UniDipVeri.Application.Abstractions.Models;
 
 public sealed record AuthResult(bool IsSuccess, SessionToken? Token = null, string? Error = null)
@@ -6,4 +8,4 @@ public sealed record AuthResult(bool IsSuccess, SessionToken? Token = null, stri
     public static AuthResult Failure(string error) => new(false, Error: error);
 }
 
-public sealed record SessionToken(string Value, DateTime ExpiresAt);
+public sealed record SessionToken(string AccessToken, DateTime ExpiresAt);

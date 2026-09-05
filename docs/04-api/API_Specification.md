@@ -66,7 +66,7 @@ Success Response (`200 OK`):
 
 ```json
 {
-  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "expiresAt": "2026-08-28T10:00:00Z"
 }
 ```
@@ -93,7 +93,7 @@ Success Response (`200 OK`):
 
 ```json
 {
-  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "expiresAt": "2026-08-28T10:00:00Z"
 }
 ```

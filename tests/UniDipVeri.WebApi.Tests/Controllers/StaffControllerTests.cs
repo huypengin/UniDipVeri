@@ -61,7 +61,7 @@ public class StaffControllerTests
 
         var token = okResult.Value as SessionToken;
         token.Should().NotBeNull();
-        token!.Value.Should().Be($"token-for-{roleClaim}");
+        token!.AccessToken.Should().Be($"token-for-{roleClaim}");
 
         _authServiceMock.Verify(s => s.AuthenticateStaffAsync(request.Email, request.Password, It.IsAny<CancellationToken>()), Times.Once);
     }

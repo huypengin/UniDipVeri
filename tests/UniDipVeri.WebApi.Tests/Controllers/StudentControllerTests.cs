@@ -57,7 +57,7 @@ public class StudentControllerTests
 
         var token = okResult.Value as SessionToken;
         token.Should().NotBeNull();
-        token!.Value.Should().Be("jwt-token-student-123");
+        token!.AccessToken.Should().Be("jwt-token-student-123");
 
         _authServiceMock.Verify(s => s.AuthenticateStudentAsync(request.Email, request.Password, It.IsAny<CancellationToken>()), Times.Once);
     }
