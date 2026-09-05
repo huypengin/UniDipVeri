@@ -1,0 +1,35 @@
+using Microsoft.AspNetCore.Mvc;
+using UniDipVeri.Application.Abstractions.Services;
+using UniDipVeri.Application.Features.Auth.Models;
+
+namespace UniDipVeri.WebApi.Controllers;
+
+[ApiController]
+[Route("api/students")]
+public class StudentController(IAuthService authService) : ControllerBase
+{
+    private readonly IAuthService _authService = authService;
+
+    [HttpPost("/api/auth/login", Order = 2)]
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest? request, CancellationToken ct = default)
+    {
+        if (request is null)
+        {
+            return Unauthorized(new { message = "Invalid email or password." });
+        }
+
+        if (!request.TryValidate(out var error))
+        {
+            return Unauthorized(new { message = error });
+        }
+
+        var result = await _authService.AuthenticateStudentAsync(request.Email, request.Password, ct);
+        if (!result.IsSuccess || result.Token is null)
+        {
+            return Unauthorized(new { message = result.Error ?? "Invalid email or password." });
+        }
+
+        return Ok(result.Token);
+    }
+}

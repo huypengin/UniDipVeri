@@ -11,7 +11,7 @@ Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`,
 - Application Service participants (`StaffService`, `StudentWalletService`, `AcademicRecordService`, `EligibilityService`, `IssuanceRequestService`, `CredentialService`, `ShareService`, `VerificationService`, `AuditService`) match §4 of `Class_Diagram.md`.
 - Repository/Port participants (`IStaffRepository`, `IStudentRepository`, etc.) represent calls through the Application Port interface; the concrete `Postgres*Repository` implementation is what actually runs, per §5.
 - `WaltIdWalletAdapter` and `WaltIdVCAdapter` represent calls through `IWalletAdapter`/`IVCAdapter` to the `walt.id` infrastructure.
-- **`AuthService`** is a small cross-cutting Application Service (not shown as a bounded-area box in `Class_Diagram.md` §4, since it has no domain state of its own) that implements FR-AUTH-01–04 for both staff and student sessions. It is called by every controller's authorization check but is only drawn explicitly in Diagrams 1 and 2.
+- **`AuthService`** is a standalone cross-cutting Application Service (matching §4 of `Class_Diagram.md`) that implements FR-AUTH-01–04 for both staff and student sessions. It is called by every controller's authorization check and handles login via `authenticateStaff` and `authenticateStudent` in Diagrams 1 and 2.
 
 ---
 
@@ -27,8 +27,8 @@ sequenceDiagram
     participant Repo as IStaffRepository
 
     Staff->>SC: POST /api/auth/login {email, password}
-    SC->>Auth: authenticate(email, password)
-    Auth->>Repo: findByEmail(email)
+    SC->>Auth: authenticateStaff(email, password)
+    Auth->>Repo: getByEmail(email)
     Repo-->>Auth: UniversityStaff | null
 
     alt no account, or status = INACTIVE
@@ -41,7 +41,7 @@ sequenceDiagram
             SC-->>Staff: 401 Unauthorized
         else match
             Auth->>Auth: issue session scoped to staff role(s)
-            Auth-->>SC: SessionDTO
+            Auth-->>SC: SessionToken
             SC-->>Staff: 200 OK + session token
         end
     end
@@ -63,16 +63,16 @@ sequenceDiagram
     participant Repo as IStudentRepository
 
     Student->>SC: POST /api/auth/login {email, password}
-    SC->>Auth: authenticate(email, password)
-    Auth->>Repo: findByEmail(email)
+    SC->>Auth: authenticateStudent(email, password)
+    Auth->>Repo: getByEmail(email)
     Repo-->>Auth: Student | null
 
-    alt no account
+    alt no account or account not active
         Auth-->>SC: AuthenticationError
         SC-->>Student: 401 Unauthorized
-    else account found
+    else account found and active
         Auth->>Auth: verifyPassword(), issue session scoped to this student only
-        Auth-->>SC: SessionDTO
+        Auth-->>SC: SessionToken
         SC-->>Student: 200 OK + session token
     end
 ```
@@ -163,7 +163,7 @@ sequenceDiagram
 
     Staff->>STC: POST /api/students/{id}/wallet/provision
     STC->>WS: provisionWallet(studentId)
-    WS->>SRepo: findById(studentId)
+    WS->>SRepo: getById(studentId)
     SRepo-->>WS: Student
 
     alt wallet_status already ACTIVE
@@ -220,7 +220,7 @@ sequenceDiagram
         IRS-->>CRC: Refused(failedRequirements)
         CRC-->>Reg: 422 Unprocessable Entity + failed requirements
     else ELIGIBLE
-        IRS->>SRepo: findById(studentId)
+        IRS->>SRepo: getById(studentId)
         SRepo-->>IRS: Student(wallet_status)
 
         alt wallet_status != ACTIVE
@@ -273,7 +273,7 @@ sequenceDiagram
             IRS->>CS: issue(requestId)
             CS->>RRepo: findById(requestId)
             RRepo-->>CS: CredentialIssuanceRequest
-            CS->>SRepo: findById(studentId)
+            CS->>SRepo: getById(studentId)
             SRepo-->>CS: Student(wallet_id)
             CS->>CS: build CredentialSubject from schema + request data
             CS->>VC: issueDiplomaVC(wallet_id, subject)
@@ -593,7 +593,7 @@ sequenceDiagram
 
     Admin->>SC: POST /api/staff {name, email, password, role}
     SC->>SS: createStaff(name, email, password, role)
-    SS->>Repo: findByEmail(email)
+    SS->>Repo: getByEmail(email)
 
     alt email already registered
         Repo-->>SS: existing staff
@@ -603,7 +603,7 @@ sequenceDiagram
         Repo-->>SS: null
         SS->>PH: hash(password)
         PH-->>SS: passwordHash
-        SS->>Repo: save UNIVERSITY_STAFF(status = ACTIVE)
+        SS->>Repo: add UNIVERSITY_STAFF(status = ACTIVE)
         Repo-->>SS: StaffDTO
         SS->>SS: log user-management audit event (FR-AUD-09)
         SS-->>SC: StaffDTO
@@ -612,14 +612,14 @@ sequenceDiagram
 
     Admin->>SC: PATCH /api/staff/{id} {roles, profile}
     SC->>SS: updateStaff(staffId, profile, roles)
-    SS->>Repo: findById(staffId)
+    SS->>Repo: getById(staffId)
     Repo-->>SS: UniversityStaff
     SS->>Repo: update roles / profile
     SS->>SS: log user-management audit event
     SS-->>SC: StaffDTO
     SC-->>Admin: 200 OK
 
-    Admin->>SC: DELETE /api/staff/{id} (deactivate)
+    Admin->>SC: POST /api/staff/{id}/deactivate
     SC->>SS: deactivateStaff(staffId)
     SS->>Repo: countActiveAdmins()
     Repo-->>SS: count
@@ -657,7 +657,7 @@ sequenceDiagram
 
     Staff->>STC: GET /api/students/{id}
     STC->>WS: getStudent(studentId)
-    WS->>Repo: findById(studentId)
+    WS->>Repo: getById(studentId)
     Repo-->>WS: Student
     WS-->>STC: StudentDTO — profile, linked academic record, eligibility evaluations, credentials
     STC-->>Staff: 200 OK

@@ -119,44 +119,55 @@ public class PostgresStudentRepositoryTests : IDisposable
             }
             else if (i <= 10)
             {
-                student.UpdateGraduationStatus(GraduationStatus.PENDING_REVIEW);
+                student.UpdateGraduationStatus(GraduationStatus.REJECTED);
             }
 
-            if (i % 2 == 0)
+            if (i == 1)
             {
-                student.AssignWallet($"wallet-{i}");
+                student.AssignWallet("wallet-001");
             }
 
             await _repository.AddAsync(student);
         }
 
-        // Act - Filter by ACTIVE account status with page size 5
-        var filter = new StudentFilter(AccountStatus: StudentAccountStatus.ACTIVE, Page: 1, PageSize: 5);
-        var result = await _repository.ListPagedAsync(filter);
+        // Act & Assert: Filter by Program
+        var result1 = await _repository.ListPagedAsync(new StudentFilter { ProgramId = _programId });
+        result1.TotalCount.Should().Be(15);
+        result1.Items.Count.Should().Be(15);
 
-        // Assert
-        result.TotalCount.Should().Be(10);
-        result.Items.Count.Should().Be(5);
-        result.TotalPages.Should().Be(2);
-        result.HasNextPage.Should().BeTrue();
-        result.HasPreviousPage.Should().BeFalse();
+        // Filter by AccountStatus
+        var result2 = await _repository.ListPagedAsync(new StudentFilter { AccountStatus = StudentAccountStatus.ACTIVE });
+        result2.TotalCount.Should().Be(10);
 
-        // Act 2 - Filter by ELIGIBLE graduation status
-        var gradFilter = new StudentFilter(GraduationStatus: GraduationStatus.ELIGIBLE, Page: 1, PageSize: 20);
-        var gradResult = await _repository.ListPagedAsync(gradFilter);
-        gradResult.TotalCount.Should().Be(5);
+        // Filter by GraduationStatus
+        var result3 = await _repository.ListPagedAsync(new StudentFilter { GraduationStatus = GraduationStatus.ELIGIBLE });
+        result3.TotalCount.Should().Be(5);
+
+        // Filter by WalletStatus
+        var result4 = await _repository.ListPagedAsync(new StudentFilter { WalletStatus = WalletStatus.ACTIVE });
+        result4.TotalCount.Should().Be(1);
+
+        // Search Term
+        var result5 = await _repository.ListPagedAsync(new StudentFilter { SearchTerm = "Student 1" });
+        result5.TotalCount.Should().Be(7); // 1, 10, 11, 12, 13, 14, 15
+
+        // Pagination
+        var result6 = await _repository.ListPagedAsync(new StudentFilter { Page = 2, PageSize = 5 });
+        result6.Items.Count.Should().Be(5);
+        result6.Page.Should().Be(2);
+        result6.TotalPages.Should().Be(3);
     }
 
     [Fact]
-    public async Task UpdateAsync_ShouldPersistStatusAndWalletChanges()
+    public async Task UpdateAsync_ShouldPersistChanges()
     {
         // Arrange
         var student = Student.Create(
             _programId,
-            "MIU2026-099",
-            "Test Student",
-            "test@miu.edu",
-            "SRC-099",
+            "MIU2026-999",
+            "Update Test",
+            "update@test.com",
+            "SRC-999",
             "hash");
         await _repository.AddAsync(student);
 

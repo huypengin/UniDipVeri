@@ -8,14 +8,9 @@ using UniDipVeri.Application.Abstractions.Security;
 
 namespace UniDipVeri.Infrastructure.Security;
 
-public sealed class JwtSessionIssuer : ISessionIssuer
+public sealed class JwtSessionIssuer(IOptions<JwtSettings> settings) : ISessionIssuer
 {
-    private readonly JwtSettings _settings;
-
-    public JwtSessionIssuer(IOptions<JwtSettings> settings)
-    {
-        _settings = settings.Value;
-    }
+    private readonly JwtSettings _settings = settings.Value;
 
     public SessionToken IssueStaffSession(Guid staffId, string role)
     {
@@ -33,10 +28,42 @@ public sealed class JwtSessionIssuer : ISessionIssuer
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, studentId.ToString()),
-            new Claim("student_id", studentNumber), // Scoped to single studentId
+            new Claim("student_id", studentNumber), // The student id provisioned by University not by UniDipVeri
             new Claim("user_type", "student")
         };
         return GenerateToken(claims);
+    }
+
+    public ClaimsPrincipal? ValidateToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = Encoding.UTF8.GetBytes(_settings.SecretKey);
+
+        var validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = true,
+            ValidIssuer = _settings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = _settings.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+
+        try
+        {
+            return tokenHandler.ValidateToken(token, validationParameters, out _);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private SessionToken GenerateToken(Claim[] claims)
