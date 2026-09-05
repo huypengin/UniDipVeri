@@ -43,7 +43,7 @@ The primary sign-in interface serves as the universal entry point for both unive
 *Figure 2.1: Unified Sign-in Page (`student-login.png`)*
 
 - **Role-Specific Authentication Endpoints (`POST /api/staffs/login`, `POST /api/students/login`):** Users enter their institutional email (`@student.miu.example` or `@staff.miu.example`) and password, submitting to their respective controller endpoint.
-- **Automated Role Dispatching:** Upon successful credential verification, the standalone `AuthService` issues a signed JWT containing the user's role claims (`STUDENT`, `REGISTRAR`, `APPROVER`, or `ADMIN`). The frontend router automatically routes the user to their authorized destination:
+- **Automated Role Dispatching:** Upon successful credential verification, the server issues an HttpOnly session cookie and returns the user's profile with role claims (`STUDENT`, `REGISTRAR`, `APPROVER`, or `ADMIN`). The frontend router automatically routes the user to their authorized destination:
   - `STUDENT` &rarr; Student Credentials Dashboard (`/credentials`)
   - `REGISTRAR` &rarr; Registrar Operations Console (`/operations`)
   - `APPROVER` &rarr; Issuance Queue Review (`/issuance-queue`)
@@ -76,7 +76,7 @@ All authenticated users — regardless of whether they are a student or a staff 
   1. Current password verification.
   2. New password input meeting institutional complexity requirements.
   3. New password confirmation.
-- **Immediate Invalidation:** Password updates update `password_hash` and immediately invalidate existing session tokens across devices.
+- **Immediate Invalidation:** Password updates update `password_hash` and immediately invalidate existing sessions across devices.
 
 ---
 

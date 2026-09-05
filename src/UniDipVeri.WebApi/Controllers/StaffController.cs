@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using UniDipVeri.Application.Abstractions.Services;
 using UniDipVeri.Application.Features.Auth.Models;
@@ -24,11 +27,29 @@ public class StaffController(IAuthService authService) : ControllerBase
         }
 
         var result = await _authService.AuthenticateStaffAsync(request.Email, request.Password, ct);
-        if (!result.IsSuccess || result.Token is null)
+        if (!result.IsSuccess || result.User is null)
         {
             return Unauthorized(new { message = result.Error ?? "Invalid email or password." });
         }
 
-        return Ok(result.Token);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, result.User.Id.ToString()),
+            new(ClaimTypes.Email, result.User.Email),
+            new(ClaimTypes.Role, result.User.Role),
+            new("user_type", result.User.UserType)
+        };
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
+        };
+
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
+
+        return Ok(result.User);
     }
 }

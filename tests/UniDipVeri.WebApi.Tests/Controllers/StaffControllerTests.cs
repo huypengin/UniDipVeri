@@ -1,5 +1,9 @@
 using System.Reflection;
+using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using UniDipVeri.Application.Abstractions.Models;
@@ -13,11 +17,25 @@ namespace UniDipVeri.WebApi.Tests.Controllers;
 public class StaffControllerTests
 {
     private readonly Mock<IAuthService> _authServiceMock = new();
+    private readonly Mock<IAuthenticationService> _authenticationServiceMock = new();
     private readonly StaffController _controller;
 
     public StaffControllerTests()
     {
         _controller = new StaffController(_authServiceMock.Object);
+
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(IAuthenticationService)))
+            .Returns(_authenticationServiceMock.Object);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                RequestServices = serviceProviderMock.Object
+            }
+        };
     }
 
     [Fact]
@@ -41,15 +59,15 @@ public class StaffControllerTests
     [InlineData(StaffRole.REGISTRAR, "REGISTRAR")]
     [InlineData(StaffRole.APPROVER, "APPROVER")]
     [InlineData(StaffRole.ADMIN, "ADMIN")]
-    public async Task Login_ShouldReturn200WithSessionToken_WhenActiveStaffCredentialsAreValid(
+    public async Task Login_ShouldReturn200WithUser_WhenActiveStaffCredentialsAreValid(
         StaffRole role,
         string roleClaim)
     {
         // Arrange
         var request = new LoginRequest($"{role.ToString().ToLower()}@miu.edu", "Password123!");
-        var expectedToken = new SessionToken($"token-for-{roleClaim}", DateTime.UtcNow.AddHours(8));
+        var expectedUser = new AuthUserInfo(Guid.NewGuid(), request.Email, roleClaim, "staff");
         _authServiceMock.Setup(s => s.AuthenticateStaffAsync(request.Email, request.Password, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AuthResult.Success(expectedToken));
+            .ReturnsAsync(AuthResult.Success(expectedUser));
 
         // Act
         var result = await _controller.Login(request, CancellationToken.None);
@@ -59,9 +77,16 @@ public class StaffControllerTests
         var okResult = (OkObjectResult)result;
         okResult.StatusCode.Should().Be(200);
 
-        var token = okResult.Value as SessionToken;
-        token.Should().NotBeNull();
-        token!.AccessToken.Should().Be($"token-for-{roleClaim}");
+        var user = okResult.Value as AuthUserInfo;
+        user.Should().NotBeNull();
+        user!.Role.Should().Be(roleClaim);
+        user.Email.Should().Be(request.Email);
+
+        _authenticationServiceMock.Verify(a => a.SignInAsync(
+            It.IsAny<HttpContext>(),
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            It.IsAny<ClaimsPrincipal>(),
+            It.IsAny<AuthenticationProperties>()), Times.Once);
 
         _authServiceMock.Verify(s => s.AuthenticateStaffAsync(request.Email, request.Password, It.IsAny<CancellationToken>()), Times.Once);
     }

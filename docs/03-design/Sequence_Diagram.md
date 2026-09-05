@@ -40,9 +40,9 @@ sequenceDiagram
             Auth-->>SC: AuthenticationError
             SC-->>Staff: 401 Unauthorized
         else match
-            Auth->>Auth: issue session scoped to staff role(s)
-            Auth-->>SC: SessionToken
-            SC-->>Staff: 200 OK + session token
+            Auth-->>SC: AuthUserInfo {id, email, role, userType}
+            SC->>SC: HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme)
+            SC-->>Staff: 200 OK + Set-Cookie (UniDipVeri.Session HttpOnly) + user payload
         end
     end
 ```
@@ -71,13 +71,46 @@ sequenceDiagram
         Auth-->>SC: AuthenticationError
         SC-->>Student: 401 Unauthorized
     else account found and active
-        Auth->>Auth: verifyPassword(), issue session scoped to this student only
-        Auth-->>SC: SessionToken
-        SC-->>Student: 200 OK + session token
+        Auth->>Auth: verifyPassword()
+        Auth-->>SC: AuthUserInfo {id, email, role, userType, studentNumber}
+        SC->>SC: HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme)
+        SC-->>Student: 200 OK + Set-Cookie (UniDipVeri.Session HttpOnly) + user payload
     end
 ```
 
 **Note:** The issued session is scoped to a single `studentId`; every later query (e.g. `GET /api/credentials`) is implicitly filtered to that student, enforcing FR-STU-04.
+
+---
+
+## 2b. Session Profile & Sign Out
+
+**Traces to:** FR-AUTH-01, FR-AUTH-04
+
+```mermaid
+sequenceDiagram
+    actor User as Graduate / Staff Member
+    participant AC as AuthController
+    participant Http as ASP.NET Core Cookie Handler
+
+    opt Verify active session on page reload
+        User->>AC: GET /api/auth/me (with Cookie: UniDipVeri.Session)
+        AC->>Http: AuthenticateAsync()
+        alt valid cookie session
+            Http-->>AC: ClaimsPrincipal
+            AC-->>User: 200 OK { id, email, role, roles, userType, studentNumber }
+        else invalid or expired cookie
+            Http-->>AC: AuthenticateResult.Fail
+            AC-->>User: 401 Unauthorized
+        end
+    end
+
+    opt User logs out
+        User->>AC: POST /api/auth/logout (with Cookie: UniDipVeri.Session)
+        AC->>Http: SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme)
+        Http-->>AC: Clear cookie header
+        AC-->>User: 200 OK + Set-Cookie: UniDipVeri.Session=, Max-Age=0
+    end
+```
 
 ---
 

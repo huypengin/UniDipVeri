@@ -71,7 +71,7 @@ public class AuthenticationIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task StaffLogin_ShouldReturn200AndValidJwt_WhenCredentialsAreValid()
+    public async Task StaffLogin_ShouldReturn200AndSetCookie_WhenCredentialsAreValid()
     {
         // Arrange
         var request = new LoginRequest(_staffEmail, _staffPassword);
@@ -81,14 +81,18 @@ public class AuthenticationIntegrationTests : IDisposable
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var token = await response.Content.ReadFromJsonAsync<SessionToken>(JsonOptions);
-        token.Should().NotBeNull();
-        token!.AccessToken.Should().NotBeNullOrWhiteSpace();
-        token.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+        var user = await response.Content.ReadFromJsonAsync<AuthUserInfo>(JsonOptions);
+        user.Should().NotBeNull();
+        user!.Email.Should().Be(_staffEmail);
+        user.Role.Should().Be("REGISTRAR");
+        user.UserType.Should().Be("staff");
+
+        response.Headers.Should().ContainKey("Set-Cookie");
+        response.Headers.GetValues("Set-Cookie").Should().Contain(c => c.Contains("UniDipVeri.Session"));
     }
 
     [Fact]
-    public async Task StudentLogin_ShouldReturn200AndValidJwt_WhenCredentialsAreValid()
+    public async Task StudentLogin_ShouldReturn200AndSetCookie_WhenCredentialsAreValid()
     {
         // Arrange
         var request = new LoginRequest(_studentEmail, _studentPassword);
@@ -98,10 +102,14 @@ public class AuthenticationIntegrationTests : IDisposable
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var token = await response.Content.ReadFromJsonAsync<SessionToken>(JsonOptions);
-        token.Should().NotBeNull();
-        token!.AccessToken.Should().NotBeNullOrWhiteSpace();
-        token.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+        var user = await response.Content.ReadFromJsonAsync<AuthUserInfo>(JsonOptions);
+        user.Should().NotBeNull();
+        user!.Email.Should().Be(_studentEmail);
+        user.Role.Should().Be("STUDENT");
+        user.UserType.Should().Be("student");
+
+        response.Headers.Should().ContainKey("Set-Cookie");
+        response.Headers.GetValues("Set-Cookie").Should().Contain(c => c.Contains("UniDipVeri.Session"));
     }
 
     [Fact]

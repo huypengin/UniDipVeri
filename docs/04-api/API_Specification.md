@@ -12,8 +12,10 @@ All endpoints are implemented as thin HTTP controllers delegating directly to do
 
 | HTTP Method & Path                             | Application Service      | Method                     | Side Effects / Persisted State                                                 |
 | :--------------------------------------------- | :----------------------- | :------------------------- | :----------------------------------------------------------------------------- |
-| `POST /api/staffs/login`                       | `AuthService`            | `AuthenticateStaffAsync`   | Generates JWT staff session token                                              |
-| `POST /api/students/login`                     | `AuthService`            | `AuthenticateStudentAsync` | Generates JWT student session token                                            |
+| `POST /api/staffs/login`                       | `AuthService`            | `AuthenticateStaffAsync`   | Authenticates staff, sets HttpOnly session cookie                              |
+| `POST /api/students/login`                     | `AuthService`            | `AuthenticateStudentAsync` | Authenticates student, sets HttpOnly session cookie                            |
+| `POST /api/auth/logout`                        | None (Controller)        | `Logout`                   | Clears HttpOnly session cookie                                                 |
+| `GET /api/auth/me`                             | None (Controller)        | `GetCurrentUser`           | None (Returns current session user profile)                                    |
 | `POST /api/staffs`                             | `StaffService`           | `createStaff`              | Persists `UNIVERSITY_STAFF`                                                    |
 | `PATCH /api/staffs/{id}`                       | `StaffService`           | `updateStaff`              | Updates `UNIVERSITY_STAFF`                                                     |
 | `POST /api/staffs/{id}/deactivate`             | `StaffService`           | `deactivateStaff`          | Sets `UNIVERSITY_STAFF.status = INACTIVE`                                      |
@@ -64,10 +66,19 @@ POST /api/staffs/login
 
 Success Response (`200 OK`):
 
+Headers:
+```http
+Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
+```
+
+Payload:
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresAt": "2026-08-28T10:00:00Z"
+  "id": "11111111-1111-1111-1111-111111111111",
+  "email": "minh.nguyen@staff.miu.example",
+  "role": "REGISTRAR",
+  "userType": "staff",
+  "studentNumber": null
 }
 ```
 
@@ -91,10 +102,19 @@ POST /api/students/login
 
 Success Response (`200 OK`):
 
+Headers:
+```http
+Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
+```
+
+Payload:
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresAt": "2026-08-28T10:00:00Z"
+  "id": "22222222-2222-2222-2222-222222222222",
+  "email": "anh.nguyen@student.miu.example",
+  "role": "STUDENT",
+  "userType": "student",
+  "studentNumber": "STU12345"
 }
 ```
 
@@ -103,6 +123,55 @@ Failure Response (`401 Unauthorized`):
 ```json
 {
   "message": "Invalid email or password."
+}
+```
+
+**Sign Out (`AuthController.Logout`):**
+
+```http
+POST /api/auth/logout
+```
+
+Success Response (`200 OK`):
+
+Headers:
+```http
+Set-Cookie: UniDipVeri.Session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; samesite=lax; httponly
+```
+
+Payload:
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+**Current User Session Profile (`AuthController.GetCurrentUser`):**
+
+```http
+GET /api/auth/me
+```
+
+Success Response (`200 OK`):
+
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "email": "minh.nguyen@staff.miu.example",
+  "role": "REGISTRAR",
+  "roles": [
+    "REGISTRAR"
+  ],
+  "userType": "staff",
+  "studentNumber": null
+}
+```
+
+Failure Response (`401 Unauthorized`):
+
+```json
+{
+  "message": "Not authenticated."
 }
 ```
 
