@@ -2,7 +2,7 @@ using FluentAssertions;
 using UniDipVeri.Domain.Entities;
 using UniDipVeri.Domain.Enums;
 
-namespace UniDipVeri.UnitTests.Domain;
+namespace UniDipVeri.Domain.Tests;
 
 public class UniversityTests
 {

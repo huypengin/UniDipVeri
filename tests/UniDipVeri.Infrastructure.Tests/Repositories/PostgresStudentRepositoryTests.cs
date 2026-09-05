@@ -6,7 +6,7 @@ using UniDipVeri.Domain.Enums;
 using UniDipVeri.Infrastructure.Persistence;
 using UniDipVeri.Infrastructure.Persistence.Repositories;
 
-namespace UniDipVeri.UnitTests.Repositories;
+namespace UniDipVeri.Infrastructure.Tests.Repositories;
 
 public class PostgresStudentRepositoryTests : IDisposable
 {

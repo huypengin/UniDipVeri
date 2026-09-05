@@ -8,7 +8,7 @@ using UniDipVeri.Application.Features.Auth.Services;
 using UniDipVeri.Domain.Entities;
 using UniDipVeri.Domain.Enums;
 
-namespace UniDipVeri.UnitTests.Services;
+namespace UniDipVeri.Application.Tests.Services;
 
 public class AuthServiceTests
 {

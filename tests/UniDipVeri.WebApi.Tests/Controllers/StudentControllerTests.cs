@@ -7,7 +7,7 @@ using UniDipVeri.Application.Abstractions.Services;
 using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.WebApi.Controllers;
 
-namespace UniDipVeri.UnitTests.Controllers;
+namespace UniDipVeri.WebApi.Tests.Controllers;
 
 public class StudentControllerTests
 {
@@ -20,19 +20,20 @@ public class StudentControllerTests
     }
 
     [Fact]
-    public void StudentController_ShouldHaveRouteAttribute_AndLoginActionShouldHavePostAuthLogin()
+    public void StudentController_ShouldHaveRouteAttribute_AndLoginActionShouldHaveHttpPostLogin()
     {
         // Assert controller has ApiController and Route
         typeof(StudentController).GetCustomAttribute<ApiControllerAttribute>().Should().NotBeNull();
         var routeAttr = typeof(StudentController).GetCustomAttribute<RouteAttribute>();
         routeAttr.Should().NotBeNull();
+        routeAttr!.Template.Should().Be("api/students");
 
-        // Assert Login method has HttpPostAttribute matching /api/auth/login
+        // Assert Login method has HttpPostAttribute matching login
         var method = typeof(StudentController).GetMethod(nameof(StudentController.Login));
         method.Should().NotBeNull();
 
         var postAttrs = method!.GetCustomAttributes<HttpPostAttribute>().ToList();
-        postAttrs.Should().Contain(a => a.Template == "/api/auth/login");
+        postAttrs.Should().Contain(a => a.Template == "login");
     }
 
     [Fact]

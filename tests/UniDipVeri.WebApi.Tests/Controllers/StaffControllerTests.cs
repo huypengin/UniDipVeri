@@ -8,7 +8,7 @@ using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Domain.Enums;
 using UniDipVeri.WebApi.Controllers;
 
-namespace UniDipVeri.UnitTests.Controllers;
+namespace UniDipVeri.WebApi.Tests.Controllers;
 
 public class StaffControllerTests
 {
@@ -21,19 +21,20 @@ public class StaffControllerTests
     }
 
     [Fact]
-    public void StaffController_ShouldHaveRouteAttribute_AndLoginActionShouldHavePostAuthLogin()
+    public void StaffController_ShouldHaveRouteAttribute_AndLoginActionShouldHaveHttpPostLogin()
     {
         // Assert controller has ApiController and Route
         typeof(StaffController).GetCustomAttribute<ApiControllerAttribute>().Should().NotBeNull();
         var routeAttr = typeof(StaffController).GetCustomAttribute<RouteAttribute>();
         routeAttr.Should().NotBeNull();
+        routeAttr!.Template.Should().Be("api/staffs");
 
-        // Assert Login method has HttpPostAttribute matching /api/auth/login
+        // Assert Login method has HttpPostAttribute matching login
         var method = typeof(StaffController).GetMethod(nameof(StaffController.Login));
         method.Should().NotBeNull();
 
         var postAttrs = method!.GetCustomAttributes<HttpPostAttribute>().ToList();
-        postAttrs.Should().Contain(a => a.Template == "/api/auth/login");
+        postAttrs.Should().Contain(a => a.Template == "login");
     }
 
     [Theory]

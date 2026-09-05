@@ -1,7 +1,7 @@
 using FluentAssertions;
 using UniDipVeri.Application.Features.Auth.Models;
 
-namespace UniDipVeri.UnitTests.Models;
+namespace UniDipVeri.Application.Tests.Models;
 
 public class LoginRequestTests
 {
