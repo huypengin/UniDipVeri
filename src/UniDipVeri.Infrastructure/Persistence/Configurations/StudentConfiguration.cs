@@ -78,6 +78,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasColumnName("imported_at")
             .IsRequired();
 
+        builder.Property(s => s.CreatedAt)
+            .HasColumnName("created_at")
+            .IsRequired();
+
         builder.Property(s => s.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
