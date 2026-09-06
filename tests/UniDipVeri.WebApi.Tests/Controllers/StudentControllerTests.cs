@@ -1,5 +1,9 @@
 using System.Reflection;
+using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using UniDipVeri.Application.Abstractions.Models;
@@ -12,11 +16,25 @@ namespace UniDipVeri.WebApi.Tests.Controllers;
 public class StudentControllerTests
 {
     private readonly Mock<IAuthService> _authServiceMock = new();
+    private readonly Mock<IAuthenticationService> _authenticationServiceMock = new();
     private readonly StudentController _controller;
 
     public StudentControllerTests()
     {
         _controller = new StudentController(_authServiceMock.Object);
+
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(IAuthenticationService)))
+            .Returns(_authenticationServiceMock.Object);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                RequestServices = serviceProviderMock.Object
+            }
+        };
     }
 
     [Fact]
@@ -37,15 +55,15 @@ public class StudentControllerTests
     }
 
     [Fact]
-    public async Task Login_ShouldReturn200WithSessionToken_WhenStudentCredentialsAreValid()
+    public async Task Login_ShouldReturn200WithUser_WhenStudentCredentialsAreValid()
     {
         // Arrange
         var studentId = Guid.NewGuid();
         var request = new LoginRequest("student@miu.edu", "Password123!");
-        var expectedToken = new SessionToken("jwt-token-student-123", DateTime.UtcNow.AddHours(8));
+        var expectedUser = new AuthUserInfo(studentId, request.Email, "STUDENT", "student", "STU-001");
 
         _authServiceMock.Setup(s => s.AuthenticateStudentAsync(request.Email, request.Password, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AuthResult.Success(expectedToken));
+            .ReturnsAsync(AuthResult.Success(expectedUser));
 
         // Act
         var result = await _controller.Login(request, CancellationToken.None);
@@ -55,9 +73,16 @@ public class StudentControllerTests
         var okResult = (OkObjectResult)result;
         okResult.StatusCode.Should().Be(200);
 
-        var token = okResult.Value as SessionToken;
-        token.Should().NotBeNull();
-        token!.Value.Should().Be("jwt-token-student-123");
+        var user = okResult.Value as AuthUserInfo;
+        user.Should().NotBeNull();
+        user!.Role.Should().Be("STUDENT");
+        user.StudentNumber.Should().Be("STU-001");
+
+        _authenticationServiceMock.Verify(a => a.SignInAsync(
+            It.IsAny<HttpContext>(),
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            It.IsAny<ClaimsPrincipal>(),
+            It.IsAny<AuthenticationProperties>()), Times.Once);
 
         _authServiceMock.Verify(s => s.AuthenticateStudentAsync(request.Email, request.Password, It.IsAny<CancellationToken>()), Times.Once);
     }

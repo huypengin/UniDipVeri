@@ -317,4 +317,4 @@ flowchart TB
    - Staff accounts comprise a small, stable set of internal users (dozens of rows).
    - Separate tables enable targeted indexing, isolate high-volume student write loads from staff administrative queries, and allow independent caching strategies.
 5. **Orthogonal Authentication via Standalone Service:**
-   - Shared authentication mechanics (password hashing and JWT issuance) are cleanly handled by `AuthService` via repository ports (`IStaffRepository`, `IStudentRepository`), achieving code reuse without schema or domain coupling.
+   - Shared authentication mechanics (password hashing and credential verification) are cleanly handled by `AuthService` via repository ports (`IStaffRepository`, `IStudentRepository`), with sessions managed securely via ASP.NET Core HttpOnly cookie authentication, achieving code reuse without schema or domain coupling.

@@ -14,5 +14,10 @@ public class UniDipVeriDbContext(DbContextOptions<UniDipVeriDbContext> options) 
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UniDipVeriDbContext).Assembly);
+
+        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            modelBuilder.SeedDevData();
+        }
     }
 }

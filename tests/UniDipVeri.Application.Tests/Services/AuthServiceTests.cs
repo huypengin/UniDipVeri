@@ -15,7 +15,6 @@ public class AuthServiceTests
     private readonly Mock<IStaffRepository> _staffRepoMock = new();
     private readonly Mock<IStudentRepository> _studentRepoMock = new();
     private readonly Mock<IPasswordHasher> _hasherMock = new();
-    private readonly Mock<ISessionIssuer> _issuerMock = new();
     private readonly AuthService _authService;
     private readonly Guid _universityId = Guid.NewGuid();
     private readonly Guid _programId = Guid.NewGuid();
@@ -25,8 +24,7 @@ public class AuthServiceTests
         _authService = new AuthService(
             _staffRepoMock.Object,
             _studentRepoMock.Object,
-            _hasherMock.Object,
-            _issuerMock.Object);
+            _hasherMock.Object);
     }
 
     #region Authentication Tests (FR-AUTH-01-04)
@@ -54,17 +52,17 @@ public class AuthServiceTests
             .ReturnsAsync(staff);
         _hasherMock.Setup(h => h.VerifyPassword("password123", "hashed_pass"))
             .Returns(true);
-        _issuerMock.Setup(i => i.IssueStaffSession(staffId, expectedRoleClaim))
-            .Returns(new SessionToken($"jwt-token-{expectedRoleClaim.ToLower()}", DateTime.UtcNow.AddHours(1)));
 
         // Act
         var result = await _authService.AuthenticateStaffAsync(email, "password123");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Token.Should().NotBeNull();
-        result.Token!.Value.Should().Be($"jwt-token-{expectedRoleClaim.ToLower()}");
-        _issuerMock.Verify(i => i.IssueStaffSession(staffId, expectedRoleClaim), Times.Once);
+        result.User.Should().NotBeNull();
+        result.User!.Id.Should().Be(staffId);
+        result.User.Email.Should().Be(email);
+        result.User.Role.Should().Be(expectedRoleClaim);
+        result.User.UserType.Should().Be("staff");
     }
 
     [Fact]
@@ -87,9 +85,8 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Token.Should().BeNull();
+        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
-        _issuerMock.Verify(i => i.IssueStaffSession(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -113,9 +110,8 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Token.Should().BeNull();
+        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
-        _issuerMock.Verify(i => i.IssueStaffSession(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
     }
 
     [Theory]
@@ -130,9 +126,8 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Token.Should().BeNull();
+        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
-        _issuerMock.Verify(i => i.IssueStaffSession(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -154,16 +149,18 @@ public class AuthServiceTests
             .ReturnsAsync(student);
         _hasherMock.Setup(h => h.VerifyPassword("studentpass", "hashed_pass"))
             .Returns(true);
-        _issuerMock.Setup(i => i.IssueStudentSession(studentId, "STD123"))
-            .Returns(new SessionToken("jwt-token-student", DateTime.UtcNow.AddHours(1)));
 
         // Act
         var result = await _authService.AuthenticateStudentAsync("student@test.com", "studentpass");
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Token.Should().NotBeNull();
-        result.Token!.Value.Should().Be("jwt-token-student");
+        result.User.Should().NotBeNull();
+        result.User!.Id.Should().Be(studentId);
+        result.User.Email.Should().Be("student@test.com");
+        result.User.Role.Should().Be("STUDENT");
+        result.User.UserType.Should().Be("student");
+        result.User.StudentNumber.Should().Be("STD123");
     }
 
     [Fact]
@@ -228,7 +225,6 @@ public class AuthServiceTests
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be("Invalid email or password.");
-        _issuerMock.Verify(i => i.IssueStaffSession(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
 
         // Act
         result = await _authService.AuthenticateStudentAsync("unknown@test.com", "pass");
@@ -321,46 +317,9 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public void RequireRole_SessionToken_ShouldReturnTrue_WhenTokenIsValidAndRoleMatches()
-    {
-        // Arrange
-        var tokenValue = "valid-approver-token";
-        var session = new SessionToken(tokenValue, DateTime.UtcNow.AddHours(1));
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.Role, "APPROVER"),
-            new Claim("user_type", "staff")
-        };
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
-
-        _issuerMock.Setup(i => i.ValidateToken(tokenValue))
-            .Returns(principal);
-
-        // Act & Assert
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeTrue();
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeFalse();
-    }
-
-    [Fact]
-    public void RequireRole_SessionToken_ShouldReturnFalse_WhenTokenIsInvalidOrNull()
-    {
-        _issuerMock.Setup(i => i.ValidateToken("invalid-token"))
-            .Returns((ClaimsPrincipal?)null);
-
-        _authService.RequireRole(new SessionToken("invalid-token", DateTime.UtcNow), StaffRole.APPROVER).Should().BeFalse();
-        _authService.RequireRole((SessionToken?)null, StaffRole.APPROVER).Should().BeFalse();
-        _authService.RequireRole((string?)null, StaffRole.APPROVER).Should().BeFalse();
-    }
-
-    [Fact]
     public void RequireRole_ShouldReject_GivenLoggedInRegistrarAttemptingApproverAction_EvenThoughSessionIsValid()
     {
         // Arrange: Given a logged-in Registrar with a valid authenticated session (FR-AUTH-04, UC-01, US-A3)
-        var registrarToken = "valid-registrar-jwt";
-        var session = new SessionToken(registrarToken, DateTime.UtcNow.AddHours(1));
-
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
@@ -369,15 +328,10 @@ public class AuthServiceTests
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
 
-        _issuerMock.Setup(i => i.ValidateToken(registrarToken))
-            .Returns(principal);
-
         // Act & Assert: When attempting an Approver-only action, the system rejects it even though the session is valid
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeFalse();
         _authService.RequireRole(principal, StaffRole.APPROVER).Should().BeFalse();
 
         // But allows Registrar-permitted action
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeTrue();
         _authService.RequireRole(principal, StaffRole.REGISTRAR).Should().BeTrue();
     }
 
@@ -385,9 +339,6 @@ public class AuthServiceTests
     public void RequireRole_ShouldReject_GivenLoggedInApproverAttemptingRegistrarAction_EvenThoughSessionIsValid()
     {
         // Arrange: Given a logged-in Approver with a valid authenticated session
-        var approverToken = "valid-approver-jwt";
-        var session = new SessionToken(approverToken, DateTime.UtcNow.AddHours(1));
-
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
@@ -396,15 +347,10 @@ public class AuthServiceTests
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
 
-        _issuerMock.Setup(i => i.ValidateToken(approverToken))
-            .Returns(principal);
-
         // Act & Assert: When attempting a Registrar-only action, the system rejects it
-        _authService.RequireRole(session, StaffRole.REGISTRAR).Should().BeFalse();
         _authService.RequireRole(principal, StaffRole.REGISTRAR).Should().BeFalse();
 
         // But allows Approver-permitted action
-        _authService.RequireRole(session, StaffRole.APPROVER).Should().BeTrue();
         _authService.RequireRole(principal, StaffRole.APPROVER).Should().BeTrue();
     }
 

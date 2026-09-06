@@ -11,6 +11,4 @@ public interface IAuthService
 
     bool RequireRole(ClaimsPrincipal? principal, StaffRole requiredRole);
     bool RequireRole(ClaimsPrincipal? principal, params StaffRole[] requiredRoles);
-    bool RequireRole(SessionToken? session, StaffRole requiredRole);
-    bool RequireRole(string? token, StaffRole requiredRole);
 }

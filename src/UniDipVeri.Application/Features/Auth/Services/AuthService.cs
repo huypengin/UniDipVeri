@@ -10,13 +10,11 @@ namespace UniDipVeri.Application.Features.Auth.Services;
 public sealed class AuthService(
     IStaffRepository staffRepository,
     IStudentRepository studentRepository,
-    IPasswordHasher passwordHasher,
-    ISessionIssuer sessionIssuer) : IAuthService
+    IPasswordHasher passwordHasher) : IAuthService
 {
     private readonly IStaffRepository _staffRepository = staffRepository;
     private readonly IStudentRepository _studentRepository = studentRepository;
     private readonly IPasswordHasher _passwordHasher = passwordHasher;
-    private readonly ISessionIssuer _sessionIssuer = sessionIssuer;
 
     public async Task<AuthResult> AuthenticateStaffAsync(string email, string password, CancellationToken ct = default)
     {
@@ -34,8 +32,8 @@ public sealed class AuthService(
                 return AuthResult.Failure("Invalid email or password.");
             }
 
-            var token = _sessionIssuer.IssueStaffSession(staff.Id, staff.Role.ToString());
-            return AuthResult.Success(token);
+            var userInfo = new AuthUserInfo(staff.Id, staff.Email, staff.Role.ToString(), "staff");
+            return AuthResult.Success(userInfo);
         }
 
         return AuthResult.Failure("Invalid email or password.");
@@ -57,8 +55,8 @@ public sealed class AuthService(
                 return AuthResult.Failure("Invalid email or password.");
             }
 
-            var token = _sessionIssuer.IssueStudentSession(student.Id, student.StudentNumber);
-            return AuthResult.Success(token);
+            var userInfo = new AuthUserInfo(student.Id, student.Email, "STUDENT", "student", student.StudentNumber);
+            return AuthResult.Success(userInfo);
         }
 
         return AuthResult.Failure("Invalid email or password.");
@@ -89,21 +87,5 @@ public sealed class AuthService(
         return requiredRoles.Any(r =>
             principal.IsInRole(r.ToString()) ||
             userRoles.Any(ur => string.Equals(ur, r.ToString(), StringComparison.OrdinalIgnoreCase)));
-    }
-
-    public bool RequireRole(SessionToken? session, StaffRole requiredRole)
-    {
-        return RequireRole(session?.Value, requiredRole);
-    }
-
-    public bool RequireRole(string? token, StaffRole requiredRole)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return false;
-        }
-
-        var principal = _sessionIssuer.ValidateToken(token);
-        return RequireRole(principal, requiredRole);
     }
 }

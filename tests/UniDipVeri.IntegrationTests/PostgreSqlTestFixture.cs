@@ -7,7 +7,7 @@ namespace UniDipVeri.IntegrationTests;
 
 public class PostgreSqlTestFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:16-alpine")
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("unidipveri_test")
         .WithUsername("postgres")
         .WithPassword("postgres")

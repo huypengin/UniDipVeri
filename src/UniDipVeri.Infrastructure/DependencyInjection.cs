@@ -23,9 +23,7 @@ public static class DependencyInjection
         });
 
         // Security
-        services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
-        services.AddScoped<ISessionIssuer, JwtSessionIssuer>();
 
         // Repositories
         services.AddScoped<IStaffRepository, PostgresStaffRepository>();

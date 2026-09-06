@@ -531,13 +531,6 @@ classDiagram
         +hashToken(string token) string
     }
 
-    class ISessionIssuer {
-        <<interface>>
-        +issueStaffSession(UUID staffId, string role) SessionToken
-        +issueStudentSession(UUID studentId, string studentNumber) SessionToken
-        +validateToken(string token) ClaimsPrincipal
-    }
-
     class IAuthService {
         <<interface>>
         +authenticateStaff(string email, string password) AuthResult
@@ -647,7 +640,6 @@ classDiagram
         -IStaffRepository staffRepo
         -IStudentRepository studentRepo
         -IPasswordHasher passwordHasher
-        -ISessionIssuer sessionIssuer
         +authenticateStaff(string email, string password) AuthResult
         +authenticateStudent(string email, string password) AuthResult
         +requireRole(ClaimsPrincipal principal, StaffRole requiredRole) bool
@@ -791,13 +783,6 @@ classDiagram
         +hashToken(string token) string
     }
 
-    class JwtSessionIssuer {
-        -JwtSettings settings
-        +issueStaffSession(UUID staffId, string role) SessionToken
-        +issueStudentSession(UUID studentId, string studentNumber) SessionToken
-        +validateToken(string token) ClaimsPrincipal
-    }
-
     %% Interface Realizations
     PostgresStaffRepository ..|> IStaffRepository
     PostgresStudentRepository ..|> IStudentRepository
@@ -814,7 +799,6 @@ classDiagram
     HttpAcademicRecordSourceAdapter ..|> IAcademicRecordSourceAdapter
     BcryptPasswordHasher ..|> IPasswordHasher
     CryptoTokenGenerator ..|> ITokenGenerator
-    JwtSessionIssuer ..|> ISessionIssuer
 ```
 
 ---
@@ -891,6 +875,11 @@ classDiagram
     class AuditController {
         -AuditService auditService
         +getAuditHistory(AuditScopeDTO scope) ActionResult
+    }
+
+    class AuthController {
+        +getCurrentUser() ActionResult
+        +logout() ActionResult
     }
 
     %% Controller -> Service linkage
