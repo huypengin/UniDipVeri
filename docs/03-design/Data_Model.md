@@ -158,6 +158,7 @@ erDiagram
         uuid approver_id FK "UNIVERSITY_STAFF.id"
         string decision "APPROVE | REJECT"
         string comment
+        bool is_self_approval "true if approver_id == request.requested_by; only possible when deployment config permits it"
         datetime decided_at
     }
 
@@ -209,6 +210,7 @@ erDiagram
 - **Verification Event Privacy & Abuse Prevention:** Client IP addresses (`ip_hash`) are intentionally omitted from `VERIFICATION_EVENT` to uphold graduate privacy and avoid unnecessary PII storage in audit logs. For abuse prevention (e.g. brute-force token scans, bot crawling, or DDoS mitigation), rate limiting is handled at the network and middleware perimeter (such as reverse proxy / API Gateway rate-limiting policies or ASP.NET Core RateLimiter middleware) rather than in core business domain tables.
 - **Strict Relational Separation of `UNIVERSITY_STAFF` and `STUDENT` Tables:** `UNIVERSITY_STAFF` and `STUDENT` are intentionally isolated into distinct relational tables rather than unified under a polymorphic `USER` table. This design guarantees database-level foreign key security (e.g. `CREDENTIAL_APPROVAL.approver_id` strictly references `UNIVERSITY_STAFF`, making unauthorized student approval structurally impossible in PostgreSQL), prevents nullable column sprawl (avoiding nullable `wallet_id`, `student_number`, `graduation_status` on staff rows), maintains the import-only write boundary for students (`AS-01`), and optimizes indexing across vastly different data volumes. Common authentication is provided orthogonally by `AuthService`.
 - **Full NFR-06 traceability chain:** `UNIVERSITY_STAFF` (configured) → `ACADEMIC_RECORD` (imported) → `STUDENT.wallet_id` (provisioned) → `ELIGIBILITY_EVALUATION` (computed) → `CREDENTIAL_ISSUANCE_REQUEST` (created only if eligible) → `CREDENTIAL_APPROVAL` (one or more) → `CREDENTIAL` (issued). Every arrow is a foreign key, so the chain is reconstructable with database joins alone.
+- **Self-approval visibility (FR-APPR-11):** `CREDENTIAL_APPROVAL.is_self_approval` is computed and set at write time by `IssuanceRequestService.approve()`, never client-supplied. It exists purely for audit visibility — the underlying permission check (whether self-approval is allowed at all) is enforced by deployment configuration, not by this column. A `true` value should render distinctly (e.g. a warning badge) in every audit view that surfaces approval decisions.
 
 ## 3. Application-Level Credential Representation
 

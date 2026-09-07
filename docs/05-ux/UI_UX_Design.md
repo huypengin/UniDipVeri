@@ -199,6 +199,9 @@ Restricted exclusively to **Platform Administrators** (`FR-USER-01..05`, `US-J1.
   - **Assigned Role Pills:** Clear tags denoting permissions (`ADMIN`, `REGISTRAR`, `APPROVER`). A staff member may hold multiple roles (e.g., both `APPROVER` and `REGISTRAR`).
 - **Deactivation with Audit Preservation (`US-J3`):** Staff accounts can be deactivated to block login while preserving historical foreign key references in approval queues, issuance requests, and rule creation logs.
 - **Sole Administrator Protection (`FR-USER-05`, `US-J3`):** The system disables deactivation for the final remaining active administrator account.
+- **Role-Combination & Self-Approval Status (read-only) (`AS-08`, `FR-USER-06`, `FR-APPR-11`):**
+- Displays current deployment-configured state: *"Registrar + Approver combination and self-approval: **Disabled (default)**"* or *"**Enabled via deployment configuration**"* if the operator has set the flag.
+- This is informational only — no in-app control exists to change it, by design. A tooltip or caption explains why: *"This restriction protects the independent-approval guarantee and can only be changed by whoever controls the deployment, not from within the application."*
 
 ---
 

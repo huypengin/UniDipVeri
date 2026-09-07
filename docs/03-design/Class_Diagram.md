@@ -287,8 +287,9 @@ classDiagram
         +UUID approverId
         +ApprovalDecision decision
         +string comment
+        +bool isSelfApproval
         +DateTime decidedAt
-        +static CredentialApproval create(requestId, approverId, decision, comment, id)
+        +static CredentialApproval create(requestId, approverId, decision, comment, isSelfApproval, id)
     }
 
     class CredentialSchema {
@@ -663,6 +664,10 @@ Note on read vs. write: methods that only read state (`listStaff`, `getStudent`,
 Note on share: `listVerificationSummary` reads via `IVerificationEventRepository` (injected alongside AuditService's copy — both services depend on the same port; no duplication of the store itself) and groups results by `share_id` within a configurable time window before returning, per **NFR-08**. It never mutates state.
 
 Note: `ShareVerificationSummaryDTO = {shareId, credentialId, credentialType, latestResult, attemptCount, lastVerifiedAt}`, sourced by `IVerificationEventRepository.listByShareId` grouped/aggregated per share the student owns (via `IShareRepository`). Still read-only, no state mutation.
+
+Note: `approve(requestId, approverStaffId, comment)` now additionally: (1) loads the request's `requested_by`; (2) if `approverStaffId == requested_by`, consults deployment configuration — reject with a domain error if self-approval is not permitted, otherwise proceed and set `CredentialApproval.isSelfApproval = true`.
+
+Note: `createStaff(...)` and `updateStaff(...)` additionally validate: if the resulting role set would include both `REGISTRAR` and `APPROVER`, consult deployment configuration — reject with a validation error if the combination is not permitted.
 
 ---
 

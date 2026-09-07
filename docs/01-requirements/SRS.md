@@ -89,6 +89,7 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - **AS-05 — Modern Browser Access:** Users access the system over a modern browser with JavaScript enabled.
 - **AS-06 — Eligibility rules:** Graduation eligibility rules configured for each academic program are assumed to accurately represent the university's graduation requirements.
 - **AS-07 — Credentials do not expire:** An issued academic diploma credential (`Credential`) has no validity window or expiration date of its own; once issued, it remains `VALID` indefinitely unless explicitly revoked via `CredentialService.revoke()` (FR-CRED-09–11). This reflects the real-world nature of an academic diploma, which does not lapse over time the way a certification or license might. Expiration in this system applies only to **share links** (`Share.expires_at`, FR-SHARE-04–05, `EXPIRED_SHARE` result) — never to the credential itself. A future extension requiring time-bound credentials (e.g., provisional or conditional diplomas) would need a new `Credential.expires_at` field and a corresponding `EXPIRED` status, which is explicitly out of scope for the MVP.
+- **AS-08 — Deployment-scoped role-combination and self-approval policy:** By default, the system shall not permit a single `UNIVERSITY_STAFF` account to hold both `REGISTRAR` and `APPROVER` roles simultaneously, since that combination allows one individual to both request and approve credential issuance, undermining the independent-approval guarantee described in FR-APPR-01–10. For constrained-staffing deployments (e.g., this MVP thesis prototype, or a small pilot with limited staff), this restriction — and the correspondingly relaxed self-approval check in FR-APPR-11 — may be overridden via a deployment-time configuration flag (e.g., an environment variable or `appsettings.json` entry, not a database column or in-app setting). This flag is read once at deployment/boot time; no authenticated session, including Platform Administrator, can change it at runtime. This follows the same principle as AS-04's deployment-time preconfiguration of walt.id issuer profiles: trust-sensitive controls are provisioned outside the running application, not exposed as in-app settings — otherwise an Admin-role account could grant itself an approval bypass on demand.
 
 ### 2.6 Constraints
 
@@ -215,6 +216,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-APPR-08** The system shall record the identity and timestamp of every approval or rejection decision.
 - **FR-APPR-09** The system shall prevent the same user from being counted twice toward the required approval count on a single request.
 - **FR-APPR-10** The approval policy shall be configurable by the Platform Administrator (the required count N), even though the MVP ships with N = 1, so the policy can be tightened later without a redesign.
+- **FR-APPR-11** The system shall, by default, prevent the same staff member from both creating (as Registrar) and approving (as Approver) a given credential issuance request, regardless of role assignment. When deployment-time configuration explicitly permits the `REGISTRAR`+`APPROVER` role combination (FR-USER-06, AS-08), this restriction is correspondingly relaxed for accounts holding both roles. Every such self-approval decision shall nonetheless be flagged on the recorded `CREDENTIAL_APPROVAL` entry and surfaced distinctly in audit views (FR-AUD-02), so that self-approved requests remain visibly traceable regardless of the current policy state.
 
 ### 4.7 Credential Issuance
 
@@ -286,6 +288,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
   - **Account Status:** `PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE` (Default is `PENDING_ACTIVATION` for newly imported data).
   - **Graduation Status:** `NOT_STARTED`, `PENDING_REVIEW`, `ELIGIBLE`, `GRADUATED`, `REJECTED` (Default is `NOT_STARTED`).
 - **FR-USER-05** The system shall prevent deactivation or role removal of the last active Platform Administrator account.
+- **FR-USER-06** The system shall, by default, prevent a Platform Administrator from assigning both `REGISTRAR` and `APPROVER` roles to the same staff account. This restriction shall only be lifted via deployment-time configuration (see AS-08), never via an in-app control.
 
 ### 4.15 Student Wallet Management
 

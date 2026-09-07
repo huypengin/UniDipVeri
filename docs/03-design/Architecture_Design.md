@@ -318,3 +318,11 @@ flowchart TB
    - Separate tables enable targeted indexing, isolate high-volume student write loads from staff administrative queries, and allow independent caching strategies.
 5. **Orthogonal Authentication via Standalone Service:**
    - Shared authentication mechanics (password hashing and credential verification) are cleanly handled by `AuthService` via repository ports (`IStaffRepository`, `IStudentRepository`), with sessions managed securely via ASP.NET Core HttpOnly cookie authentication, achieving code reuse without schema or domain coupling.
+
+### Deployment-Time Trust Configuration: Role-Combination & Self-Approval Restrictions
+
+**Decision:** Whether a single staff account may hold both `REGISTRAR` and `APPROVER` roles, and whether a staff member may approve their own issuance request, are governed by a single deployment-time configuration flag — not a database-stored `ApprovalPolicy` field, and not an in-app Admin Settings toggle.
+
+**Rationale:** These two behaviors are causally linked: the `REGISTRAR`+`APPROVER` combination is only risky _because_ it enables self-approval under the MVP's N=1 policy, so one flag governs both enforcement points (`StaffService` role assignment, `IssuanceRequestService.approve()`). Keeping this out of the database and out of any in-app control prevents a privilege-escalation loop: if a Platform Administrator account could toggle this at runtime, and that same account (or a colluding one) also held `REGISTRAR`+`APPROVER`, they could grant themselves the exception on demand. Provisioning it at deployment time only (mirroring AS-04's treatment of walt.id issuer profiles) means the decision is made by whoever controls the deployment, not by anyone operating the running application — appropriate for a control that exists specifically to constrain what in-app actors, including Admins, can do to each other's oversight.
+
+**Consequence:** The Admin System Settings screen (`UI_UX_Design.md` §4.5) shows this as a **read-only status indicator** ("Self-approval & Registrar+Approver combination: Enabled via deployment config / Disabled (default)"), not an interactive toggle.
