@@ -78,5 +78,83 @@ public class UniversityStaffTests
         var staff = UniversityStaff.Create(_universityId, "Name", "email@test.com", "hash", StaffRole.REGISTRAR);
         staff.UpdateRole(StaffRole.APPROVER);
         staff.Role.Should().Be(StaffRole.APPROVER);
+        staff.Roles.Should().ContainSingle().Which.Should().Be(StaffRole.APPROVER);
+    }
+
+    [Fact]
+    public void Create_ShouldSupportMultipleRoles()
+    {
+        var staff = UniversityStaff.Create(
+            _universityId,
+            "Multi Role Staff",
+            "multi@miu.edu",
+            "hash",
+            [StaffRole.APPROVER, StaffRole.REGISTRAR]);
+
+        staff.Roles.Should().HaveCount(2);
+        staff.HasRole(StaffRole.APPROVER).Should().BeTrue();
+        staff.HasRole(StaffRole.REGISTRAR).Should().BeTrue();
+        staff.HasRole(StaffRole.ADMIN).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_ShouldThrow_WhenRolesIsEmpty()
+    {
+        var act = () => UniversityStaff.Create(
+            _universityId,
+            "No Role",
+            "norole@miu.edu",
+            "hash",
+            Enumerable.Empty<StaffRole>());
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddRole_ShouldAddNewRole_WhenNotPresent()
+    {
+        var staff = UniversityStaff.Create(_universityId, "Name", "email@test.com", "hash", StaffRole.REGISTRAR);
+        staff.AddRole(StaffRole.APPROVER);
+
+        staff.Roles.Should().HaveCount(2);
+        staff.HasRole(StaffRole.APPROVER).Should().BeTrue();
+        staff.HasRole(StaffRole.REGISTRAR).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RemoveRole_ShouldRemoveSpecifiedRole()
+    {
+        var staff = UniversityStaff.Create(
+            _universityId,
+            "Name",
+            "email@test.com",
+            "hash",
+            [StaffRole.APPROVER, StaffRole.REGISTRAR]);
+
+        staff.RemoveRole(StaffRole.APPROVER);
+
+        staff.Roles.Should().ContainSingle().Which.Should().Be(StaffRole.REGISTRAR);
+        staff.HasRole(StaffRole.APPROVER).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RemoveRole_ShouldThrow_WhenRemovingLastRole()
+    {
+        var staff = UniversityStaff.Create(_universityId, "Name", "email@test.com", "hash", StaffRole.REGISTRAR);
+        var act = () => staff.RemoveRole(StaffRole.REGISTRAR);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void UpdateRoles_ShouldReplaceAllRoles()
+    {
+        var staff = UniversityStaff.Create(_universityId, "Name", "email@test.com", "hash", StaffRole.REGISTRAR);
+        staff.UpdateRoles([StaffRole.ADMIN, StaffRole.APPROVER]);
+
+        staff.Roles.Should().HaveCount(2);
+        staff.HasRole(StaffRole.ADMIN).Should().BeTrue();
+        staff.HasRole(StaffRole.APPROVER).Should().BeTrue();
+        staff.HasRole(StaffRole.REGISTRAR).Should().BeFalse();
     }
 }

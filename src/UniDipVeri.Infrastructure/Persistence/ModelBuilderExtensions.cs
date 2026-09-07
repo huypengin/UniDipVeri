@@ -72,7 +72,6 @@ public static class ModelBuilderExtensions
                 Name = "System Administrator",
                 Email = "admin@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
-                Role = StaffRole.ADMIN,
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
@@ -84,7 +83,6 @@ public static class ModelBuilderExtensions
                 Name = "Sarah Registrar",
                 Email = "registrar@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
-                Role = StaffRole.REGISTRAR,
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
@@ -96,11 +94,17 @@ public static class ModelBuilderExtensions
                 Name = "David Approver",
                 Email = "approver@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
-                Role = StaffRole.APPROVER,
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
             }
+        );
+
+        // 3b. Staff Roles (Join table seed data)
+        modelBuilder.Entity<StaffRoleAssignment>().HasData(
+            new { StaffId = StaffAdminId, Role = StaffRole.ADMIN },
+            new { StaffId = StaffRegistrarId, Role = StaffRole.REGISTRAR },
+            new { StaffId = StaffApproverId, Role = StaffRole.APPROVER }
         );
 
         // 4. Students

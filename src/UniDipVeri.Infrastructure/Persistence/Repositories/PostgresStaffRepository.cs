@@ -13,6 +13,7 @@ public class PostgresStaffRepository(UniDipVeriDbContext dbContext) : IStaffRepo
     {
         return await _dbContext.UniversityStaff
             .Include(s => s.University)
+            .Include(s => s.StaffRoles)
             .FirstOrDefaultAsync(s => s.Id == id, ct);
     }
 
@@ -26,19 +27,21 @@ public class PostgresStaffRepository(UniDipVeriDbContext dbContext) : IStaffRepo
         var normalizedEmail = email.Trim().ToLower();
         return await _dbContext.UniversityStaff
             .Include(s => s.University)
+            .Include(s => s.StaffRoles)
             .FirstOrDefaultAsync(s => s.Email.ToLower() == normalizedEmail, ct);
     }
 
     public async Task<int> CountActiveAdminsAsync(CancellationToken ct = default)
     {
         return await _dbContext.UniversityStaff
-            .CountAsync(s => s.Role == StaffRole.ADMIN && s.Status == StaffStatus.ACTIVE, ct);
+            .CountAsync(s => s.Status == StaffStatus.ACTIVE && s.StaffRoles.Any(r => r.Role == StaffRole.ADMIN), ct);
     }
 
     public async Task<IReadOnlyList<UniversityStaff>> ListAllAsync(CancellationToken ct = default)
     {
         return await _dbContext.UniversityStaff
             .Include(s => s.University)
+            .Include(s => s.StaffRoles)
             .AsNoTracking()
             .OrderBy(s => s.Name)
             .ToListAsync(ct);

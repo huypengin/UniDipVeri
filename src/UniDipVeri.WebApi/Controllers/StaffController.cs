@@ -36,9 +36,13 @@ public class StaffController(IAuthService authService) : ControllerBase
         {
             new(ClaimTypes.NameIdentifier, result.User.Id.ToString()),
             new(ClaimTypes.Email, result.User.Email),
-            new(ClaimTypes.Role, result.User.Role),
             new("user_type", result.User.UserType)
         };
+
+        foreach (var role in result.User.Roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
