@@ -5,7 +5,7 @@
 Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
 1. **Single tenant.** `UNIVERSITY` is a singleton table (one row, seeded at deployment). No cross-university foreign keys exist anywhere else in the model.
-2. **User management.** `UNIVERSITY_STAFF` tracks administrative staff accounts with explicit roles (`REGISTRAR | APPROVER | ADMIN`) and `status` (`ACTIVE | INACTIVE`) managed by Platform Administrators.
+2. **User management.** `UNIVERSITY_STAFF` tracks administrative staff accounts with `status` (`ACTIVE | INACTIVE`) managed by Platform Administrators. Because staff members may hold multiple concurrent roles (`REGISTRAR`, `APPROVER`, `ADMIN`), roles are normalized into the `STAFF_ROLE` join table.
 3. **Approval workflow.** Issuance goes through `CREDENTIAL_ISSUANCE_REQUEST` and `CREDENTIAL_APPROVAL` before a `CREDENTIAL` row is created, governed by `APPROVAL_POLICY`.
 4. **Academic record import, student wallet & eligibility.** `STUDENT` and `ACADEMIC_RECORD` are populated from the external Academic Record Source. A server-managed custodial wallet (`wallet_id`, `wallet_status`) is provisioned on walt.id. Each `PROGRAM` carries a versioned `ELIGIBILITY_RULE_SET`, and a student's `ELIGIBILITY_EVALUATION` against that rule set gates whether a `CREDENTIAL_ISSUANCE_REQUEST` can even be created.
 
@@ -17,6 +17,7 @@ Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative archi
 erDiagram
 
     UNIVERSITY ||--o{ UNIVERSITY_STAFF : employs
+    UNIVERSITY_STAFF ||--|{ STAFF_ROLE : holds
     UNIVERSITY ||--o{ PROGRAM : offers
     UNIVERSITY ||--o{ CREDENTIAL_SCHEMA : defines
     UNIVERSITY ||--|| APPROVAL_POLICY : configures
@@ -57,10 +58,14 @@ erDiagram
         string name
         string email
         string password_hash
-        string role "REGISTRAR | APPROVER | ADMIN"
         string status "ACTIVE | INACTIVE"
         datetime created_at
         datetime updated_at
+    }
+
+    STAFF_ROLE {
+        uuid staff_id PK,FK
+        string role PK "REGISTRAR | APPROVER | ADMIN"
     }
 
     PROGRAM {
@@ -192,7 +197,7 @@ erDiagram
 
 ## 2. Notes on Entity Semantics & Lifecycle
 
-- **`UNIVERSITY_STAFF` management:** Platform Administrators manage staff rows. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
+- **`UNIVERSITY_STAFF` and Multi-Valued `STAFF_ROLE` Normalization:** Platform Administrators manage staff accounts and their assigned role(s). A staff member may simultaneously hold multiple distinct roles (e.g. both `APPROVER` and `REGISTRAR`, per `UI_UX_Design.md` §4.4, `SRS.md` `FR-USER-01`/`FR-USER-05`, and `Class_Diagram.md`). Rather than using non-relational CSV strings or PostgreSQL array columns, roles are normalized into the `STAFF_ROLE` join table (`staff_id`, `role`) with a composite primary key `(staff_id, role)` and foreign key `REFERENCES university_staff(id) ON DELETE CASCADE`. This preserves 1NF relational normalization, enables efficient B-tree index seeks (e.g. `WHERE role = 'ADMIN'` for `FR-USER-05` quorum checks), and maintains consistency with the project's pattern of separate relational tables over polymorphic/CSV columns. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
 - **`STUDENT` and `ACADEMIC_RECORD` Ingestion vs. Lifecycle Boundary:** There is no Registrar-facing manual "create student" or "edit academic record" write path in the UI (enforcing `AS-01` "source data trusted as correct"). Student and transcript rows are initialized strictly via the inbound ingestion pipeline (`AcademicRecordService.importRecord`). However, while `ACADEMIC_RECORD` is an immutable snapshot, `STUDENT` is a stateful domain aggregate whose operational lifecycle fields (`account_status`, `graduation_status`, `wallet_id`, `wallet_status`, `password_hash`) are updated by internal system domain workflows (wallet provisioning, graduation evaluation, credential issuance, and account activation/deactivation). In addition, subsequent authoritative batch imports synchronize updated profile data (name, email) per `FR-STU-01`.
 - **Student Account, Graduation & Wallet lifecycle:** Each `STUDENT` carries `account_status` (`PENDING_ACTIVATION | ACTIVE | INACTIVE`, default `PENDING_ACTIVATION` for newly imported data), `graduation_status` (`NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED`, default `NOT_STARTED`), and `wallet_id` / `wallet_status` (`PENDING | ACTIVE | FAILED | INACTIVE`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. When a student account is deactivated (`INACTIVE`), its `wallet_status` is also transitioned to `INACTIVE`. Credential issuance requires `wallet_status = ACTIVE` and `graduation_status = ELIGIBLE` (or passing evaluation).
 - **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a *share link* stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.

@@ -98,14 +98,16 @@ classDiagram
         +string name
         +string email
         +string passwordHash
-        +StaffRole role
+        +List~StaffRole~ roles
         +StaffStatus status
-        +static UniversityStaff create(universityId, name, email, passwordHash, role, id)
+        +static UniversityStaff create(universityId, name, email, passwordHash, roles, id)
         +bool isActive()
         +bool hasRole(StaffRole requiredRole)
         +void deactivate()
         +void activate()
-        +void updateRole(StaffRole newRole)
+        +void updateRoles(List~StaffRole~ roles)
+        +void addRole(StaffRole role)
+        +void removeRole(StaffRole role)
         +void updateProfile(name, email)
         +void setPassword(passwordHash)
     }
@@ -552,7 +554,7 @@ classDiagram
     class StaffService {
         -IStaffRepository staffRepo
         -IPasswordHasher passwordHasher
-        +createStaff(string name, string email, string password, StaffRole role) StaffDTO
+        +createStaff(string name, string email, string password, List~StaffRole~ roles) StaffDTO
         +updateStaff(UUID staffId, ProfileUpdateDTO profile, List~StaffRole~ roles) StaffDTO
         +deactivateStaff(UUID staffId) StaffDTO
         +listStaff() List~StaffDTO~

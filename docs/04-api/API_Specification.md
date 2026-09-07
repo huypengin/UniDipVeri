@@ -67,11 +67,13 @@ POST /api/staffs/login
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "id": "11111111-1111-1111-1111-111111111111",
@@ -103,11 +105,13 @@ POST /api/students/login
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "id": "22222222-2222-2222-2222-222222222222",
@@ -135,11 +139,13 @@ POST /api/auth/logout
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "message": "Logged out successfully"
@@ -212,7 +218,7 @@ POST /api/staffs
   "name": "Nguyen Anh Minh",
   "email": "minh.nguyen@staff.miu.example",
   "password": "SecurePassword123!",
-  "role": "REGISTRAR"
+  "roles": ["REGISTRAR"]
 }
 ```
 
@@ -223,7 +229,7 @@ Response:
     "staffId": "staff-uuid-1",
     "name": "Nguyen Anh Minh",
     "email": "minh.nguyen@staff.miu.example",
-    "role": "REGISTRAR",
+    "roles": ["REGISTRAR"],
     "status": "ACTIVE",
     "createdAt": "2026-08-27T10:00:00Z"
 }
@@ -234,7 +240,7 @@ Response:
 ```json
 PATCH /api/staffs/{staffId}
 {
-  "role": "APPROVER",
+  "roles": ["APPROVER", "REGISTRAR"],
   "name": "Nguyen Anh Minh"
 }
 ```
