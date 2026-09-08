@@ -91,7 +91,7 @@ flowchart TD
         C7[Count distinct approvals]
         C8{Approvals ≥\nrequired policy count?}
         C9[Wait for more approvals]
-        C10[Confer degree:\nset graduation_status = GRADUATED\n(durable regardless of\nissuance outcome)]
+        C10["Confer degree:\nset graduation_status = GRADUATED\n(durable regardless of\nissuance outcome)"]
         D1[Load schema; build\ncredential subject]
         D2[Call VC Adapter -> issue\ninto student wallet_id]
         D3{walt.id call\nsucceeds?}
