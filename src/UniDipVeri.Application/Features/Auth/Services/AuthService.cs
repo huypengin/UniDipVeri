@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using UniDipVeri.Application.Abstractions.Models;
 using UniDipVeri.Application.Abstractions.Repositories;
 using UniDipVeri.Application.Abstractions.Security;
-using UniDipVeri.Application.Abstractions.Services;
+using UniDipVeri.Application.Features.Auth.Abstractions;
+using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Domain.Enums;
 
 namespace UniDipVeri.Application.Features.Auth.Services;

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace UniDipVeri.Application.Abstractions.Models;
+namespace UniDipVeri.Application.Features.Auth.Models;
 
 public sealed record AuthUserInfo
 {
