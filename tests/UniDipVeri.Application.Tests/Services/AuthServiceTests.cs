@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Moq;
-using UniDipVeri.Application.Abstractions.Models;
 using UniDipVeri.Application.Abstractions.Repositories;
 using UniDipVeri.Application.Abstractions.Security;
 using UniDipVeri.Application.Features.Auth.Services;

@@ -13,18 +13,6 @@ public class CustomWebApplicationFactory(string connectionString) : WebApplicati
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = _connectionString,
-                ["JwtSettings:SecretKey"] = "UniDipVeriIntegrationTestSecretKeyForTestingPurposesOnly123!",
-                ["JwtSettings:Issuer"] = "UniDipVeriTestIssuer",
-                ["JwtSettings:Audience"] = "UniDipVeriTestAudience",
-                ["JwtSettings:ExpirationInHours"] = "1"
-            });
-        });
-
         builder.ConfigureServices(services =>
         {
             var descriptors = services.Where(d =>

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using UniDipVeri.Infrastructure.Persistence;
-using Xunit;
 
 namespace UniDipVeri.IntegrationTests;
 
