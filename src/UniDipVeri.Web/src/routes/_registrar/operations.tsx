@@ -3,25 +3,25 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, LogOut } from "lucide-react";
 
-export const Route = createFileRoute("/staff/users")({
+export const Route = createFileRoute("/_registrar/operations")({
   beforeLoad: ({ context }) => {
     if (!context.auth.isAuthenticated) {
       throw redirect({
         to: "/login",
-        search: { redirect: "/staff/users" },
+        search: { redirect: "/staff/operations" },
       });
     }
-    if (!context.auth.hasRole("ADMIN")) {
+    if (!context.auth.hasRole("REGISTRAR")) {
       throw redirect({ to: "/" });
     }
   },
   head: () => ({
-    meta: [{ title: "User Administration — UniDipVeri" }],
+    meta: [{ title: "Registrar Operations — UniDipVeri" }],
   }),
-  component: StaffUsersPage,
+  component: StaffOperationsPage,
 });
 
-function StaffUsersPage() {
+function StaffOperationsPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -42,7 +42,7 @@ function StaffUsersPage() {
                 UniDipVeri
               </span>
               <span className="ml-2 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-                Staff Administration
+                Registrar Operations
               </span>
             </div>
           </div>
@@ -57,11 +57,11 @@ function StaffUsersPage() {
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 p-8">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Staff & Administration
+          Registrar Operations
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage university staff provisioning, roles, and administrative
-          governance policies.
+          Cohort graduation evaluation, issuance request creation, and academic
+          program records.
         </p>
       </main>
     </div>

@@ -138,6 +138,63 @@ public class PostgresStaffRepositoryTests : IDisposable
         updated.IsActive().Should().BeFalse();
     }
 
+    [Fact]
+    public async Task AddAsync_ShouldPersistMultipleRoles_InStaffRoleTable()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(
+            _universityId,
+            "Dual Role Staff",
+            "dual@miu.edu",
+            "hash456",
+            [StaffRole.APPROVER, StaffRole.REGISTRAR]);
+
+        await _repository.AddAsync(staff);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(staff.Id);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.Roles.Should().HaveCount(2);
+        retrieved.HasRole(StaffRole.APPROVER).Should().BeTrue();
+        retrieved.HasRole(StaffRole.REGISTRAR).Should().BeTrue();
+        retrieved.StaffRoles.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetDefaultUniversityIdAsync_ShouldReturnSeededUniversityId()
+    {
+        // Act
+        var result = await _repository.GetDefaultUniversityIdAsync();
+
+        // Assert
+        result.Should().Be(_universityId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldUpdateAssignedRoles()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(
+            _universityId,
+            "Role Changing Staff",
+            "change_role@miu.edu",
+            "hash",
+            [StaffRole.ADMIN]);
+        await _repository.AddAsync(staff);
+
+        // Act
+        staff.UpdateRoles([StaffRole.REGISTRAR, StaffRole.APPROVER]);
+        await _repository.UpdateAsync(staff);
+
+        var retrieved = await _repository.GetByIdAsync(staff.Id);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.Roles.Should().BeEquivalentTo([StaffRole.REGISTRAR, StaffRole.APPROVER]);
+    }
+
     public void Dispose()
     {
         _dbContext.Database.EnsureDeleted();

@@ -35,12 +35,6 @@ public class UniversityStaffConfiguration : IEntityTypeConfiguration<UniversityS
             .HasMaxLength(255)
             .IsRequired();
 
-        builder.Property(s => s.Role)
-            .HasColumnName("role")
-            .HasMaxLength(50)
-            .HasConversion<string>()
-            .IsRequired();
-
         builder.Property(s => s.Status)
             .HasColumnName("status")
             .HasMaxLength(50)
@@ -59,5 +53,13 @@ public class UniversityStaffConfiguration : IEntityTypeConfiguration<UniversityS
             .WithMany(u => u.StaffMembers)
             .HasForeignKey(s => s.UniversityId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(s => s.StaffRoles)
+            .WithOne(r => r.Staff)
+            .HasForeignKey(r => r.StaffId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(s => s.StaffRoles)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

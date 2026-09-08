@@ -1,6 +1,6 @@
 # API Specification
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 Implements the HTTP interface required by `docs/01-requirements/SRS.md` Section 5, mapped to the **Clean Architecture** defined in `docs/03-design/Architecture_Design.md` and `docs/03-design/Class_Diagram.md`. Single tenant: there is no `{universityId}` path segment anywhere.
 
@@ -20,6 +20,7 @@ All endpoints are implemented as thin HTTP controllers delegating directly to do
 | `PATCH /api/staffs/{id}`                       | `StaffService`           | `updateStaff`              | Updates `UNIVERSITY_STAFF`                                                     |
 | `POST /api/staffs/{id}/deactivate`             | `StaffService`           | `deactivateStaff`          | Sets `UNIVERSITY_STAFF.status = INACTIVE`                                      |
 | `GET /api/staffs`                              | `StaffService`           | `listStaff`                | None (Read-only)                                                               |
+| `GET /api/staffs/{id}`                         | `StaffService`           | `getStaffById`             | None (Read-only)                                                               |
 | `GET /api/students`                            | `StudentWalletService`   | `listStudents`             | None (Read-only)                                                               |
 | `GET /api/students/{id}`                       | `StudentWalletService`   | `getStudent`               | None (Read-only)                                                               |
 | `POST /api/students/{id}/wallet/provision`     | `StudentWalletService`   | `provisionWallet`          | Calls `IWalletAdapter`, updates `STUDENT.wallet_id`                            |
@@ -67,16 +68,18 @@ POST /api/staffs/login
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "id": "11111111-1111-1111-1111-111111111111",
   "email": "minh.nguyen@staff.miu.example",
-  "role": "REGISTRAR",
+  "roles": ["REGISTRAR"],
   "userType": "staff",
   "studentNumber": null
 }
@@ -103,11 +106,13 @@ POST /api/students/login
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=<encrypted-session-ticket>; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "id": "22222222-2222-2222-2222-222222222222",
@@ -135,11 +140,13 @@ POST /api/auth/logout
 Success Response (`200 OK`):
 
 Headers:
+
 ```http
 Set-Cookie: UniDipVeri.Session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; samesite=lax; httponly
 ```
 
 Payload:
+
 ```json
 {
   "message": "Logged out successfully"
@@ -158,10 +165,7 @@ Success Response (`200 OK`):
 {
   "id": "11111111-1111-1111-1111-111111111111",
   "email": "minh.nguyen@staff.miu.example",
-  "role": "REGISTRAR",
-  "roles": [
-    "REGISTRAR"
-  ],
+  "roles": ["REGISTRAR"],
   "userType": "staff",
   "studentNumber": null
 }
@@ -182,6 +186,81 @@ In accordance with **FR-AUTH-04**, a valid session token does not imply authoriz
 - **Unauthenticated requests** (missing or invalid session): Return `401 Unauthorized`.
 - **Authenticated requests with mismatched role** (e.g. Registrar attempting an Approver-only action): Return `403 Forbidden`.
 - **Authenticated requests with matching role**: Proceed to business service execution.
+
+---
+
+## 2a. Password Reset & Account Management (Planned)
+
+> These endpoints are planned for implementation. The frontend reset-password page already exists.
+
+```http
+POST   /api/auth/reset-password
+POST   /api/auth/reset-password/confirm
+POST   /api/auth/change-password
+```
+
+**Request Password Reset (`AuthService.RequestPasswordReset`):**
+
+```json
+POST /api/auth/reset-password
+{
+  "email": "anh.nguyen@student.miu.example"
+}
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "message": "If this email is registered, a reset link has been sent."
+}
+```
+
+**Confirm Password Reset (`AuthService.ConfirmPasswordReset`):**
+
+```json
+POST /api/auth/reset-password/confirm
+{
+  "token": "single-use-reset-token",
+  "newPassword": "NewSecurePassword123!"
+}
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "message": "Password has been reset successfully."
+}
+```
+
+**Change Password (`AuthService.ChangePassword`):**
+
+Requires authenticated session.
+
+```json
+POST /api/auth/change-password
+{
+  "currentPassword": "OldPassword123!",
+  "newPassword": "NewSecurePassword123!"
+}
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "message": "Password changed successfully."
+}
+```
+
+Failure Response (`400 Bad Request`):
+
+```json
+{
+  "message": "Current password is incorrect."
+}
+```
 
 ---
 
@@ -212,7 +291,7 @@ POST /api/staffs
   "name": "Nguyen Anh Minh",
   "email": "minh.nguyen@staff.miu.example",
   "password": "SecurePassword123!",
-  "role": "REGISTRAR"
+  "roles": ["REGISTRAR"]
 }
 ```
 
@@ -220,12 +299,52 @@ Response:
 
 ```json
 {
+    "id": "staff-uuid-1",
     "staffId": "staff-uuid-1",
     "name": "Nguyen Anh Minh",
     "email": "minh.nguyen@staff.miu.example",
-    "role": "REGISTRAR",
+    "roles": ["REGISTRAR"],
     "status": "ACTIVE",
     "createdAt": "2026-08-27T10:00:00Z"
+}
+```
+
+Duplicate Email (`409 Conflict`):
+
+```json
+{
+    "error": "DUPLICATE_EMAIL",
+    "message": "A staff member with this email already exists."
+}
+```
+
+Role-Combination Restriction (`409 Conflict`) — when `AllowRegistrarApproverCombination = false` (default, AS-08):
+
+```json
+{
+    "error": "ROLE_COMBINATION_NOT_ALLOWED",
+    "message": "Cannot assign both REGISTRAR and APPROVER roles to the same staff member."
+}
+```
+
+**Get staff by ID (`StaffService.getStaffById`):**
+
+```http
+GET /api/staffs/{staffId}
+```
+
+Response (`200 OK`):
+
+```json
+{
+    "id": "staff-uuid-1",
+    "staffId": "staff-uuid-1",
+    "name": "Nguyen Anh Minh",
+    "email": "minh.nguyen@staff.miu.example",
+    "roles": ["REGISTRAR"],
+    "status": "ACTIVE",
+    "createdAt": "2026-08-27T10:00:00Z",
+    "updatedAt": "2026-08-27T10:00:00Z"
 }
 ```
 
@@ -234,7 +353,7 @@ Response:
 ```json
 PATCH /api/staffs/{staffId}
 {
-  "role": "APPROVER",
+  "roles": ["APPROVER", "REGISTRAR"],
   "name": "Nguyen Anh Minh"
 }
 ```

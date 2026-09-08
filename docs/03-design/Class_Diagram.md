@@ -1,6 +1,6 @@
 # Class Diagram
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
@@ -98,14 +98,16 @@ classDiagram
         +string name
         +string email
         +string passwordHash
-        +StaffRole role
+        +List~StaffRole~ roles
         +StaffStatus status
-        +static UniversityStaff create(universityId, name, email, passwordHash, role, id)
+        +static UniversityStaff create(universityId, name, email, passwordHash, roles, id)
         +bool isActive()
         +bool hasRole(StaffRole requiredRole)
         +void deactivate()
         +void activate()
-        +void updateRole(StaffRole newRole)
+        +void updateRoles(List~StaffRole~ roles)
+        +void addRole(StaffRole role)
+        +void removeRole(StaffRole role)
         +void updateProfile(name, email)
         +void setPassword(passwordHash)
     }
@@ -285,8 +287,9 @@ classDiagram
         +UUID approverId
         +ApprovalDecision decision
         +string comment
+        +bool isSelfApproval
         +DateTime decidedAt
-        +static CredentialApproval create(requestId, approverId, decision, comment, id)
+        +static CredentialApproval create(requestId, approverId, decision, comment, isSelfApproval, id)
     }
 
     class CredentialSchema {
@@ -463,6 +466,7 @@ classDiagram
         <<interface>>
         +findById(UUID id) CredentialIssuanceRequest
         +findActiveByStudentAndType(UUID studentId, string type) CredentialIssuanceRequest
+        +findSchemaByCredentialType(UUID universityId, string credentialType) CredentialSchema
         +listPending() List~CredentialIssuanceRequest~
         +saveRequest(CredentialIssuanceRequest request) void
         +saveApproval(CredentialApproval approval) void
@@ -552,7 +556,7 @@ classDiagram
     class StaffService {
         -IStaffRepository staffRepo
         -IPasswordHasher passwordHasher
-        +createStaff(string name, string email, string password, StaffRole role) StaffDTO
+        +createStaff(string name, string email, string password, List~StaffRole~ roles) StaffDTO
         +updateStaff(UUID staffId, ProfileUpdateDTO profile, List~StaffRole~ roles) StaffDTO
         +deactivateStaff(UUID staffId) StaffDTO
         +listStaff() List~StaffDTO~
@@ -592,6 +596,7 @@ classDiagram
         +listPending() List~RequestDTO~
         +approve(UUID requestId, UUID approverStaffId, string comment) RequestDTO
         +reject(UUID requestId, UUID approverStaffId, string reason) RequestDTO
+        +conferDegree(UUID studentId) void   // sets graduation_status = GRADUATED; called internally by approve() at threshold
     }
 
     class CredentialService {
@@ -662,6 +667,14 @@ Note on share: `listVerificationSummary` reads via `IVerificationEventRepository
 
 Note: `ShareVerificationSummaryDTO = {shareId, credentialId, credentialType, latestResult, attemptCount, lastVerifiedAt}`, sourced by `IVerificationEventRepository.listByShareId` grouped/aggregated per share the student owns (via `IShareRepository`). Still read-only, no state mutation.
 
+Note: `approve(requestId, approverStaffId, comment)` now additionally: (1) loads the request's `requested_by`; (2) if `approverStaffId == requested_by`, consults deployment configuration — reject with a domain error if self-approval is not permitted, otherwise proceed and set `CredentialApproval.isSelfApproval = true`.
+
+Note: `createStaff(...)` and `updateStaff(...)` additionally validate: if the resulting role set would include both `REGISTRAR` and `APPROVER`, consult deployment configuration — reject with a validation error if the combination is not permitted.
+
+Note: `conferDegree` is called internally by `approve()` once the approval threshold is met, immediately before `CredentialService.issue()`. It sets `Student.graduationStatus = GRADUATED` via `IStudentRepository` and is not exposed as its own controller endpoint — conferral and issuance are always triggered together from `approve()`, but recorded as two distinct, independently durable writes.
+
+Note: `createRequest` resolves `credentialType` to a `CredentialSchema` via `ICredentialRequestRepository.findSchemaByCredentialType(...)` before creating the request, rather than through a dedicated schema repository — this is the only place a schema lookup is needed, so it's folded onto the existing request repository port rather than adding a new interface (Architecture_Design.md §1.2, minimum viable structure).
+
 ---
 
 ## 5. Infrastructure Layer (PostgreSQL & External Adapters)
@@ -713,6 +726,7 @@ classDiagram
         -NpgsqlConnection dbConnection
         +findById(UUID id) CredentialIssuanceRequest
         +findActiveByStudentAndType(UUID studentId, string type) CredentialIssuanceRequest
+        +findSchemaByCredentialType(UUID universityId, string credentialType) CredentialSchema
         +listPending() List~CredentialIssuanceRequest~
         +saveRequest(CredentialIssuanceRequest request) void
         +saveApproval(CredentialApproval approval) void

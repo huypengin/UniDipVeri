@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using UniDipVeri.Application.Abstractions.Services;
+using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Models;
 
 namespace UniDipVeri.WebApi.Controllers;

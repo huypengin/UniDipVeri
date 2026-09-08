@@ -8,6 +8,7 @@ public class UniDipVeriDbContext(DbContextOptions<UniDipVeriDbContext> options) 
     public DbSet<University> Universities => Set<University>();
     public DbSet<Program> Programs => Set<Program>();
     public DbSet<UniversityStaff> UniversityStaff => Set<UniversityStaff>();
+    public DbSet<StaffRoleAssignment> StaffRoles => Set<StaffRoleAssignment>();
     public DbSet<Student> Students => Set<Student>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

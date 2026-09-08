@@ -6,8 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
-using UniDipVeri.Application.Abstractions.Models;
-using UniDipVeri.Application.Abstractions.Services;
+using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.WebApi.Controllers;
 

@@ -100,6 +100,39 @@ namespace UniDipVeri.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("UniDipVeri.Domain.Entities.StaffRoleAssignment", b =>
+                {
+                    b.Property<Guid>("StaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_id");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("role");
+
+                    b.HasKey("StaffId", "Role");
+
+                    b.ToTable("staff_role", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            StaffId = new Guid("33333333-3333-3333-3333-333333333331"),
+                            Role = "ADMIN"
+                        },
+                        new
+                        {
+                            StaffId = new Guid("33333333-3333-3333-3333-333333333332"),
+                            Role = "REGISTRAR"
+                        },
+                        new
+                        {
+                            StaffId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            Role = "APPROVER"
+                        });
+                });
+
             modelBuilder.Entity("UniDipVeri.Domain.Entities.Student", b =>
                 {
                     b.Property<Guid>("Id")
@@ -318,12 +351,6 @@ namespace UniDipVeri.Infrastructure.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("role");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -355,7 +382,6 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "admin@staff.miu.example",
                             Name = "System Administrator",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
-                            Role = "ADMIN",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -367,7 +393,6 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "registrar@staff.miu.example",
                             Name = "Sarah Registrar",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
-                            Role = "REGISTRAR",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -379,7 +404,6 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "approver@staff.miu.example",
                             Name = "David Approver",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
-                            Role = "APPROVER",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -395,6 +419,17 @@ namespace UniDipVeri.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("University");
+                });
+
+            modelBuilder.Entity("UniDipVeri.Domain.Entities.StaffRoleAssignment", b =>
+                {
+                    b.HasOne("UniDipVeri.Domain.Entities.UniversityStaff", "Staff")
+                        .WithMany("StaffRoles")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Staff");
                 });
 
             modelBuilder.Entity("UniDipVeri.Domain.Entities.Student", b =>
@@ -429,6 +464,11 @@ namespace UniDipVeri.Infrastructure.Migrations
                     b.Navigation("Programs");
 
                     b.Navigation("StaffMembers");
+                });
+
+            modelBuilder.Entity("UniDipVeri.Domain.Entities.UniversityStaff", b =>
+                {
+                    b.Navigation("StaffRoles");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,6 +1,6 @@
 # Data Flow Diagrams — UniDipVeri
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/03-design/Data_Model.md`, and `docs/03-design/Architecture_Design.md`. This document shows _what data moves where_, complementing the use cases (interaction detail) and the architecture doc (component/layering detail). Notation: external entities are rectangles, processes are rounded/circular nodes numbered `P<n>`, data stores are open-ended boxes numbered `D<n>`, and arrows are labeled data flows. It does not introduce any process, store, or flow that isn't implied by the SRS functional requirements.
 
@@ -88,6 +88,7 @@ flowchart TB
     D7[(D7 Credential)]
     D8[(D8 Share)]
     D9[(D9 VerificationEvent)]
+    D10[(D10 CredentialSchema)]
 
     %% Auth & User Management
     Registrar -->|credentials| P1
@@ -127,6 +128,7 @@ flowchart TB
 
     %% Issuance request
     Registrar -->|request issuance| P5
+    P5 -->|schema lookup| D10
     P5 -->|read latest evaluation| D4
     P5 -->|check wallet_status ACTIVE| D3
     P5 -->|check existing requests/credentials| D6
@@ -276,7 +278,7 @@ flowchart TB
 
     Registrar -->|query students| P14_4
     Admin -->|query students| P14_4
-    P14_4 -->|read student profiles (account, graduation, wallet status)| D3
+    P14_4 -->|"read student profiles (account, graduation, wallet status)"| D3
 ```
 
 ---
@@ -294,9 +296,11 @@ flowchart TB
     P5_1(("P5.1\nCheck Latest\nEvaluation = ELIGIBLE"))
     P5_2(("P5.2\nCheck Student Wallet\nstatus = ACTIVE"))
     P5_3(("P5.3\nCheck No Active\nDuplicate Request"))
+    P5_3a(("P5.3a\nCheck Schema Exists\nfor credentialType"))
     P5_4(("P5.4\nCreate Request\nPENDING_APPROVAL"))
     P6_1(("P6.1\nRecord\nApprove/Reject"))
     P6_2(("P6.2\nCount Distinct\nApprovals vs Policy"))
+    P6_3(("P6.3\nConfer Degree\n(graduation_status = GRADUATED)"))
     P7_1(("P7.1\nBuild Credential\nSubject"))
     P7_2(("P7.2\nCall VC Adapter\n(with wallet_id)"))
     P7_3(("P7.3\nStore Credential\n(VALID) & Mark ISSUED"))
@@ -306,6 +310,7 @@ flowchart TB
     D5[(D5 ApprovalPolicy)]
     D6[(D6 CredentialIssuanceRequest /\nCredentialApproval)]
     D7[(D7 Credential)]
+    D10[(D10 CredentialSchema)]
 
     Registrar -->|request issuance| P5_1
     P5_1 -->|read latest| D4
@@ -316,7 +321,10 @@ flowchart TB
     P5_2 -->|wallet ACTIVE| P5_3
     P5_3 -->|check existing| D6
     P5_3 -->|duplicate: refuse| Registrar
-    P5_3 -->|clear| P5_4
+    P5_3 -->|clear| P5_3a
+    P5_3a -->|schema missing: refuse| Registrar
+    P5_3a -->|schema lookup| D10
+    P5_3a -->|schema found| P5_4
     P5_4 -->|write request, link evaluation| D6
 
     Approver -->|decision + comment/reason| P6_1
@@ -327,7 +335,9 @@ flowchart TB
     P6_2 -->|approvals so far| D6
     P6_2 -->|required count| D5
     P6_2 -->|"threshold not yet met: wait"| D6
-    P6_2 -->|"threshold met: trigger issuance"| P7_1
+    P6_2 -->|"threshold met: confer degree"| P6_3
+    P6_3 -->|write GRADUATED| D3
+    P6_3 -->|trigger issuance| P7_1
 
     P7_1 -->|read request + student/program data| D6
     P7_1 -->|read student wallet_id| D3
@@ -388,16 +398,17 @@ flowchart TB
 
 ## 7. Data Store Cross-Reference
 
-| Store | Entity/Entities (Data_Model.md)                  | Written by                           | Read by                             |
-| ----- | ------------------------------------------------ | ------------------------------------ | ----------------------------------- |
-| D1    | UNIVERSITY, UNIVERSITY_STAFF                     | P14 (staff CRUD), Admin config       | P1, P2, P6, P14                     |
-| D2    | PROGRAM, ELIGIBILITY_RULE_SET                    | P2                                   | P2, P3, P4, P5                      |
-| D3    | STUDENT, ACADEMIC_RECORD                         | P3 (import), P15 (wallet_id/status)  | P1, P4, P5, P7, P8, P14, P15, P13   |
-| D4    | ELIGIBILITY_EVALUATION                           | P4                                   | P5, P6 (indirect), P10              |
-| D5    | APPROVAL_POLICY                                  | Admin via P2-adjacent config process | P6                                  |
-| D6    | CREDENTIAL_ISSUANCE_REQUEST, CREDENTIAL_APPROVAL | P5, P6, P7                           | P5, P6, P7, P10, P13                |
-| D7    | CREDENTIAL                                       | P7, P9, P10                          | P8, P9, P11, P12                    |
-| D8    | SHARE                                            | P11                                  | P11, P12                            |
-| D9    | VERIFICATION_EVENT                               | P12                                  | P13 (student/registrar audit views) |
+| Store | Entity/Entities (Data_Model.md)                  | Written by                                                             | Read by                                              |
+| ----- | ------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| D1    | UNIVERSITY, UNIVERSITY_STAFF                     | P14 (staff CRUD), Admin config                                         | P1, P2, P6, P14                                      |
+| D2    | PROGRAM, ELIGIBILITY_RULE_SET                    | P2                                                                     | P2, P3, P4, P5                                       |
+| D3    | STUDENT, ACADEMIC_RECORD                         | P3 (import), P6 (conferral: graduation_status), P15 (wallet_id/status) | P1, P4, P5, P7, P8, P14, P15, P13                    |
+| D4    | ELIGIBILITY_EVALUATION                           | P4                                                                     | P5, P6 (indirect), P10                               |
+| D5    | APPROVAL_POLICY                                  | Admin via P2-adjacent config process                                   | P6                                                   |
+| D6    | CREDENTIAL_ISSUANCE_REQUEST, CREDENTIAL_APPROVAL | P5, P6, P7                                                             | P5, P6, P7, P10, P13                                 |
+| D7    | CREDENTIAL                                       | P7, P9, P10                                                            | P8, P9, P11, P12                                     |
+| D8    | SHARE                                            | P11                                                                    | P11, P12                                             |
+| D9    | VERIFICATION_EVENT                               | P12                                                                    | P13 (student/registrar audit views)                  |
+| D10   | CREDENTIAL_SCHEMA                                | Deployment-time seed (AS-04), not written by any process               | P5 (schema validation), P7 (schema_uri for issuance) |
 
 This table is the DFD-side counterpart to the traceability chain in `Data_Model.md` §2 and SRS NFR-06: every data store here corresponds 1:1 to an ERD entity, and every write in §2–§6 above is one link in the chain _Staff Setup → Academic Record Imported → Student Wallet Provisioned → Eligibility Evaluated → Issuance Requested → Approved → Issued (→ Revoked → Reissued) → Shared → Verified_.

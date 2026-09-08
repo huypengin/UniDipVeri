@@ -1,6 +1,6 @@
 # Sequence Diagrams — UniDipVeri
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, `docs/02-analysis/DFD.md`, `docs/03-design/Architecture_Design.md`, and `docs/03-design/Class_Diagram.md`. Where the Activity Diagrams show control flow and decision points, these diagrams show **object interaction over time** — which layer calls which, in what order, and what each call returns — down to the Application Service, Repository Port, and Adapter names used in the class diagram. All diagrams are Mermaid `sequenceDiagram`s.
 
@@ -267,10 +267,18 @@ sequenceDiagram
                 CRC-->>Reg: 409 Conflict — duplicate request
             else none found
                 RRepo-->>IRS: null
-                IRS->>RRepo: saveRequest(PENDING_APPROVAL, linked to evaluation)
-                RRepo-->>IRS: RequestDTO
-                IRS-->>CRC: RequestDTO
-                CRC-->>Reg: 201 Created (PENDING_APPROVAL)
+                IRS->>RRepo: findSchemaByCredentialType(universityId, credentialType)
+                alt schema not found
+                    RRepo-->>IRS: null
+                    IRS-->>CRC: Refused(no schema configured)
+                    CRC-->>Reg: 422 Unprocessable Entity — unknown credential type
+                else schema found
+                    RRepo-->>IRS: CredentialSchema
+                    IRS->>RRepo: saveRequest(PENDING_APPROVAL, linked to evaluation, schema_id)
+                    RRepo-->>IRS: RequestDTO
+                    IRS-->>CRC: RequestDTO
+                    CRC-->>Reg: 201 Created (PENDING_APPROVAL)
+                end
             end
         end
     end
@@ -303,6 +311,8 @@ sequenceDiagram
             IRS-->>CRC: RequestDTO(still PENDING_APPROVAL)
             CRC-->>App: 200 OK — awaiting more approvals
         else threshold met
+            IRS->>RRepo: set status = APPROVED (durable, pre-issuance)
+            IRS->>SRepo: conferDegree(studentId) — set graduation_status = GRADUATED
             IRS->>CS: issue(requestId)
             CS->>RRepo: findById(requestId)
             RRepo-->>CS: CredentialIssuanceRequest
@@ -315,9 +325,9 @@ sequenceDiagram
             alt walt.id issuance fails
                 Walt-->>VC: error
                 VC-->>CS: failure
-                CS->>CS: log failure, leave request in last-approved state (retryable)
+                CS->>CS: log failure, leave request in last-approved,\nalready-conferred state (retryable)
                 CS-->>IRS: IssuanceFailed
-                IRS-->>CRC: RequestDTO(approved, not yet issued)
+                IRS-->>CRC: RequestDTO(approved, conferred, not yet issued)
                 CRC-->>App: 200 OK — issuance pending retry
             else success
                 Walt-->>VC: vc_reference

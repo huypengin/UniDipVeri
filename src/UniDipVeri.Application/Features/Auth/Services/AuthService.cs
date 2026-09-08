@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using UniDipVeri.Application.Abstractions.Models;
 using UniDipVeri.Application.Abstractions.Repositories;
 using UniDipVeri.Application.Abstractions.Security;
-using UniDipVeri.Application.Abstractions.Services;
+using UniDipVeri.Application.Features.Auth.Abstractions;
+using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Domain.Enums;
 
 namespace UniDipVeri.Application.Features.Auth.Services;
@@ -32,7 +32,8 @@ public sealed class AuthService(
                 return AuthResult.Failure("Invalid email or password.");
             }
 
-            var userInfo = new AuthUserInfo(staff.Id, staff.Email, staff.Role.ToString(), "staff");
+            var roles = staff.Roles.Select(r => r.ToString()).ToList();
+            var userInfo = new AuthUserInfo(staff.Id, staff.Email, roles, "staff");
             return AuthResult.Success(userInfo);
         }
 

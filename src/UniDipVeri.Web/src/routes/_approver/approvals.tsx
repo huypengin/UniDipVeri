@@ -3,25 +3,25 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, LogOut } from "lucide-react";
 
-export const Route = createFileRoute("/student/credentials")({
+export const Route = createFileRoute("/_approver/approvals")({
   beforeLoad: ({ context }) => {
     if (!context.auth.isAuthenticated) {
       throw redirect({
         to: "/login",
-        search: { redirect: "/student/credentials" },
+        search: { redirect: "/staff/approvals" },
       });
     }
-    if (!context.auth.hasRole("STUDENT")) {
+    if (!context.auth.hasRole("APPROVER")) {
       throw redirect({ to: "/" });
     }
   },
   head: () => ({
-    meta: [{ title: "My Credentials — UniDipVeri Student Portal" }],
+    meta: [{ title: "Issuance Approvals — UniDipVeri" }],
   }),
-  component: StudentCredentialsPage,
+  component: StaffApprovalsPage,
 });
 
-function StudentCredentialsPage() {
+function StaffApprovalsPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -42,7 +42,7 @@ function StudentCredentialsPage() {
                 UniDipVeri
               </span>
               <span className="ml-2 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-                Student Portal
+                Issuance Queue
               </span>
             </div>
           </div>
@@ -57,11 +57,11 @@ function StudentCredentialsPage() {
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 p-8">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          My Credentials
+          Issuance Approval Queue
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View issued digital diplomas, create time-limited share links, and
-          audit verification activity.
+          Independent verification review, multi-party consensus decisions, and
+          audit commentary.
         </p>
       </main>
     </div>

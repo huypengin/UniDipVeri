@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using UniDipVeri.Application.Abstractions.Models;
+using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Domain.Enums;
 
-namespace UniDipVeri.Application.Abstractions.Services;
+namespace UniDipVeri.Application.Features.Auth.Abstractions;
 
 public interface IAuthService
 {

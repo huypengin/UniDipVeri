@@ -3,13 +3,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using UniDipVeri.Application.Abstractions.Models;
 using UniDipVeri.Application.Abstractions.Security;
 using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Domain.Entities;
 using UniDipVeri.Domain.Enums;
 using UniDipVeri.Infrastructure.Persistence;
-using Xunit;
 using DomainProgram = UniDipVeri.Domain.Entities.Program;
 
 namespace UniDipVeri.IntegrationTests;

@@ -1,6 +1,6 @@
 # Use Cases
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`. Each use case is traceable to the functional requirements it implements, so a reviewer can check completeness in both directions. This document is process/interaction detail — it does not introduce new requirements beyond what's in the SRS.
 
@@ -201,15 +201,17 @@ flowchart LR
 **Main success scenario:**
 
 1. Registrar selects an eligible student and initiates issuance.
-2. System verifies active wallet status (UC-21).
-3. System creates a `CREDENTIAL_ISSUANCE_REQUEST` in `PENDING_APPROVAL`, linked to the qualifying evaluation.
-4. Request becomes visible to Approvers (UC-08/UC-09).
+2. System verifies a `CREDENTIAL_SCHEMA` exists for the requested `credentialType` under the university; if none exists, the system refuses request creation with a configuration error.
+3. System verifies active wallet status (UC-21).
+4. System creates a `CREDENTIAL_ISSUANCE_REQUEST` in `PENDING_APPROVAL`, linked to the qualifying evaluation.
+5. Request becomes visible to Approvers (UC-08/UC-09).
 
 **Extensions:**
 
 - 1a. Student's latest evaluation is `NOT_ELIGIBLE` → system refuses to create the request and shows the failed requirements.
 - 1b. Student has no active wallet (`PENDING`, `FAILED` or `INACTIVE`) → system prompts Registrar to provision/retry student wallet.
 - 1c. A pending or already-issued (non-superseded) request already exists for this student/credential type → system refuses duplicate creation.
+- 1d. No `CREDENTIAL_SCHEMA` is configured for the requested `credentialType` → system refuses to create the request and reports a configuration error distinct from an eligibility or wallet failure.
 
 **Postconditions:** A request awaits approval, or was rejected at creation for ineligibility.
 
@@ -226,7 +228,7 @@ flowchart LR
 1. Approver reviews a pending request.
 2. Approver approves, optionally with a comment.
 3. System records the decision.
-4. If the approval count now meets the policy's required count (1 in the MVP), system triggers UC-10 automatically.
+4. If the approval count now meets the policy's required count (1 in the MVP), system confers the degree (`graduation_status = GRADUATED`) and automatically triggers UC-10 (Issue Credential).
 
 **Postconditions:** Request is one step closer to, or has reached, `ISSUED`.
 
@@ -252,7 +254,7 @@ flowchart LR
 
 **Primary actor:** System (triggered by UC-08 reaching the required approval count)
 
-**Preconditions:** Request has met its approval policy, and student has an active `wallet_id`.
+**Preconditions:** Request has met its approval policy, the student's degree has been conferred (UC-08 step 4), and student has an active `wallet_id`.
 
 **Main success scenario:**
 
