@@ -1,6 +1,6 @@
 # Activity Diagrams — UniDipVeri
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/01-requirements/Use_Cases.md`, and `docs/02-analysis/DFD.md`. Where the DFD shows data at rest and in motion, these diagrams show control flow and decision points over time for the workflows that matter most to the thesis's central contribution (the eligibility-gated, approval-gated issuance pipeline), its user and wallet foundation, and its payoff (public verification). Swimlanes are actors/system components; diamonds are decisions; each diagram is traced back to the use case(s) and requirement(s) it implements.
 
@@ -61,7 +61,6 @@ flowchart TD
 
 ---
 
-<!-- markdownlint-disable MD024 -->
 ## 2. Credential Issuance Request -> Approval -> Issuance
 
 **Traces to:** UC-07, UC-08, UC-09, UC-10, UC-21 · FR-APPR-01–10, FR-CRED-01–06, FR-WAL-04
@@ -92,6 +91,7 @@ flowchart TD
         C7[Count distinct approvals]
         C8{Approvals ≥\nrequired policy count?}
         C9[Wait for more approvals]
+        C10[Confer degree:\nset graduation_status = GRADUATED\n(durable regardless of\nissuance outcome)]
         D1[Load schema; build\ncredential subject]
         D2[Call VC Adapter -> issue\ninto student wallet_id]
         D3{walt.id call\nsucceeds?}
@@ -130,7 +130,7 @@ flowchart TD
     C5 -- no (reject) --> C6 --> D6
     C5 -- yes (approve) --> C7 --> C8
     C8 -- no --> C9 --> E1
-    C8 -- yes --> D1 --> D2 --> D3
+    C8 -- yes --> C10 --> D1 --> D2 --> D3
     D3 -- no --> D4 --> C9
     D3 -- yes --> D5 --> F1
 ```
@@ -141,11 +141,10 @@ flowchart TD
 - `C4` implements FR-APPR-09 (no double-counting the same approver).
 - `D3`/`D4` implements UC-10's extension: a failed walt.id call does not corrupt request state — it stays at "fully approved, not yet issued" and can be retried.
 - The MVP policy (`B8`/`C8` threshold) is N = 1, but the flow is drawn generically since N is Admin-configurable (FR-APPR-10, US-E5).
-<!-- markdownlint-enable MD024 -->
+- `C10` records degree conferral as a distinct, durable step that occurs once, at the approval threshold, and does not depend on `D3` (the walt.id issuance call) succeeding — see Architecture_Design.md §4 and §9.
 
 ---
 
-<!-- markdownlint-disable MD024 -->
 ## 3. Credential Revocation -> Reissuance
 
 **Traces to:** UC-15, UC-16 · FR-CRED-09–13, FR-ELIG-10
@@ -185,7 +184,6 @@ flowchart TD
 ### Notes
 
 - `B4`/`B5` is the enforcement point for FR-ELIG-10 and the reissuance extension in UC-16: a student's _past_ eligibility never carries over automatically — reissuance is treated as a brand-new issuance request, re-evaluated and re-approved from scratch (folds into Diagram 2 at `C1`).
-<!-- markdownlint-enable MD024 -->
 
 ---
 

@@ -1,6 +1,6 @@
 # Data Model
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Supports `docs/01-requirements/SRS.md` Section 7. Reflects four cumulative architectural elements:
 
@@ -72,7 +72,7 @@ erDiagram
         uuid id PK
         uuid university_id FK
         string name
-        string full_title
+        string full_title "validated: must contain degree-level keyword (FR-PROG-05)"
         string degree_level "BACHELOR | MASTER | DOCTORATE | ASSOCIATE"
         string status "ACTIVE | INACTIVE"
         datetime created_at
@@ -201,7 +201,7 @@ erDiagram
 - **`UNIVERSITY_STAFF` and Multi-Valued `STAFF_ROLE` Normalization:** Platform Administrators manage staff accounts and their assigned role(s). A staff member may simultaneously hold multiple distinct roles (e.g. both `APPROVER` and `REGISTRAR`, per `UI_UX_Design.md` §4.4, `SRS.md` `FR-USER-01`/`FR-USER-05`, and `Class_Diagram.md`). Rather than using non-relational CSV strings or PostgreSQL array columns, roles are normalized into the `STAFF_ROLE` join table (`staff_id`, `role`) with a composite primary key `(staff_id, role)` and foreign key `REFERENCES university_staff(id) ON DELETE CASCADE`. This preserves 1NF relational normalization, enables efficient B-tree index seeks (e.g. `WHERE role = 'ADMIN'` for `FR-USER-05` quorum checks), and maintains consistency with the project's pattern of separate relational tables over polymorphic/CSV columns. Deactivation sets `status = INACTIVE` without deleting historical references in `CREDENTIAL_APPROVAL`, `CREDENTIAL_ISSUANCE_REQUEST`, or `ELIGIBILITY_RULE_SET`.
 - **`STUDENT` and `ACADEMIC_RECORD` Ingestion vs. Lifecycle Boundary:** There is no Registrar-facing manual "create student" or "edit academic record" write path in the UI (enforcing `AS-01` "source data trusted as correct"). Student and transcript rows are initialized strictly via the inbound ingestion pipeline (`AcademicRecordService.importRecord`). However, while `ACADEMIC_RECORD` is an immutable snapshot, `STUDENT` is a stateful domain aggregate whose operational lifecycle fields (`account_status`, `graduation_status`, `wallet_id`, `wallet_status`, `password_hash`) are updated by internal system domain workflows (wallet provisioning, graduation evaluation, credential issuance, and account activation/deactivation). In addition, subsequent authoritative batch imports synchronize updated profile data (name, email) per `FR-STU-01`.
 - **Student Account, Graduation & Wallet lifecycle:** Each `STUDENT` carries `account_status` (`PENDING_ACTIVATION | ACTIVE | INACTIVE`, default `PENDING_ACTIVATION` for newly imported data), `graduation_status` (`NOT_STARTED | PENDING_REVIEW | ELIGIBLE | GRADUATED | REJECTED`, default `NOT_STARTED`), and `wallet_id` / `wallet_status` (`PENDING | ACTIVE | FAILED | INACTIVE`). When imported, the system calls walt.id's Wallet API to provision a server-managed custodial wallet. When a student account is deactivated (`INACTIVE`), its `wallet_status` is also transitioned to `INACTIVE`. Credential issuance requires `wallet_status = ACTIVE` and `graduation_status = ELIGIBLE` (or passing evaluation).
-- **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a *share link* stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.
+- **`CREDENTIAL` has no expiration field by design.** `status` is intentionally two-state (`VALID | REVOKED`) with no `expires_at` column and no `EXPIRED` value — an issued diploma does not lapse over time; only an explicit revocation (`CREDENTIAL.revoked_at`, `revocation_reason`) invalidates it. This is distinct from `SHARE.expires_at`, which governs how long a _share link_ stays usable, not the credential's own validity. See SRS AS-06 and `Architecture_Design.md` §7 for the rationale.
 - **`CREDENTIAL_SCHEMA` and walt.id Profile Binding:** `CREDENTIAL_SCHEMA.schema_uri` holds the identifier of the preconfigured profile defined in walt.id's `issuer2-profiles.conf` (e.g. `AcademicDiploma_jwt_vc_json`). UniDipVeri does not generate or push cryptographic schemas into walt.id dynamically at runtime; it passes this preconfigured identifier during the OID4VCI issuance call (`WaltIdVCAdapter`).
 - **`UNIVERSITY.issuer_id` and Static walt.id Binding:** `UNIVERSITY.issuer_id` stores the institution's active public Decentralized Identifier (e.g. `did:web:miu.edu` or `did:jwk:...`). Because the walt.id Community Stack statically preconfigures private signing keys and issuer profiles via `issuer2-profiles.conf` at deployment/boot time (see AS-03/AS-04), `UNIVERSITY.issuer_id` does not feed KMS keys to walt.id dynamically at runtime. Instead, it serves as the application-level authoritative record for (1) issuer authorization whitelisting during public verification (`VerificationService` validates `credential.issuer.id == University.issuer_id` to prevent fraud and return `UNKNOWN_ISSUER` per FR-VER-05), (2) institutional metadata presentation on diploma cards and UI summaries without hardcoded DID strings, and (3) deterministic environment pairing between PostgreSQL test/staging/production seeds and their corresponding walt.id deployment profiles.
 - **`ELIGIBILITY_RULE_SET` is versioned per program**, and `ELIGIBILITY_EVALUATION` stores a foreign key to the specific version it ran against (not just to `PROGRAM`). This directly implements FR-ELIG-10: editing a program's rules later does not retroactively change what an old evaluation (or a credential issued off it) meant.
@@ -211,6 +211,8 @@ erDiagram
 - **Strict Relational Separation of `UNIVERSITY_STAFF` and `STUDENT` Tables:** `UNIVERSITY_STAFF` and `STUDENT` are intentionally isolated into distinct relational tables rather than unified under a polymorphic `USER` table. This design guarantees database-level foreign key security (e.g. `CREDENTIAL_APPROVAL.approver_id` strictly references `UNIVERSITY_STAFF`, making unauthorized student approval structurally impossible in PostgreSQL), prevents nullable column sprawl (avoiding nullable `wallet_id`, `student_number`, `graduation_status` on staff rows), maintains the import-only write boundary for students (`AS-01`), and optimizes indexing across vastly different data volumes. Common authentication is provided orthogonally by `AuthService`.
 - **Full NFR-06 traceability chain:** `UNIVERSITY_STAFF` (configured) → `ACADEMIC_RECORD` (imported) → `STUDENT.wallet_id` (provisioned) → `ELIGIBILITY_EVALUATION` (computed) → `CREDENTIAL_ISSUANCE_REQUEST` (created only if eligible) → `CREDENTIAL_APPROVAL` (one or more) → `CREDENTIAL` (issued). Every arrow is a foreign key, so the chain is reconstructable with database joins alone.
 - **Self-approval visibility (FR-APPR-11):** `CREDENTIAL_APPROVAL.is_self_approval` is computed and set at write time by `IssuanceRequestService.approve()`, never client-supplied. It exists purely for audit visibility — the underlying permission check (whether self-approval is allowed at all) is enforced by deployment configuration, not by this column. A `true` value should render distinctly (e.g. a warning badge) in every audit view that surfaces approval decisions.
+- Conferral (`graduation_status = GRADUATED`) is recorded by `IssuanceRequestService` at the moment an issuance request meets its approval threshold, and is durable independent of whether the subsequent walt.id credential issuance call succeeds. This mirrors the real-world distinction between a university officially awarding a degree and later producing/delivering the physical or cryptographic artifact attesting to it.
+- `graduation_status = REJECTED` is a reserved value for a future manual override capability (e.g. a faculty committee denying graduation for reasons outside the automated eligibility engine, such as an academic integrity hold). No MVP workflow sets this value; only `NOT_STARTED`, `PENDING_REVIEW`, `ELIGIBLE`, and `GRADUATED` are reachable in the current system.
 
 ## 3. Application-Level Credential Representation
 
@@ -238,20 +240,20 @@ flowchart TD
 
 ```json
 {
-    "credentialType": "AcademicDiploma",
-    "schemaVersion": "1.0",
-    "id": "did:web:miu.edu",
-    "issuer": "Mekong International University",
-    "subject": {
-        "id": "miu-bscs-2026-0348",
-        "name": "Nguyen Minh Anh",
-        "studentNumber": "MIU2026-001",
-        "degree": "Bachelor of Science in Computer Science",
-        "program": "Computer Science",
-        "degreeLevel": "Bachelor",
-        "awardDate": "2026-06-15"
-    }
+  "credentialType": "AcademicDiploma",
+  "schemaVersion": "1.0",
+  "id": "did:web:miu.edu",
+  "issuer": "Mekong International University",
+  "subject": {
+    "id": "miu-bscs-2026-0348",
+    "name": "Nguyen Minh Anh",
+    "studentNumber": "MIU2026-001",
+    "degree": "Bachelor of Science in Computer Science",
+    "program": "Computer Science",
+    "degreeLevel": "Bachelor",
+    "awardDate": "2026-06-15"
+  }
 }
 ```
 
-Note what is deliberately *not* in this payload: `ACADEMIC_RECORD` details (GPA, course list) and `ELIGIBILITY_EVALUATION` results. Those justify *why* the credential was issued but are not part of the credential subject itself and are never sent to walt.id or exposed on the public verification page (SRS NFR-02, NFR-07).
+Note what is deliberately _not_ in this payload: `ACADEMIC_RECORD` details (GPA, course list) and `ELIGIBILITY_EVALUATION` results. Those justify _why_ the credential was issued but are not part of the credential subject itself and are never sent to walt.id or exposed on the public verification page (SRS NFR-02, NFR-07).

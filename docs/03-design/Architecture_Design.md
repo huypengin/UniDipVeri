@@ -1,6 +1,6 @@
 # Architecture & Design
 
-**Version:** 0.2.1
+**Version:** 0.4.0
 
 This document contains architectural and design decisions supporting `docs/01-requirements/SRS.md`. It specifies the technical organization of UniDipVeri using **Clean Architecture**: a small set of layers with dependencies pointing strictly inward, keeping the domain core free of framework, database, and external-API concerns.
 
@@ -128,9 +128,10 @@ public interface IAcademicRecordSourceAdapter {
 - **Custodial Server-Managed Wallets:** Students do not install wallet apps. The backend creates server-managed wallet identities via `IWalletAdapter` upon student ingestion.
 - **Server-Driven OID4VCI (Issuance):** In `CredentialService.issue(...)`, `WaltIdVCAdapter` calls walt.id's issuance endpoint with the preconfigured `credentialConfigurationId`, dynamic subject claims, and `credentialStatus` runtime override, acting as the holder side of the OID4VCI exchange using the student's `wallet_id` to accept the credential automatically. The resulting wallet identifier is stored as `Credential.vc_reference`.
 - **Self-Hosted Credential Status Lists (Revocation):** Because the walt.id Community Stack does not include a hosted status list service out-of-the-box, UniDipVeri manages revocation at two coordinated levels:
-    1. _Authoritative Application State:_ `CredentialService.revoke(...)` updates `CREDENTIAL.status = REVOKED`, `revoked_at`, and `revocation_reason` in PostgreSQL.
-    2. _W3C Bitstring Status List Hosting:_ UniDipVeri serves the W3C Bitstring Status List at `GET /api/status/{listId}`. During issuance, `WaltIdVCAdapter` injects a `BitstringStatusListEntry` (with index and URI) via walt.id's `runtimeOverrides.credentialStatus`. Upon revocation, the adapter flips the bit at the credential's allocated index.
-- **Application-Orchestrated Reissuance Lineage:** Reissuance is not an external cryptographic primitive, but a domain lifecycle workflow. `CredentialService.reissue(...)` initiates a new `CREDENTIAL_ISSUANCE_REQUEST` that references `supersedes_credential_id`. Once the new request passes the approval threshold, a fresh Verifiable Credential is issued via walt.id, and PostgreSQL records the lineage in `CREDENTIAL.supersedes_id`.
+  1. _Authoritative Application State:_ `CredentialService.revoke(...)` updates `CREDENTIAL.status = REVOKED`, `revoked_at`, and `revocation_reason` in PostgreSQL.
+  2. _W3C Bitstring Status List Hosting:_ UniDipVeri serves the W3C Bitstring Status List at `GET /api/status/{listId}`. During issuance, `WaltIdVCAdapter` injects a `BitstringStatusListEntry` (with index and URI) via walt.id's `runtimeOverrides.credentialStatus`. Upon revocation, the adapter flips the bit at the credential's allocated index.
+- **Application-Orchestrated Reissuance Lineage:** Reissuance is not an external cryptographic primitive, but a domain lifecycle workflow. `CredentialService.reissue(...)` initiates a new `CREDENTIAL_ISSUANCE_REQUEST` that references `supersedes_credential_id`. Once the new request passes the approval threshold, a fresh Verifiable Credential is issued via walt.id, and PostgreSQL records the lineage in `CREDENTIAL.supersedes_id`. Reissuance corrects the _credential artifact_ (e.g. a schema mapping error, a wrong credential type, or a revocation followed by a legitimate re-issuance), not the underlying academic record. Because `STUDENT` and `ACADEMIC_RECORD` are read-only to staff (AS-01, US-B3), a defect originating in source data (e.g. a misspelled name propagated from the Academic Record Source) cannot be fixed by reissuance alone; it requires a corrected re-import from the Academic Record Source, after which reissuance can proceed against the corrected record.
+  - `IssuanceRequestService.createRequest(...)` checks that a `CREDENTIAL_SCHEMA` exists for the requested `credentialType` before creating a `PENDING_APPROVAL` request, via `ICredentialRequestRepository.findSchemaByCredentialType(...)`, so a misconfigured or unsupported credential type is rejected at request creation rather than surfacing only after approval, inside `CredentialService.issue(...)`. This read is folded onto the existing request repository port rather than a dedicated schema repository, since it is the only caller that needs it.
 - **Server-Driven OID4VP (Verification):** In `VerificationService.verify(...)`, `WaltIdVCAdapter` triggers and completes the OID4VP presentation exchange internally against the server-managed wallet. `VerificationService` evaluates both cryptographic validity (signature + status list) and internal database state. Verifiers communicate strictly with UniDipVeri's `/api/public/shares/{token}/verify` endpoint, receiving clean JSON verification summaries.
 
 ---
@@ -160,6 +161,8 @@ public interface IAcademicRecordSourceAdapter {
 | `GET /api/audit`                                                        | `AuditService`           | `getAuditHistory`                 | `PostgresAuditRepository`                                                                      |
 
 `IssuanceRequestService.approve(...)` calls `CredentialService.issue(...)` directly once the approval threshold is met — a plain method call across two Application Services, not an event or a mediator dispatch.
+
+`IssuanceRequestService.approve(...)` persists the `CREDENTIAL_APPROVAL` row and, if the approval threshold is met, updates `CREDENTIAL_ISSUANCE_REQUEST.status = APPROVED` as a durable write, then calls `conferDegree(studentId)` to set `graduation_status = GRADUATED`, before calling `CredentialService.issue(...)`. Conferral and the `APPROVED` status write happen in the same transaction the approval count check, so a subsequent failure in the walt.id issuance call leaves the request in a clean, durable `APPROVED` conferred state that can be retried without re-running the approval count or re-conferring the degree (FR-CONF-02).
 
 ---
 
@@ -232,7 +235,7 @@ flowchart TB
         end
 
         subgraph Infra["Infrastructure Layer (Adapters)"]
-            Postgres["PostgreSQL Database Repositories\n(EF Core / Prisma / Dapper)"]
+            Postgres["PostgreSQL Database Repositories\n(Entity Framework Core 10)"]
             WaltVC["WaltIdVCAdapter (OID4VCI / OID4VP)"]
             WaltWallet["WaltIdWalletAdapter (Custodial Wallet API)"]
             Security["Security & Crypto Utilities"]
@@ -279,14 +282,32 @@ flowchart TB
 4. **Explicit, Direct Orchestration:** Application Services call other Application Services or ports directly by method call — no mediator, no hidden dispatch table. `IssuanceRequestService.approve()` calling `CredentialService.issue()` is visible in the code, not inferred from a routing configuration.
 5. **Minimum Viable Structure:** No Command/Query class pairs, no per-operation Handler classes, no in-memory Mediator, no per-feature slice directories — one service class and a handful of methods per bounded area. A single PostgreSQL database instance is used without distributed read databases or event sourcing.
 6. **Three-Tier Trust Isolation:**
-    - _Tier 1 (Source Facts):_ Ingested via `IAcademicRecordSourceAdapter` and trusted as input.
-    - _Tier 2 (Eligibility Claims):_ Computed strictly by `EligibilityService` against versioned domain rules.
-    - _Tier 3 (Cryptographic Trust):_ Handled via `IVCAdapter` and backed by `walt.id`.
+   - _Tier 1 (Source Facts):_ Ingested via `IAcademicRecordSourceAdapter` and trusted as input.
+   - _Tier 2 (Eligibility Claims):_ Computed strictly by `EligibilityService` against versioned domain rules.
+   - _Tier 3 (Cryptographic Trust):_ Handled via `IVCAdapter` and backed by `walt.id`.
 7. **No Credential Expiry by Design:** `Credential.status` is a two-state lifecycle (`VALID` → `REVOKED`), not a time-bound one — there is no `expires_at` on `Credential` and no `EXPIRED` credential status. This is a deliberate scope decision (SRS AS-06), not an oversight: expiration semantics exist only for `Share` (short-lived access links), which is why `VerificationResult` has `EXPIRED_SHARE` (and `REVOKED_SHARE`) but no analogous `EXPIRED` value for the credential itself.
 8. **Noise Control at Write Time, Aggregation at Read Time:** `VerificationService.verify(...)` never persists a `VERIFICATION_EVENT` for a `NOT_FOUND_SHARE`, `EXPIRED_SHARE`, or `REVOKED_SHARE` outcome (FR-VER-09) — a missing, expired, or revoked share has no resolvable identity worth tracking, and this path is the one most exposed to dead links, bookmarks, and automated crawlers. Every other outcome is persisted in full for the Registrar-facing audit view (NFR-06). The student-facing summary (`GET /api/me/verification-events`) further aggregates this by grouping per share and surfacing only the latest result, a total count, and the last-verified timestamp — full per-attempt detail remains available only to Registrars via the audit endpoints.
 9. **Verification Privacy & Perimeter Abuse:** `VERIFICATION_EVENT` records strictly domain-relevant verification outcomes (`share_id`, `verified_at`, `result`, `verifier_context`) without capturing or persisting client IP addresses (`ip_hash`). This preserves privacy and prevents PII log pollution. Abuse prevention (such as token brute-force protection, bot crawling defenses, and request rate limiting) is handled at the network/middleware perimeter (e.g., reverse proxy / API Gateway rate limiters or ASP.NET Core RateLimiting middleware) rather than in core business domain tables.
 
-## 8. Architectural Decisions
+## 8. Exception & Remediation Paths in the Issuance Pipeline
+
+The issuance pipeline (§2, §4) is not purely linear. The table below states, for each failure point identified during design review, whether it is already covered by an existing requirement/use case or is an explicit MVP scope exclusion.
+
+| Failure point                                                    | Status            | Reference                                                              |
+| ---------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------- |
+| Eligibility evaluation fails                                     | Covered           | UC-05 extension 3a, FR-ELIG-06/07                                      |
+| Approver rejects the request                                     | Covered           | UC-09, FR-APPR-07                                                      |
+| Approver never responds (stale request)                          | Excluded from MVP | SRS §3.2                                                               |
+| Academic record changes after approval, before issuance          | Excluded from MVP | SRS §3.2 — eligibility is not re-checked between approval and issuance |
+| Conferral write fails                                            | Covered           | Durable, same transaction as `APPROVED` status (§4 above)              |
+| Credential issuance (walt.id call) fails                         | Covered           | UC-10 extension 3a — request remains approved and conferred, retryable |
+| Credential needs revocation or correction                        | Covered           | UC-15, UC-16                                                           |
+| Registrar wants to withdraw a mistaken pending request           | Excluded from MVP | SRS §3.2                                                               |
+| No `CREDENTIAL_SCHEMA` configured for requested `credentialType` | Covered           | UC-07 extension 1d (see §3a below)                                     |
+
+This table exists so that a reviewer checking the pipeline against a real-world academic institution's failure modes (departmental deficiency resolution, late holds, registrar rejection, print-vendor delay) can see which of those failure modes UniDipVeri has an explicit answer for, and which are deliberately out of scope rather than overlooked.
+
+## 9. Architectural Decisions
 
 ### Cross-Cutting Services: The Standalone AuthService
 
@@ -326,3 +347,9 @@ flowchart TB
 **Rationale:** These two behaviors are causally linked: the `REGISTRAR`+`APPROVER` combination is only risky _because_ it enables self-approval under the MVP's N=1 policy, so one flag governs both enforcement points (`StaffService` role assignment, `IssuanceRequestService.approve()`). Keeping this out of the database and out of any in-app control prevents a privilege-escalation loop: if a Platform Administrator account could toggle this at runtime, and that same account (or a colluding one) also held `REGISTRAR`+`APPROVER`, they could grant themselves the exception on demand. Provisioning it at deployment time only (mirroring AS-04's treatment of walt.id issuer profiles) means the decision is made by whoever controls the deployment, not by anyone operating the running application — appropriate for a control that exists specifically to constrain what in-app actors, including Admins, can do to each other's oversight.
 
 **Consequence:** The Admin System Settings screen (`UI_UX_Design.md` §4.5) shows this as a **read-only status indicator** ("Self-approval & Registrar+Approver combination: Enabled via deployment config / Disabled (default)"), not an interactive toggle.
+
+### Simplified Approval Model (vs. Real Graduation Council Structure)
+
+**Decision:** `ApprovalPolicy` and `CREDENTIAL_APPROVAL` model approval as N independent, asynchronous decisions by any user holding the `APPROVER` role, rather than a convened council session with fixed membership and batch voting.
+
+**Rationale:** A faithful model of a real graduation council (fixed session membership, batch-level votes on a cohort, meeting-minute records) is out of scope for a single-developer, three-month undergraduate prototype. The N-of-M policy preserves the essential property under test — that issuance requires explicit, attributable, multi-party sign-off, distinct from a single Registrar unilaterally issuing credentials — while avoiding the added domain complexity of session/quorum/membership modeling. This is documented as a known simplification, not an oversight, per SRS §2.3 and §3.2.

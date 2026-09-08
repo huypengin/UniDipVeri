@@ -1,6 +1,6 @@
 # Software Requirements Specification — UniDipVeri
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 **Project type:** Undergraduate thesis prototype
 
@@ -49,7 +49,7 @@ Thesis committee/reviewers, the system developer (author), and any future mainta
 
 ### 2.1 Product Perspective
 
-UniDipVeri is a new, self-contained system. It integrates with walt.id for VC issuance and verification but owns its own domain model (users, students, programs, credentials, shares, audit log) independently of walt.id's internal representations. UniDipVeri receives academic records from an authoritative academic source system. Source academic records are assumed to be correct and authentic at the point of import. UniDipVeri does not independently authenticate individual grades or transcript entries. Instead, it evaluates imported academic data against configured graduation eligibility rules. Platform Administrators manage university staff accounts and roles. The system provisions server-managed wallets for students to hold credentials. Registrar users review and initiate credential issuance requests, while authorized Approvers authorize issuance before the credential is cryptographically issued.
+UniDipVeri is a new, self-contained system. It integrates with walt.id for VC issuance and verification but owns its own domain model (users, students, programs, credentials, shares, audit log) independently of walt.id's internal representations. UniDipVeri receives academic records from an authoritative academic source system. Source academic records are assumed to be correct and authentic at the point of import. UniDipVeri does not independently authenticate individual grades or transcript entries. Instead, it evaluates imported academic data against configured graduation eligibility rules. Platform Administrators manage university staff accounts and roles. The system provisions server-managed wallets for students to hold credentials. Registrar users review and initiate credential issuance requests, while authorized Approvers authorize issuance before the credential is cryptographically issued. Because student data enters the system only through the trusted Academic Record Source (AS-01), there is no student-initiated "apply to graduate" step; graduation candidacy is determined entirely by evaluating imported records against configured eligibility rules, not by a separate application workflow.
 
 ### 2.2 Product Functions (Summary)
 
@@ -75,6 +75,9 @@ UniDipVeri is a new, self-contained system. It integrates with walt.id for VC is
 | Verifier               | External employer or organization checking a credential                                                                         | None; anonymous, no account     |
 
 A single staff account may hold multiple staff roles (e.g. Registrar and Approver) in the prototype, but the system shall treat them as distinct permissions so that a stricter policy (e.g., requiring a different person to approve) can be enabled without a redesign.
+
+**Note on the Approver role and real institutional graduation councils:**
+In practice, Vietnamese universities (including MIU) convene a graduation council — a fixed, named body that meets as a session to review and vote on a cohort of candidates together, producing a single meeting record covering many students at once. UniDipVeri's `ApprovalPolicy` (N of M) is a simplified analogue of this: any staff member holding the `APPROVER` role may cast an independent decision on any pending request, asynchronously and in any order, until N distinct approvals accumulate. It does not model fixed council membership per session, batch/session-level voting, meeting minutes, or quorum tied to a specific convened session. This simplification is intentional and scoped for the MVP (see §3.2); a full council model is reserved for future work.
 
 ### 2.4 Operating Environment
 
@@ -145,6 +148,13 @@ Web application (server-rendered or SPA) served over HTTPS, backed by an applica
 - **Student-facing, holder-interactive OID4VP** (student's own wallet app, QR-scan/consent-tap flow) as the primary verification workflow — candidate future work. Note: walt.id's OID4VCI/OID4VP protocols are still used _internally_ by the system (see Architecture_Design.md §3a), driven entirely server-side against a server-managed wallet; what's out of scope here is exposing that protocol's interactive steps to the student or verifier.
 - Approval policies more complex than "N of M approvers" (e.g., role-weighted or sequential approval chains) — the MVP implements only N=1.
 - Integration with a specific production Student Information System (SIS). The MVP shall use the designated academic record source through the defined academic-record ingestion boundary; implementing a live integration with a specific university SIS is reserved for Future Work.
+- Manual override of a student's graduation status outside the automated eligibility engine (e.g. denying graduation for disciplinary or integrity reasons). `Student.graduation_status = REJECTED` is modeled in the data layer for future extension but has no MVP trigger.
+- Withdrawal or cancellation of a `PENDING_APPROVAL` credential issuance request by the Registrar who created it. Once created, a request can only be resolved by an Approver's decision (approve or reject); correcting a mistaken request requires an Approver rejection followed by a new, correct request.
+- Automatic expiration, reminder, or escalation of a `PENDING_APPROVAL` request that no Approver has acted on. Requests remain pending indefinitely until an Approver decides; monitoring for stale requests is an operational/reporting concern, not an enforced system behavior, in the MVP.
+- Push notifications or email alerts for any workflow event (new pending request, approval decision, degree conferral, credential issuance, revocation). The MVP is pull-based: actors discover state changes by logging into their respective portal and viewing the relevant list or dashboard.
+- Re-validation of eligibility between approval and issuance. If a source re-import (UC-03) updates a student's academic record after their issuance request has already met its approval threshold, the system does not re-check eligibility or block conferral/issuance already in progress. Eligibility is only checked at request creation time (FR-APPR-01, FR-APPR-02).
+- A student-facing "apply to graduate" workflow. Eligibility evaluation is triggered automatically by record import or manual Registrar re-evaluation (UC-05), not by student self-application.
+- Modeling a graduation council as a distinct entity with fixed session membership, batch voting on a cohort in a single sitting, or meeting-minute records. The MVP's `ApprovalPolicy` (N of M) is a simplified, per-request, asynchronous approval count by any staff member holding the `APPROVER` role — not a convened council session.
 
 ### 3.3 Thesis Contribution Boundary
 
@@ -157,6 +167,62 @@ walt.id is an external VC infrastructure dependency. It provides the underlying 
 The MVP scope is intentionally limited to a single university and a server-managed, self-service verification workflow. Multi-university support, student-facing holder-interactive OID4VP, multi-step or sequential approval chains, batch academic-record processing, batch eligibility evaluation, batch approval, and integration with a specific production Student Information System (SIS) are outside the MVP scope and are reserved for Future Work.
 
 This boundary is frozen for the MVP. These exclusions are scope decisions rather than implementation deficiencies and shall not be treated as missing MVP requirements.
+
+### 3.4 Baseline: Manual Workflow Comparison
+
+To motivate the problem statement in Section 1.2, this subsection places UniDipVeri's two central workflows (eligibility gated issuance and public verification) side by side with the manual process they replace at a typical university. This grounds the thesis contribution in a real operational baseline rather than an assumed one, and shows that the approval gate in Section 4.6 mirrors an existing institutional control rather than introducing a new one.
+
+#### 3.4.1 Issuance Baseline
+
+| Stage                                 | UniDipVeri (this system)                                                                                                                                  | Manual counterpart                                                                                       |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Record intake                         | Academic Record Source submits a trusted payload (UC-03)                                                                                                  | Grades post; registrar staff assemble the candidate's record                                             |
+| Eligibility check                     | `EligibilityService.evaluate` applies a versioned rule set (UC-05)                                                                                        | Degree audit checks credits, GPA, residency, course requirements [1]                                     |
+| Issuance request / precondition check | Registrar creates a request; system validates a `CREDENTIAL_SCHEMA` exists for the credential type (UC-07)                                                | No direct equivalent; the paper process does not have an equivalent machine-enforced schema precondition |
+| Program/department approval           | Configured approvers provide N-of-M approval per ApprovalPolicy (FR-APPR-03, UC-08)                                                                       | Department/program reviews and clears the candidate, followed by independent registrar review [1][2]     |
+| **Conferral**                         | `IssuanceRequestService.conferDegree` sets `graduation_status = GRADUATED` once the threshold is met, durable and independent of VC creation (FR-CONF-01) | Degree is marked conferred on the transcript [3]                                                         |
+| Credential issuance                   | `CredentialService.issue` builds and signs the VC via walt.id; failure here does not affect conferral (FR-CONF-03)                                        | Diploma record is generated from the conferred degree and sent to a print vendor [3]                     |
+| Delivery                              | Credential is immediately available in the student portal (UC-11)                                                                                         | Diploma is printed, checked, and mailed, three to eight weeks later [3][4][5]                            |
+
+This comparison supports three claims worth stating explicitly in Section 1.2:
+
+- The approval workflow in Section 4.6 is not an invented control. Rice University's certification process already routes degree candidates through a departmental or program level petition and approval, followed by a second, independent internal review performed by the Office of the Registrar [2]. UniDipVeri's `ApprovalPolicy` formalizes an existing two party review pattern rather than adding bureaucracy that did not previously exist.
+- The multi week gap between conferral and physical diploma delivery is a real, cited cost that UniDipVeri's near instant issuance (NFR-04) is designed to eliminate. University at Buffalo reports diplomas mailed approximately three to six weeks after conferral [4]; Columbia reports five to eight weeks depending on domestic or international delivery [5]; Mercy University reports up to three months [3].
+- Conferral and credential issuance are modeled as two distinct, independently durable acts (FR-CONF-01 through FR-CONF-03), reflecting the distinction in the manual process between recording the degree as conferred and subsequently producing the physical diploma. A delay or failure in credential production therefore does not put the recorded fact of graduation in question.
+
+**Sources:**
+
+[1] Rice University, Graduation Certification Process — https://registrar.rice.edu/facstaff/grad-certification-process  
+[2] Rice University, Graduation Certification Process (departmental/GPS petition review followed by Office of the Registrar's second internal review) —https://registrar.rice.edu/facstaff/grad-certification-process  
+[3] Mercy University, Degree Conferral Procedures — https://mercy.edu/student-support/office-registrar/degree-conferral-procedures  
+[4] University at Buffalo, Undergraduate Degree Application & Conferral — https://www.buffalo.edu/registrar/degree-conferral/undergraduate-degree-application-conferral.html  
+[5] Columbia University, Graduation Checklist / University Registrar — https://registrar.columbia.edu/content/graduation-requirements-and-diplomas
+
+#### 3.4.2 Verification Baseline
+
+| Stage                    | UniDipVeri (this system)                                                                                                                                      | Manual counterpart                                                                                                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Verifier initiates check | Opens a self service share link (UC-14, FR-VER-01)                                                                                                            | Contacts the registrar's office directly by phone, email, or fax, or goes through a third party clearinghouse [6][7]                                                                                                                                             |
+| Turnaround               | Seconds (NFR-04)                                                                                                                                              | Direct registrar contact: five to seven business days on average, up to ten to fifteen during peak periods such as graduation season [6]. Automated clearinghouse queries: twenty four to forty eight hours for participating institutions [8]                   |
+| Trust mechanism          | Cryptographic issuer and status check delegated to walt.id (FR-VER-04 to FR-VER-06)                                                                           | Human staff member manually confirms name, attendance dates, and degree conferred against internal records [7][9]                                                                                                                                                |
+| Verifier access          | Any verifier possessing a valid share link can perform the check without an account or prior relationship with the issuer                                     | A nationwide clearinghouse processes over a billion verification requests annually across thousands of participating institutions, but non participating schools and foreign institutions still require direct contact or separate credential evaluation [8][10] |
+| Fraud exposure           | Cryptographic integrity: A modified or improperly signed VC fails issuer/signature validation; a revoked or otherwise invalid credential fails status checks. | Industry sources report roughly a third of job applicants misrepresent educational credentials, and note diploma mills as a persistent, human scale verification problem [6][11]                                                                                 |
+
+This comparison is useful for two reasons beyond turnaround time:
+
+- It shows that a centralized trust broker for verification already exists in practice. Georgia State University's registrar office names its relationship with a nationwide clearinghouse explicitly, delegating verification on the university's behalf rather than answering every inquiry directly [10]. UniDipVeri's public verification portal is best framed as a decentralized, institution owned alternative to that same need, not as a wholly new category of service.
+- It shows the gap the clearinghouse model itself does not close: institutions outside the clearinghouse network, and credentials issued abroad, still fall back to slow manual contact or third party credential evaluation services such as NACES member organizations [9]. This is the gap a self verifying, cryptographically signed credential is positioned to close without requiring universal enrollment in a shared database.
+
+**Sources:**
+
+[6] SimpliVerified, How to Validate Degrees and Diplomas: The 2026 Employer Guide — https://simpliverified.com/news/how-to-validate-degrees-and-diplomas-the-2026-employer-guide  
+[7] Proof of Education for Employment, ValidGrad — https://validgrad.com/blog/proof-of-education-employment/  
+[8] SimpliVerified, How to Validate Degrees and Diplomas: The 2026 Employer Guide (National Student Clearinghouse volume and turnaround) — https://simpliverified.com/news/how-to-validate-degrees-and-diplomas-the-2026-employer-guide  
+[9] iprospectcheck, Education Verification for Employment: A Complete Guide — https://iprospectcheck.com/education-verification/ (foreign credential evaluation via NACES member organizations)  
+[10] Georgia State University, Degree Conferral and Diploma Information — https://registrar.gsu.edu/degree-conferral-and-diploma-information/  
+[11] SimpliVerified, How to Validate Degrees and Diplomas: The 2026 Employer Guide (2023 Employment Screening Benchmark Report figure) — https://simpliverified.com/news/how-to-validate-degrees-and-diplomas-the-2026-employer-guide
+
+**Note on scope:** this subsection is descriptive baseline material for framing the research problem. It does not introduce new functional or non functional requirements, and nothing in Section 4 depends on it. The turnaround figures cited above are third party reported industry figures rather than measurements of any specific institution UniDipVeri models itself on, and should be treated as illustrative context in the thesis writeup rather than as a controlled benchmark. Given how fast this space moves, it would be worth re-checking these figures for currency before final submission.
 
 ---
 
@@ -182,6 +248,7 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-PROG-02** A program shall contain: name, full title (e.g., _Bachelor of Science in Computer Science_ or _Bachelor of Computer Science_), degree level.
 - **FR-PROG-03** A program shall have associated graduation eligibility rules.
 - **FR-PROG-04** Registrar users shall be able to configure the graduation eligibility rules for a program.
+- **FR-PROG-05** The system shall validate that a program's full title contains a keyword matching its degree level (e.g., "Bachelor" for `BACHELOR`, "Master" for `MASTER`, "Doctor" for `DOCTORATE`), so that program metadata is internally consistent.
 
 ### 4.4 Student Management
 
@@ -218,6 +285,16 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 - **FR-APPR-10** The approval policy shall be configurable by the Platform Administrator (the required count N), even though the MVP ships with N = 1, so the policy can be tightened later without a redesign.
 - **FR-APPR-11** The system shall, by default, prevent the same staff member from both creating (as Registrar) and approving (as Approver) a given credential issuance request, regardless of role assignment. When deployment-time configuration explicitly permits the `REGISTRAR`+`APPROVER` role combination (FR-USER-06, AS-08), this restriction is correspondingly relaxed for accounts holding both roles. Every such self-approval decision shall nonetheless be flagged on the recorded `CREDENTIAL_APPROVAL` entry and surfaced distinctly in audit views (FR-AUD-02), so that self-approved requests remain visibly traceable regardless of the current policy state.
 
+---
+
+### 4.6a Degree Conferral
+
+- **FR-CONF-01** Upon a credential issuance request meeting its required approval count (FR-APPR-06), the system shall record the degree as officially conferred by setting the student's `graduation_status = GRADUATED`, as an academic decision distinct from, and prior to, producing the Verifiable Credential artifact (FR-CRED-01).
+- **FR-CONF-02** Conferral shall be idempotent: conferring a degree for a student whose `graduation_status` is already `GRADUATED` for that program (e.g. during a reissuance) shall not alter the original conferral record.
+- **FR-CONF-03** If credential issuance subsequently fails (FR-CRED "Extensions" 3a) after conferral has been recorded, the conferral shall not be rolled back. A conferred degree is an academic fact independent of whether a credential artifact currently exists to attest to it.
+
+---
+
 ### 4.7 Credential Issuance
 
 - **FR-CRED-01** Upon meeting the approval policy, the system shall issue an academic diploma credential for the associated student.
@@ -242,6 +319,8 @@ This boundary is frozen for the MVP. These exclusions are scope decisions rather
 
 - **FR-CRED-12** The system shall support issuing a corrected credential after revocation via an application-managed lifecycle workflow, subject to the same approval workflow as a new issuance (4.6).
 - **FR-CRED-13** The new credential shall be issued as a distinct Verifiable Credential and shall explicitly reference the superseded credential in the application domain.
+
+**Note:** Reissuance operates on the credential produced by the issuance pipeline; if the defect originates in the source academic record itself, a corrected re-import (§4.5, AS-01) is a precondition for a materially different reissued credential. Reissuance alone cannot correct a defect that originates upstream of the credential subject.
 
 ### 4.11 Credential Sharing
 

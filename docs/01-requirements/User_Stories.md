@@ -1,6 +1,6 @@
 # User Stories
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.md`. Stories are grouped into epics matching the SRS's functional sections, written in standard "As a / I want / so that" form with Given/When/Then acceptance criteria, and traced back to requirement IDs. All stories below are in scope for the MVP unless marked otherwise.
 
@@ -255,13 +255,21 @@ Companion to `docs/01-requirements/SRS.md` and `docs/01-requirements/Use_Cases.m
 
 ---
 
-## Backlog Prioritization (MVP Build Order)
+## Backlog Prioritization (MVP Build Order — 12 Vertical-Slice Cycles)
 
-1. **Foundation & Users:** US-A1–A3, US-J1–J3, US-C1 (auth, staff user management, programs must exist before anything else)
-2. **Trust boundary & Wallet:** US-B1–B3, US-K1–K2, US-J4, US-C2–C3, US-D1–D2 (import + wallet provisioning + eligibility before any issuance is possible)
-3. **Core workflow:** US-E1–E7 (the request/approval/issuance pipeline — this is the thesis's central contribution)
-4. **Graduate-facing value:** US-F1–F3, US-G1–G3 (credential lifecycle + sharing)
-5. **The payoff:** US-H1–H4 (public verification — this is what proves the research question)
-6. **Supporting:** US-I1–I2 (audit views — can be trimmed first if time is short, per Architecture_Design.md)
+Each cycle delivers both backend and frontend for the same feature area (vertical slice). The detailed issue breakdown is maintained in `.temp/development-issues.md`.
 
-This order intentionally puts user management, wallet provisioning, eligibility, and the request/approval chain before public verification, ensuring that the entire issuance and identity pipeline is robust from the ground up.
+1. **Cycle 1 — Authentication & Foundation** ✅ Completed: US-A1–A3 (auth backend, login/logout, shared login UI)
+2. **Cycle 2 — Staff & Program Management:** US-J1–J3, US-A1, US-A2, US-C1 (staff CRUD + shared auth extension: forgot password, account management & first-time activation + program CRUD, both API and UI)
+3. **Cycle 3 — Academic Record Import & Student Directory:** US-B1–B3, US-J4, US-J5 (ingestion pipeline + student list, both API and UI)
+4. **Cycle 4 — Wallet Provisioning & Eligibility:** US-K1–K3, US-C2–C3, US-D1–D2 (walt.id wallet adapter + rules + evaluation engine, both API and UI)
+5. **Cycle 5 — Issuance Request & Approval Workflow:** US-E1–E4, US-E7 (core thesis issuance pipeline: request/approval workflow, N-of-M approval policy enforcement + registrar/approver UI; US-E5 admin policy UI is in Cycle 10)
+6. **Cycle 6 — VC Integration & Credential Issuance:** US-E6, US-F1 (walt.id OID4VCI + credential entity + views)
+7. **Cycle 7 — Credential Lifecycle (Revoke & Reissue):** US-F2, US-F3 (revocation + status list + reissuance with lineage)
+8. **Cycle 8 — Sharing & Student Credential Portal:** US-G1–G3, US-F1 (share links + student dashboard)
+9. **Cycle 9 — Public Verification:** US-H1–H4, US-I2 (zero-auth verification portal — this is what proves the research question)
+10. **Cycle 10 — Audit & System Settings:** US-I1, US-E5 (audit trail + admin system settings & approval policy threshold configuration UI)
+11. **Cycle 11 — UI Polish:** N/A — Quality (UX refinement, responsive design, accessibility review, loading/empty states, and regression pass across all views — accounts/password reset built in Cycle 2 reviewed here for consistency)
+12. **Cycle 12 — Integration Testing & Documentation:** N/A — Quality & Docs (end-to-end tests, API docs, thesis writeup, deployment config)
+
+This order intentionally puts user management, wallet provisioning, eligibility, and the request/approval chain before public verification, ensuring that the entire issuance and identity pipeline is robust from the ground up. Each cycle is a vertical slice delivering both backend and frontend for the same feature area.

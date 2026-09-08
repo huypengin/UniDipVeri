@@ -2,7 +2,7 @@
 
 # UI/UX Design Specification
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 **Companion Documents:** `docs/01-requirements/SRS.md` · `docs/01-requirements/Use_Cases.md` · `docs/01-requirements/User_Stories.md` · `docs/04-api/API_Specification.md` · `docs/03-design/Data_Model.md`
 
@@ -40,14 +40,14 @@ To prevent duplication and maintain architectural consistency, **all four system
 The primary sign-in interface serves as the universal entry point for both university staff and students.
 
 ![Unified Sign In](../assets/student-login.png)
-*Figure 2.1: Unified Sign-in Page (`student-login.png`)*
+_Figure 2.1: Unified Sign-in Page (`student-login.png`)_
 
 - **Role-Specific Authentication Endpoints (`POST /api/staffs/login`, `POST /api/students/login`):** Users enter their institutional email (`@student.miu.example` or `@staff.miu.example`) and password, submitting to their respective controller endpoint.
 - **Automated Role Dispatching:** Upon successful credential verification, the server issues an HttpOnly session cookie and returns the user's profile with role claims (`STUDENT`, `REGISTRAR`, `APPROVER`, or `ADMIN`). The frontend router automatically routes the user to their authorized destination:
-  - `STUDENT` &rarr; Student Credentials Dashboard (`/credentials`)
+  - `STUDENT` &rarr; Student Credentials Dashboard (`/my/credentials`)
   - `REGISTRAR` &rarr; Registrar Operations Console (`/operations`)
-  - `APPROVER` &rarr; Issuance Queue Review (`/issuance-queue`)
-  - `ADMIN` &rarr; Staff & Administration Suite (`/admin/staffs`)
+  - `APPROVER` &rarr; Approver Issuance Queue (`/approvals`)
+  - `ADMIN` &rarr; Staff & Administration Suite (`/staffs`)
 - **First-Time User Onboarding:** Newly imported students (`account_status = PENDING_ACTIVATION`) and newly provisioned staff members use this same portal to establish their initial password, automatically activating their account upon first login.
 - **Access Boundary Notice:** A security reminder reinforces that accounts can only view authorized records and all access attempts are logged for audit compliance.
 
@@ -56,7 +56,7 @@ The primary sign-in interface serves as the universal entry point for both unive
 ### 2.2 Password Recovery & First-Time Activation
 
 ![Password Reset & Account Activation](../assets/student-reset-pass.png)
-*Figure 2.2: Password Reset & Activation Page (`student-reset-pass.png`)*
+_Figure 2.2: Password Reset & Activation Page (`student-reset-pass.png`)_
 
 - **Unified Password Reset Flow (`POST /api/auth/reset-password`):** Accessible via "Forgot your password?" on the login page.
 - **Secure Token Delivery:** Users enter their registered institutional email to receive a single-use, time-limited reset/activation link.
@@ -69,9 +69,9 @@ The primary sign-in interface serves as the universal entry point for both unive
 All authenticated users — regardless of whether they are a student or a staff member — manage their personal profile details and password through the shared **Account** view (`/api/me`).
 
 ![Shared Account Management](../assets/student-acc-manage.png)
-*Figure 2.3: Shared Account Management View (`student-acc-manage.png`)*
+_Figure 2.3: Shared Account Management View (`student-acc-manage.png`)_
 
-- **Profile Summary:** Displays the authenticated user's registered institutional email, affiliated institution (*Mekong International University*), and active assigned role.
+- **Profile Summary:** Displays the authenticated user's registered institutional email, affiliated institution (_Mekong International University_), and active assigned role.
 - **Password Update Form (`POST /api/auth/change-password`):** Provides a standardized interface requiring:
   1. Current password verification.
   2. New password input meeting institutional complexity requirements.
@@ -89,9 +89,9 @@ The Student Portal gives graduates complete sovereign control over viewing their
 The main student dashboard (`/api/me/credentials`) provides a consolidated view of all academic diplomas issued to the student.
 
 ![Student Credentials Dashboard](../assets/student-dashboard.png)
-*Figure 3.1: My Credentials Dashboard (`student-dashboard.png`)*
+_Figure 3.1: My Credentials Dashboard (`student-dashboard.png`)_
 
-- **Credential Cards:** Each credential card displays degree full title (e.g., *Bachelor of Computer Science*), issuing institution (*Mekong International University*), award date, unique credential reference ID (e.g., `MKIU-BSC-2025-0417`), and real-time cryptographic status (`VALID` or `REVOKED`).
+- **Credential Cards:** Each credential card displays degree full title (e.g., _Bachelor of Computer Science_), issuing institution (_Mekong International University_), award date, unique credential reference ID (e.g., `MKIU-BSC-2025-0417`), and real-time cryptographic status (`VALID` or `REVOKED`).
 - **Global Navigation Bar:** Clean top bar with navigation tabs: `Credentials`, `Share links`, `Verifications`, and `Account`, alongside a one-click `Sign out` action.
 
 ---
@@ -101,7 +101,7 @@ The main student dashboard (`/api/me/credentials`) provides a consolidated view 
 Graduates generate and manage time-limited public verification links from the **Share links** view (`/api/me/shares`).
 
 ![Student Share Links Management](../assets/student-share-links.png)
-*Figure 3.2: Share Links Management View (`student-share-links.png`)*
+_Figure 3.2: Share Links Management View (`student-share-links.png`)_
 
 - **Custom Purpose Labeling:** Each share entry lists a custom purpose/label (e.g., `Application — CS`), linked credential title, creation date, and expiration date.
 - **Immediate Revocation (`FR-SHARE-06`):** Students can click **Revoke** at any time to instantly cut off access, rendering the share link inactive regardless of the original expiration date.
@@ -114,7 +114,7 @@ Graduates generate and manage time-limited public verification links from the **
 Accessible via the **Verifications** tab (`/api/me/verification-events`), this view presents graduates with a consolidated audit summary of how their share links have been verified by employers and third parties.
 
 ![Student Verification Events](../assets/student-verification-events.png)
-*Figure 3.3: Student Verification Events View (`student-verification-events.png`)*
+_Figure 3.3: Student Verification Events View (`student-verification-events.png`)_
 
 - **Grouped by Share Link (SRS FR-AUD-05a):** Rather than exposing an overwhelming flood of raw request logs, events are aggregated per share link.
 - **Verification Metrics:** Displays the linked degree, purpose label, latest outcome (`VERIFIED`, `REVOKED`), total attempt count, and the most recent verification timestamp.
@@ -131,12 +131,12 @@ The Staff & Administration Portal provides dedicated, role-tailored consoles for
 Designed for users holding the `REGISTRAR` role, this console unifies program curriculum definitions with graduation readiness evaluation.
 
 ![Registrar Operations Console](../assets/registrar-op.png)
-*Figure 4.1: Registrar Operations Console (`registrar-op.png`)*
+_Figure 4.1: Registrar Operations Console (`registrar-op.png`)_
 
 - **Academic Programs Card (`FR-PROG-01..04`):**
-  - Displays configured academic programs with name, degree full title, degree level, and active rule-set version (e.g., *Computer Science · Bachelor of Science in Computer Science · Rules v3: 120 credits, GPA 2.5, Algorithms, Operating Systems*).
+  - Displays configured academic programs with name, degree full title, degree level, and active rule-set version (e.g., _Computer Science · Bachelor of Science in Computer Science · Rules v3: 120 credits, GPA 2.5, Algorithms, Operating Systems_).
   - **Create / Edit Program:** Enables creating new programs (`+ Create program`) or editing details and eligibility rules (`Edit`).
-  - **Explicit Ingestion Boundary Reminder:** Clearly states: *"Imported student records remain read-only,"* preventing accidental manual tampering with academic achievement facts.
+  - **Explicit Ingestion Boundary Reminder:** Clearly states: _"Imported student records remain read-only,"_ preventing accidental manual tampering with academic achievement facts.
 - **Issuance Readiness & Batch Evaluation Card (`FR-ELIG-01..09`, `FR-APPR-01`):**
   - Lists student cohort candidates with current graduation eligibility badges:
     - <span style="color:#16a34a;font-weight:bold;">ELIGIBLE</span>: Student satisfies all mandatory degree rules.
@@ -152,9 +152,9 @@ Designed for users holding the `REGISTRAR` role, this console unifies program cu
 Designed for users holding the `APPROVER` role, this view enforces multi-party separation of duties by ensuring credentials cannot be issued without independent sign-off.
 
 ![Approver Issuance Queue](../assets/approver-op.png)
-*Figure 4.2: Approver Issuance Queue View (`approver-op.png`)*
+_Figure 4.2: Approver Issuance Queue View (`approver-op.png`)_
 
-- **Queue Summary Banner:** Displays the total count of requests currently pending sign-off (*"Pending your decision — Each approval is tied to your staff identity and the current approval threshold"*).
+- **Queue Summary Banner:** Displays the total count of requests currently pending sign-off (_"Pending your decision — Each approval is tied to your staff identity and the current approval threshold"_).
 - **Issuance Request Cards (`FR-APPR-04..09`):**
   - Displays graduate name, unique request ID badge (e.g., `REQ-1042`, `REQ-1038`), student ID number, academic program, and submission timestamp.
   - **Decision Context Form:** Includes an optional "Decision comment" input field to record rationale for audit compliance (`CREDENTIAL_APPROVAL.comment`).
@@ -170,15 +170,15 @@ Designed for users holding the `APPROVER` role, this view enforces multi-party s
 Accessible by both **Registrars** and **Platform Administrators** (`FR-USER-04`, `US-J4`), this screen provides cohort-level oversight of student profiles, account standing, and custodial wallet health.
 
 ![Student Directory & Lifecycle Oversight](../assets/admin-student-acc-manage.png)
-*Figure 4.3: Student Directory Oversight View (`admin-student-acc-manage.png`)*
+_Figure 4.3: Student Directory Oversight View (`admin-student-acc-manage.png`)_
 
-- **Read-Only Directory Banner (AS-01):** Reaffirms that student demographic and enrollment data is an authoritative, read-only mirror of the external SIS (*"Read-only directory of enrolled and graduated students"*).
+- **Read-Only Directory Banner (AS-01):** Reaffirms that student demographic and enrollment data is an authoritative, read-only mirror of the external SIS (_"Read-only directory of enrolled and graduated students"_).
 - **Universal Search:** Search bar filtering across student name, student institutional email, and student ID number (`student_number`).
 - **Student Profile Cards:**
   - **Dual Status Badges (`FR-USER-04`):**
     - Account Status: <span style="color:#16a34a;font-weight:bold;">ACTIVE</span> or <span style="color:#dc2626;font-weight:bold;">DEACTIVATED</span>.
     - Wallet Provisioning Status: <span style="color:#16a34a;font-weight:bold;">VERIFIED / ACTIVE</span>, <span style="color:#ca8a04;font-weight:bold;">PENDING</span>, or <span style="color:#dc2626;font-weight:bold;">FAILED</span>.
-  - **Explanatory Context:** Informs staff of wallet readiness (e.g., *"Wallet ready — credentials can be delivered to this student"* vs. *"Provisioning failed — the student cannot receive credentials until this succeeds"*).
+  - **Explanatory Context:** Informs staff of wallet readiness (e.g., _"Wallet ready — credentials can be delivered to this student"_ vs. _"Provisioning failed — the student cannot receive credentials until this succeeds"_).
 - **Administrative Actions:**
   - **Retry Wallet Provisioning (`FR-WAL-02`, `US-K2`):** Allows staff to re-trigger custodial wallet generation on `walt.id` if a previous attempt failed.
   - **Account Deactivation / Reactivation (`US-J5`):** Allows deactivating a student account, which automatically cascades to deactivating the student's custodial wallet (`FR-WAL-05`).
@@ -190,18 +190,18 @@ Accessible by both **Registrars** and **Platform Administrators** (`FR-USER-04`,
 Restricted exclusively to **Platform Administrators** (`FR-USER-01..05`, `US-J1..J3`), this console manages university staff accounts and internal security permissions.
 
 ![Staff Account Management](../assets/admin-staff-acc-manage.png)
-*Figure 4.4: Staff Account Management View (`admin-staff-acc-manage.png`)*
+_Figure 4.4: Staff Account Management View (`admin-staff-acc-manage.png`)_
 
-- **Create Staff Action (`+ Create staff account`):** Modal dialog allowing administrators to provision new university staff by supplying name, institutional email (`@staff.miu.example`), and role assignments (`REGISTRAR`, `APPROVER`, `ADMIN`).
+- **Create Staff Action (`+ Create staff account`):** Modal dialog (`CreateStaffDialog`) allowing administrators to provision new university staff by supplying name, institutional email (`@staff.miu.example`), and role assignments (`REGISTRAR`, `APPROVER`, `ADMIN`). By default, the dialog enforces the role-combination restriction (`AS-08`, `FR-USER-06`) directly in the UI, preventing simultaneous selection of both `REGISTRAR` and `APPROVER` checkboxes unless the deployment-time configuration override is active.
 - **Staff Member Cards:**
   - Displays staff name, institutional email, unique staff identifier (e.g., `STF-0001`), and last active timestamp.
   - **Status Badge:** <span style="color:#16a34a;font-weight:bold;">ACTIVE</span> or <span style="color:#dc2626;font-weight:bold;">DEACTIVATED</span>.
-  - **Assigned Role Pills:** Clear tags denoting permissions (`ADMIN`, `REGISTRAR`, `APPROVER`). A staff member may hold multiple roles (e.g., both `APPROVER` and `REGISTRAR`).
+  - **Assigned Role Pills:** Clear tags denoting permissions (`ADMIN`, `REGISTRAR`, `APPROVER`). A staff member may hold multiple roles (e.g., both `APPROVER` and `REGISTRAR` if permitted by deployment configuration).
 - **Deactivation with Audit Preservation (`US-J3`):** Staff accounts can be deactivated to block login while preserving historical foreign key references in approval queues, issuance requests, and rule creation logs.
 - **Sole Administrator Protection (`FR-USER-05`, `US-J3`):** The system disables deactivation for the final remaining active administrator account.
 - **Role-Combination & Self-Approval Status (read-only) (`AS-08`, `FR-USER-06`, `FR-APPR-11`):**
-- Displays current deployment-configured state: *"Registrar + Approver combination and self-approval: **Disabled (default)**"* or *"**Enabled via deployment configuration**"* if the operator has set the flag.
-- This is informational only — no in-app control exists to change it, by design. A tooltip or caption explains why: *"This restriction protects the independent-approval guarantee and can only be changed by whoever controls the deployment, not from within the application."*
+  - Displays current deployment-configured state: _"Registrar + Approver combination and self-approval: **Disabled (default)**"_ or _"**Enabled via deployment configuration**"_ if the operator has set the flag.
+  - This is informational only — no in-app control exists to change it, by design. A tooltip or caption explains why: _"This restriction protects the independent-approval guarantee and can only be changed by whoever controls the deployment, not from within the application."_ In addition to backend service validation, `CreateStaffDialog` and `EditStaffDialog` enforce this check client-side.
 
 ---
 
@@ -210,7 +210,7 @@ Restricted exclusively to **Platform Administrators** (`FR-USER-01..05`, `US-J1.
 Restricted to **Platform Administrators**, this console configures platform-wide security, issuance policies, and automated worker parameters.
 
 ![System Settings & Issuance Governance](../assets/admin-system-conf.png)
-*Figure 4.5: System Settings & Policy Configuration View (`admin-system-conf.png`)*
+_Figure 4.5: System Settings & Policy Configuration View (`admin-system-conf.png`)_
 
 - **Approvals Required per Credential Issuance (`FR-APPR-03`, `US-D1`):**
   - Sets the approval policy threshold $N$ (e.g., `2`). A credential is only minted and signed once $N$ distinct authorized Approvers submit approval decisions.
@@ -218,9 +218,9 @@ Restricted to **Platform Administrators**, this console configures platform-wide
 - **Maximum Student Share-Link Lifetime (Days) (`FR-SHARE-05`):**
   - Configures the maximum validity window (e.g., `30` days) that students can select when generating verification links, preventing indefinite link exposure.
 - **Automated Wallet Provisioning Retry Toggle (`US-K1`):**
-  - Checkbox toggle: *"Automatically retry failed wallet provisions — Retries three times over 24 hours before flagging the student for manual retry."*
+  - Checkbox toggle: _"Automatically retry failed wallet provisions — Retries three times over 24 hours before flagging the student for manual retry."_
 - **Active Administrators Quorum Indicator:**
-  - Status alert: *"Active administrators: 1. The platform always keeps at least one active admin account,"* confirming system governance resilience.
+  - Status alert: _"Active administrators: 1. The platform always keeps at least one active admin account,"_ confirming system governance resilience.
 
 ---
 
@@ -233,7 +233,7 @@ When a third-party verifier (employer, background check service, or academic ins
 When the share token is valid, active, and the cryptographic VC verification succeeds, the verifier is presented with the verified credential summary.
 
 ![Public Verification — Verified Credential](../assets/verifier-verified.png)
-*Figure 5.1: Verified Credential Result (`verifier-verified.png`)*
+_Figure 5.1: Verified Credential Result (`verifier-verified.png`)_
 
 - **Status Banner:** Prominent green **Credential verified** (`VERIFIED`) header confirming authenticity and active standing.
 - **Graduate & Award Information:** Graduate name, degree title, academic program, issuing institution, award date, credential identifier, and issuance timestamp.
@@ -246,7 +246,7 @@ When the share token is valid, active, and the cryptographic VC verification suc
 If the underlying diploma has been rescinded or revoked by the university registrar, the verification portal clearly alerts the verifier.
 
 ![Public Verification — Revoked Credential](../assets/verifier-revoked.png)
-*Figure 5.2: Revoked Credential Result (`verifier-revoked.png`)*
+_Figure 5.2: Revoked Credential Result (`verifier-revoked.png`)_
 
 - **Revocation Warning Banner:** High-visibility red banner stating that the credential was genuinely issued by the institution but has since been revoked and should not be accepted as proof of award.
 - **Historical Attribution:** Displays the original degree and graduate details for identification while maintaining the clear `REVOKED` badge.
@@ -262,7 +262,7 @@ When a share link cannot be used, the system returns a designated quick-exit sta
 When a verifier navigates to an invalid or non-existent token:
 
 ![Verification Unavailable — Link Not Found](../assets/verifier-link-not-found.png)
-*Figure 5.3: Verification Unavailable / Link Not Found (`verifier-link-not-found.png`)*
+_Figure 5.3: Verification Unavailable / Link Not Found (`verifier-link-not-found.png`)_
 
 - **Friendly Error Guidance:** Explains that the verification link does not exist or is no longer available, prompting the verifier to check the URL or request a new link from the graduate.
 
@@ -273,7 +273,7 @@ When a verifier navigates to an invalid or non-existent token:
 When a share URL is accessed after its configured `expiresAt` timestamp:
 
 ![Share Link Expired](../assets/verifier-link-expired.png)
-*Figure 5.4: Share Link Expired (`verifier-link-expired.png`)*
+_Figure 5.4: Share Link Expired (`verifier-link-expired.png`)_
 
 - **Amber Expiration Notice:** Informs the verifier that the share validity window has elapsed and instructs them to request a fresh link from the candidate.
 
@@ -284,7 +284,7 @@ When a share URL is accessed after its configured `expiresAt` timestamp:
 When a student has explicitly revoked an active share link:
 
 ![Share Link Revoked](../assets/verifier-link-revoked.png)
-*Figure 5.5: Share Link Revoked by Graduate (`verifier-link-revoked.png`)*
+_Figure 5.5: Share Link Revoked by Graduate (`verifier-link-revoked.png`)_
 
 - **Revoked Share Notice:** Explicitly indicates that the graduate has revoked access to this specific link, distinguishing link revocation from credential revocation.
 - **Neutral Disclaimer:** Reassures the verifier that share link unavailability does not imply the underlying diploma is invalid or fraudulent.
@@ -295,21 +295,21 @@ When a student has explicitly revoked an active share link:
 
 The following matrix maps every interface mockup to its corresponding system route, API endpoints, and functional/non-functional requirements:
 
-| Screen / Component | Asset File | Role Access | Route / Endpoint | Traces to Requirements |
-| :--- | :--- | :--- | :--- | :--- |
-| **Unified Sign In** | `student-login.png` | All Roles | `POST /api/staffs/login`<br>`POST /api/students/login` | FR-AUTH-01, FR-USER-04, FR-STU-04 |
-| **Password Reset / Activation** | `student-reset-pass.png` | All Roles | `POST /api/auth/reset-password` | FR-AUTH-01, US-B1, US-J1 |
-| **Shared Account Management** | `student-acc-manage.png` | All Roles | `GET /api/me`<br>`POST /api/auth/change-password` | FR-STU-04, FR-USER-02 |
-| **Student Credentials Dashboard** | `student-dashboard.png` | Student | `GET /api/me/credentials` | FR-CRED-07, FR-CRED-08, US-F1 |
-| **Student Share Links Management** | `student-share-links.png` | Student | `GET /api/me/shares`<br>`POST /api/me/shares` | FR-SHARE-01–07, US-G1–G4 |
-| **Student Verification History** | `student-verification-events.png` | Student | `GET /api/me/verification-events` | FR-AUD-05, FR-AUD-05a, US-I2 |
-| **Registrar Operations Console** | `registrar-op.png` | Registrar | `GET /api/programs`<br>`POST /api/programs`<br>`POST /api/credential-requests` | FR-PROG-01–04, FR-ELIG-01–09, FR-APPR-01, US-C1–C2, US-D1 |
-| **Approver Issuance Queue** | `approver-op.png` | Approver | `GET /api/credential-requests`<br>`POST /api/credential-requests/{id}/approve`<br>`POST /api/credential-requests/{id}/reject` | FR-APPR-03–09, US-D2, US-D3 |
-| **Student Directory & Lifecycle** | `admin-student-acc-manage.png` | Registrar, Admin | `GET /api/students`<br>`POST /api/students/{id}/wallet/provision`<br>`PATCH /api/students/{id}/status` | FR-USER-04, FR-STU-01–03, FR-WAL-01–05, US-J4, US-J5, US-K2 |
-| **Staff Account Management** | `admin-staff-acc-manage.png` | Platform Admin | `GET /api/staffs`<br>`POST /api/staffs`<br>`PATCH /api/staffs/{id}` | FR-USER-01–05, US-J1–J3 |
-| **System Settings & Policy** | `admin-system-conf.png` | Platform Admin | `GET /api/approval-policy`<br>`PUT /api/approval-policy`<br>`GET /api/university` | FR-UNI-01–02, FR-APPR-03, FR-SHARE-05, US-D1 |
-| **Verified Credential View** | `verifier-verified.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-VER-01–08, US-H1 |
-| **Revoked Credential View** | `verifier-revoked.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-VER-06, FR-VER-07, US-H2 |
-| **Missing Share Quick-Exit** | `verifier-link-not-found.png` | Public (Unauthenticated) | `GET /api/public/shares/{token}` | FR-VER-02, FR-VER-07, FR-VER-09, US-H3 |
-| **Expired Share View** | `verifier-link-expired.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-SHARE-05, FR-VER-07, FR-VER-09, US-G3 |
-| **Revoked Share View** | `verifier-link-revoked.png` | Public (Unauthenticated) | `POST /api/public/shares/{token}/verify` | FR-SHARE-06, FR-VER-07, FR-VER-09, US-G4 |
+| Screen / Component                 | Asset File                        | Role Access              | Route / Endpoint                                                                                                                              | Traces to Requirements                                      |
+| :--------------------------------- | :-------------------------------- | :----------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| **Unified Sign In**                | `student-login.png`               | All Roles                | `/login`<br>`POST /api/staffs/login`<br>`POST /api/students/login`                                                                            | FR-AUTH-01, FR-USER-04, FR-STU-04                           |
+| **Password Reset / Activation**    | `student-reset-pass.png`          | All Roles                | `/reset-password`<br>`POST /api/auth/reset-password`                                                                                          | FR-AUTH-01, US-B1, US-J1                                    |
+| **Shared Account Management**      | `student-acc-manage.png`          | All Roles                | `GET /api/me`<br>`POST /api/auth/change-password`                                                                                             | FR-STU-04, FR-USER-02                                       |
+| **Student Credentials Dashboard**  | `student-dashboard.png`           | Student                  | `/my/credentials`<br>`GET /api/me/credentials`                                                                                                | FR-CRED-07, FR-CRED-08, US-F1                               |
+| **Student Share Links Management** | `student-share-links.png`         | Student                  | `GET /api/me/shares`<br>`POST /api/credentials/{id}/shares`                                                                                   | FR-SHARE-01–07, US-G1–G3                                    |
+| **Student Verification History**   | `student-verification-events.png` | Student                  | `GET /api/me/verification-events`                                                                                                             | FR-AUD-05, FR-AUD-05a, US-I2                                |
+| **Registrar Operations Console**   | `registrar-op.png`                | Registrar                | `/operations`<br>`GET /api/programs`<br>`POST /api/programs`<br>`POST /api/credential-requests`                                               | FR-PROG-01–05, FR-ELIG-01–09, FR-APPR-01, US-C1–C2, US-D1   |
+| **Approver Issuance Queue**        | `approver-op.png`                 | Approver                 | `/approvals`<br>`GET /api/credential-requests`<br>`POST /api/credential-requests/{id}/approve`<br>`POST /api/credential-requests/{id}/reject` | FR-APPR-03–09, US-E2, US-E3                                 |
+| **Student Directory & Lifecycle**  | `admin-student-acc-manage.png`    | Registrar, Admin         | `GET /api/students`<br>`POST /api/students/{id}/wallet/provision`                                                                             | FR-USER-04, FR-STU-01–03, FR-WAL-01–05, US-J4, US-J5, US-K2 |
+| **Staff Account Management**       | `admin-staff-acc-manage.png`      | Platform Admin           | `/staffs`<br>`GET /api/staffs`<br>`POST /api/staffs`<br>`PATCH /api/staffs/{id}`                                                              | FR-USER-01–06, US-J1–J3                                     |
+| **System Settings & Policy**       | `admin-system-conf.png`           | Platform Admin           | `GET /api/settings`<br>`PATCH /api/settings/approval-policy`<br>`GET /api/university`                                                         | FR-UNI-01–02, FR-APPR-03, FR-APPR-10, FR-SHARE-05, US-E5    |
+| **Verified Credential View**       | `verifier-verified.png`           | Public (Unauthenticated) | `/s/{token}`<br>`POST /api/public/shares/{token}/verify`                                                                                      | FR-VER-01–08, US-H1, US-H2                                  |
+| **Revoked Credential View**        | `verifier-revoked.png`            | Public (Unauthenticated) | `/s/{token}`<br>`POST /api/public/shares/{token}/verify`                                                                                      | FR-VER-06, FR-VER-07, US-H3                                 |
+| **Missing Share Quick-Exit**       | `verifier-link-not-found.png`     | Public (Unauthenticated) | `/s/{token}`<br>`GET /api/public/shares/{token}`                                                                                              | FR-VER-02, FR-VER-07, FR-VER-09, US-H3                      |
+| **Expired Share View**             | `verifier-link-expired.png`       | Public (Unauthenticated) | `/s/{token}`<br>`GET /api/public/shares/{token}`                                                                                              | FR-SHARE-05, FR-VER-07, FR-VER-09, US-H3                    |
+| **Revoked Share View**             | `verifier-link-revoked.png`       | Public (Unauthenticated) | `/s/{token}`<br>`GET /api/public/shares/{token}`                                                                                              | FR-SHARE-06, FR-VER-07, FR-VER-09, US-H3                    |

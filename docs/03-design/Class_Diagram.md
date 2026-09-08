@@ -1,6 +1,6 @@
 # Class Diagram
 
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 Companion to `docs/01-requirements/SRS.md`, `docs/03-design/Architecture_Design.md`, `docs/03-design/Data_Model.md`, and `docs/04-api/API_Specification.md`. This document presents the structural design of UniDipVeri using plain **Clean Architecture**.
 
@@ -466,6 +466,7 @@ classDiagram
         <<interface>>
         +findById(UUID id) CredentialIssuanceRequest
         +findActiveByStudentAndType(UUID studentId, string type) CredentialIssuanceRequest
+        +findSchemaByCredentialType(UUID universityId, string credentialType) CredentialSchema
         +listPending() List~CredentialIssuanceRequest~
         +saveRequest(CredentialIssuanceRequest request) void
         +saveApproval(CredentialApproval approval) void
@@ -595,6 +596,7 @@ classDiagram
         +listPending() List~RequestDTO~
         +approve(UUID requestId, UUID approverStaffId, string comment) RequestDTO
         +reject(UUID requestId, UUID approverStaffId, string reason) RequestDTO
+        +conferDegree(UUID studentId) void   // sets graduation_status = GRADUATED; called internally by approve() at threshold
     }
 
     class CredentialService {
@@ -669,6 +671,10 @@ Note: `approve(requestId, approverStaffId, comment)` now additionally: (1) loads
 
 Note: `createStaff(...)` and `updateStaff(...)` additionally validate: if the resulting role set would include both `REGISTRAR` and `APPROVER`, consult deployment configuration — reject with a validation error if the combination is not permitted.
 
+Note: `conferDegree` is called internally by `approve()` once the approval threshold is met, immediately before `CredentialService.issue()`. It sets `Student.graduationStatus = GRADUATED` via `IStudentRepository` and is not exposed as its own controller endpoint — conferral and issuance are always triggered together from `approve()`, but recorded as two distinct, independently durable writes.
+
+Note: `createRequest` resolves `credentialType` to a `CredentialSchema` via `ICredentialRequestRepository.findSchemaByCredentialType(...)` before creating the request, rather than through a dedicated schema repository — this is the only place a schema lookup is needed, so it's folded onto the existing request repository port rather than adding a new interface (Architecture_Design.md §1.2, minimum viable structure).
+
 ---
 
 ## 5. Infrastructure Layer (PostgreSQL & External Adapters)
@@ -720,6 +726,7 @@ classDiagram
         -NpgsqlConnection dbConnection
         +findById(UUID id) CredentialIssuanceRequest
         +findActiveByStudentAndType(UUID studentId, string type) CredentialIssuanceRequest
+        +findSchemaByCredentialType(UUID universityId, string credentialType) CredentialSchema
         +listPending() List~CredentialIssuanceRequest~
         +saveRequest(CredentialIssuanceRequest request) void
         +saveApproval(CredentialApproval approval) void
