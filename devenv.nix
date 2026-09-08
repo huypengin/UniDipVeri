@@ -8,6 +8,7 @@
 
   languages.javascript = {
     enable = true;
+    nodejs.enable = false;
     bun.enable = true;
   };
 
@@ -18,6 +19,13 @@
     initialDatabases = [
       { name = "unidipveri"; }
     ];
+    settings = {
+      shared_buffers = "64MB";
+      effective_cache_size = "256MB";
+      work_mem = "4MB";
+      maintenance_work_mem = "32MB";
+      max_connections = 30;
+    };
   };
 
   # Dev proxies
