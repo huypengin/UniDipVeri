@@ -3,25 +3,25 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, LogOut } from "lucide-react";
 
-export const Route = createFileRoute("/staff/operations")({
+export const Route = createFileRoute("/my/credentials")({
   beforeLoad: ({ context }) => {
     if (!context.auth.isAuthenticated) {
       throw redirect({
         to: "/login",
-        search: { redirect: "/staff/operations" },
+        search: { redirect: "/my/credentials" },
       });
     }
-    if (!context.auth.hasRole("REGISTRAR")) {
+    if (!context.auth.hasRole("STUDENT")) {
       throw redirect({ to: "/" });
     }
   },
   head: () => ({
-    meta: [{ title: "Registrar Operations — UniDipVeri" }],
+    meta: [{ title: "My Credentials — UniDipVeri Student Portal" }],
   }),
-  component: StaffOperationsPage,
+  component: StudentCredentialsPage,
 });
 
-function StaffOperationsPage() {
+function StudentCredentialsPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -42,7 +42,7 @@ function StaffOperationsPage() {
                 UniDipVeri
               </span>
               <span className="ml-2 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-                Registrar Operations
+                Student Portal
               </span>
             </div>
           </div>
@@ -57,11 +57,11 @@ function StaffOperationsPage() {
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 p-8">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Registrar Operations
+          My Credentials
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cohort graduation evaluation, issuance request creation, and academic
-          program records.
+          View issued digital diplomas, create time-limited share links, and
+          audit verification activity.
         </p>
       </main>
     </div>

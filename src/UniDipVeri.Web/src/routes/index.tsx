@@ -8,13 +8,13 @@ export const Route = createFileRoute("/")({
 
     const user = context.auth.user;
     if (user?.roles.includes("ADMIN")) {
-      throw redirect({ to: "/staff/users" });
+      throw redirect({ to: "/staffs" });
     } else if (user?.roles.includes("APPROVER")) {
-      throw redirect({ to: "/staff/approvals" });
+      throw redirect({ to: "/approvals" });
     } else if (user?.roles.includes("REGISTRAR")) {
-      throw redirect({ to: "/staff/operations" });
+      throw redirect({ to: "/operations" });
     } else {
-      throw redirect({ to: "/student/credentials" });
+      throw redirect({ to: "/my/credentials" });
     }
   },
   component: () => null,

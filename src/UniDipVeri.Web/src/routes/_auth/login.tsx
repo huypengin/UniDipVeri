@@ -4,6 +4,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api/client";
 
@@ -47,7 +48,7 @@ function LoginPage() {
     else if (val.includes("@student.")) setRoleType("student");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password.");
@@ -72,13 +73,13 @@ function LoginPage() {
       if (targetRedirect) {
         await router.navigate({ href: targetRedirect });
       } else if (user.roles.includes("ADMIN")) {
-        await router.navigate({ to: "/staff/users" });
+        await router.navigate({ to: "/staffs" });
       } else if (user.roles.includes("APPROVER")) {
-        await router.navigate({ to: "/staff/approvals" });
+        await router.navigate({ to: "/approvals" });
       } else if (user.roles.includes("REGISTRAR")) {
-        await router.navigate({ to: "/staff/operations" });
+        await router.navigate({ to: "/operations" });
       } else {
-        await router.navigate({ to: "/student/credentials" });
+        await router.navigate({ to: "/my/credentials" });
       }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err));
@@ -158,9 +159,8 @@ function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             placeholder="••••••••••••"
             value={password}
