@@ -33,6 +33,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+// Configuration Options
+builder.Services.Configure<UniDipVeri.Application.Configurations.ApprovalPolicyOptions>(
+    builder.Configuration.GetSection(UniDipVeri.Application.Configurations.ApprovalPolicyOptions.SectionName));
+
 // Application & Infrastructure Layers
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

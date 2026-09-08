@@ -47,6 +47,12 @@ public class PostgresStaffRepository(UniDipVeriDbContext dbContext) : IStaffRepo
             .ToListAsync(ct);
     }
 
+    public async Task<Guid> GetDefaultUniversityIdAsync(CancellationToken ct = default)
+    {
+        var id = await _dbContext.Universities.Select(u => u.Id).FirstOrDefaultAsync(ct);
+        return id != Guid.Empty ? id : ModelBuilderExtensions.UniversityId;
+    }
+
     public async Task AddAsync(UniversityStaff staff, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(staff);
