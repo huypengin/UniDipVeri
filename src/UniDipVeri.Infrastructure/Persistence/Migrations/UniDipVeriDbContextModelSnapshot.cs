@@ -22,6 +22,56 @@ namespace UniDipVeri.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("UniDipVeri.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<string>("UserType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("user_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("TokenHash");
+
+                    b.ToTable("password_reset_tokens", (string)null);
+                });
+
             modelBuilder.Entity("UniDipVeri.Domain.Entities.Program", b =>
                 {
                     b.Property<Guid>("Id")
@@ -186,6 +236,12 @@ namespace UniDipVeri.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("program_id");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("security_stamp");
+
                     b.Property<string>("SourceRecordRef")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -237,6 +293,7 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Name = "Alice Nguyen",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
                             ProgramId = new Guid("22222222-2222-2222-2222-222222222221"),
+                            SecurityStamp = "00000000000000000000000000000004",
                             SourceRecordRef = "SIS-2026-CS-001",
                             StudentNumber = "STU-2026-001",
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -254,6 +311,7 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Name = "Bob Tran",
                             PasswordHash = "",
                             ProgramId = new Guid("22222222-2222-2222-2222-222222222221"),
+                            SecurityStamp = "00000000000000000000000000000005",
                             SourceRecordRef = "SIS-2026-CS-002",
                             StudentNumber = "STU-2026-002",
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -351,6 +409,12 @@ namespace UniDipVeri.Infrastructure.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("security_stamp");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -382,6 +446,7 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "admin@staff.miu.example",
                             Name = "System Administrator",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
+                            SecurityStamp = "00000000000000000000000000000001",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -393,6 +458,7 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "registrar@staff.miu.example",
                             Name = "Sarah Registrar",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
+                            SecurityStamp = "00000000000000000000000000000002",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -404,6 +470,7 @@ namespace UniDipVeri.Infrastructure.Migrations
                             Email = "approver@staff.miu.example",
                             Name = "David Approver",
                             PasswordHash = "sha256.600000.a7I238/7ec9pD3ZfmSr7yg==.ZqaSsZ2dnjnlRAFRgLq6RTdSmNGycU+DSsdxdmmufk0=",
+                            SecurityStamp = "00000000000000000000000000000003",
                             Status = "ACTIVE",
                             UniversityId = new Guid("11111111-1111-1111-1111-111111111111"),
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)

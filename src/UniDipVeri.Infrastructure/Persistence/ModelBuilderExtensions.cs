@@ -72,6 +72,7 @@ public static class ModelBuilderExtensions
                 Name = "System Administrator",
                 Email = "admin@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
+                SecurityStamp = "00000000000000000000000000000001",
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
@@ -83,6 +84,7 @@ public static class ModelBuilderExtensions
                 Name = "Sarah Registrar",
                 Email = "registrar@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
+                SecurityStamp = "00000000000000000000000000000002",
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
@@ -94,6 +96,7 @@ public static class ModelBuilderExtensions
                 Name = "David Approver",
                 Email = "approver@staff.miu.example",
                 PasswordHash = DefaultPasswordHash,
+                SecurityStamp = "00000000000000000000000000000003",
                 Status = StaffStatus.ACTIVE,
                 CreatedAt = seedTime,
                 UpdatedAt = seedTime
@@ -118,6 +121,7 @@ public static class ModelBuilderExtensions
                 Name = "Alice Nguyen",
                 Email = "student@student.miu.example",
                 PasswordHash = DefaultPasswordHash,
+                SecurityStamp = "00000000000000000000000000000004",
                 AccountStatus = StudentAccountStatus.ACTIVE,
                 GraduationStatus = GraduationStatus.ELIGIBLE,
                 SourceRecordRef = "SIS-2026-CS-001",
@@ -136,6 +140,7 @@ public static class ModelBuilderExtensions
                 Name = "Bob Tran",
                 Email = "bob.tran@student.miu.example",
                 PasswordHash = string.Empty,
+                SecurityStamp = "00000000000000000000000000000005",
                 AccountStatus = StudentAccountStatus.PENDING_ACTIVATION,
                 GraduationStatus = GraduationStatus.NOT_STARTED,
                 SourceRecordRef = "SIS-2026-CS-002",

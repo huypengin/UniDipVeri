@@ -35,6 +35,11 @@ public class UniversityStaffConfiguration : IEntityTypeConfiguration<UniversityS
             .HasMaxLength(255)
             .IsRequired();
 
+        builder.Property(s => s.SecurityStamp)
+            .HasColumnName("security_stamp")
+            .HasMaxLength(100)
+            .IsRequired();
+
         builder.Property(s => s.Status)
             .HasColumnName("status")
             .HasMaxLength(50)

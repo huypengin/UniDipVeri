@@ -128,7 +128,7 @@ public class StaffControllerTests
     {
         // Arrange
         var request = new LoginRequest($"{role.ToString().ToLower()}@miu.edu", "Password123!");
-        var expectedUser = new AuthUserInfo(Guid.NewGuid(), request.Email, roleClaim, "staff");
+        var expectedUser = new AuthUserInfo(Guid.NewGuid(), request.Email, roleClaim, "staff", name: $"{role} Staff");
         _authServiceMock.Setup(s => s.AuthenticateStaffAsync(request.Email, request.Password, It.IsAny<CancellationToken>()))
             .ReturnsAsync(AuthResult.Success(expectedUser));
 
@@ -144,6 +144,7 @@ public class StaffControllerTests
         user.Should().NotBeNull();
         user!.Role.Should().Be(roleClaim);
         user.Email.Should().Be(request.Email);
+        user.Name.Should().Be($"{role} Staff");
 
         _authenticationServiceMock.Verify(a => a.SignInAsync(
             It.IsAny<HttpContext>(),

@@ -41,7 +41,9 @@ public class StaffController(IAuthService authService, IStaffService staffServic
         {
             new(ClaimTypes.NameIdentifier, result.User.Id.ToString()),
             new(ClaimTypes.Email, result.User.Email),
-            new("user_type", result.User.UserType)
+            new(ClaimTypes.Name, result.User.Name),
+            new("user_type", result.User.UserType),
+            new("security_stamp", result.User.SecurityStamp)
         };
 
         foreach (var role in result.User.Roles)

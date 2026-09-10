@@ -7,30 +7,24 @@ import {
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
+import type { UserProfileData } from "@/types/user";
 
-export type UserType = "student" | "staff";
+export type { UserProfileData } from "@/types/user";
 
 export type StaffRole = "ADMIN" | "REGISTRAR" | "APPROVER" | "STAFF";
 
-export interface User {
-  id: string;
-  email: string;
-  userType: UserType;
-  roles: string[];
-  studentNumber?: string | undefined;
-}
-
 export interface AuthContextType {
-  user: User | null;
+  user: UserProfileData | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   login: (
     email: string,
     password: string,
-    portalType: UserType,
-  ) => Promise<User>;
+    portalType: UserProfileData["userType"],
+  ) => Promise<UserProfileData>;
 
   logout: () => Promise<void>;
 
@@ -41,13 +35,15 @@ export interface AuthContextType {
 interface AuthApiResponse {
   id: string;
   email: string;
+  name: string;
   role?: string;
   roles?: string[];
-  userType: UserType;
+  userType: UserProfileData["userType"];
   studentNumber?: string | null;
+  institution?: string | null;
 }
 
-function normalizeUser(data: AuthApiResponse): User {
+function normalizeUser(data: AuthApiResponse): UserProfileData {
   const roles =
     data.roles && data.roles.length > 0
       ? data.roles.map((r) => r.toUpperCase())
@@ -58,19 +54,26 @@ function normalizeUser(data: AuthApiResponse): User {
   return {
     id: data.id,
     email: data.email,
-    userType: data.userType,
+    name: data.name,
+    role: roles[0] ?? "",
     roles,
-    studentNumber: data.studentNumber ?? undefined,
+    userType: data.userType,
+
+    ...(data.studentNumber != null
+      ? { studentNumber: data.studentNumber }
+      : {}),
+
+    ...(data.institution != null ? { institution: data.institution } : {}),
   };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Restore session on initial load via HttpOnly session cookie
   useEffect(() => {
     let isMounted = true;
 
@@ -83,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (isMounted) {
+          queryClient.clear();
           setUser(null);
         }
       })
@@ -95,14 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback(
     async (
       email: string,
       password: string,
-      portalType: UserType,
-    ): Promise<User> => {
+      portalType: UserProfileData["userType"],
+    ): Promise<UserProfileData> => {
       const endpoint =
         portalType === "student" ? "/students/login" : "/staffs/login";
 
@@ -112,12 +116,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const authenticatedUser = normalizeUser(response.data);
+
+      queryClient.clear();
+
       flushSync(() => {
         setUser(authenticatedUser);
       });
+
       return authenticatedUser;
     },
-    [],
+    [queryClient],
   );
 
   const logout = useCallback(async () => {
@@ -126,11 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Logout request failed:", err);
     } finally {
+      queryClient.clear();
+
       flushSync(() => {
         setUser(null);
       });
     }
-  }, []);
+  }, [queryClient]);
 
   const hasRole = useCallback(
     (role: string) => {
@@ -142,7 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAnyRole = useCallback(
     (requiredRoles: string[]) => {
       if (!user) return false;
+
       const normalized = requiredRoles.map((r) => r.toUpperCase());
+
       return user.roles.some((r) => normalized.includes(r));
     },
     [user],
@@ -167,8 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
 }

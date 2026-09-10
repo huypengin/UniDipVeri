@@ -1,37 +1,36 @@
 import { Link } from "@tanstack/react-router";
-import { ShieldCheck, User as UserIcon, LogOut } from "lucide-react";
+import { UserProfileData } from "@/context/AuthContext";
+import { GraduationCap, LogOut, UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { UserProfileData } from "@/types/user";
 
-interface AdminHeaderProps {
+interface StudentHeaderProps {
   onLogout: () => Promise<void>;
-  activeTab?: "staffs" | "students" | "settings" | "account";
+  activeTab?: "credentials" | "shares" | "verifications" | "account";
   user: UserProfileData | null;
 }
 
-export function AdminHeader({
+export function StudentHeader({
   onLogout,
-  activeTab = "staffs",
+  activeTab = "credentials",
   user,
-}: AdminHeaderProps) {
-  const displayName =
-    user?.name.trim() || user?.email || "Platform administrator";
+}: StudentHeaderProps) {
+  const displayName = user?.name.trim() || user?.email || "Student";
 
   return (
     <header className="border-b border-border bg-card">
       <div className="mx-auto max-w-5xl px-6 pt-5 pb-0">
         <div className="flex items-center justify-between">
-          {/* Logo and Brand */}
+          {/* Logo and Portal Title */}
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0f172a] text-white shadow-xs">
-              <ShieldCheck className="h-5 w-5" />
+              <GraduationCap className="h-5 w-5" />
             </div>
             <div className="flex flex-col">
               <span className="text-base font-bold leading-tight tracking-tight text-foreground">
                 UniDipVeri
               </span>
               <span className="text-xs text-muted-foreground leading-tight">
-                Administration
+                Student Portal
               </span>
             </div>
           </div>
@@ -58,23 +57,23 @@ export function AdminHeader({
           </div>
         </div>
 
-        {/* Navigation tabs */}
+        {/* Navigation Tabs - Matches Figure 2.3 & 3.1 */}
         <nav className="flex items-center gap-6 mt-4 -mb-px">
           <Link
-            to="/staffs"
+            to="/credentials"
             className={`pb-2.5 text-sm font-medium transition-colors ${
-              activeTab === "staffs"
+              activeTab === "credentials"
                 ? "border-b-2 border-[#0f172a] text-foreground font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Staffs
+            Credentials
           </Link>
           <span className="pb-2.5 text-sm font-medium text-muted-foreground/60 cursor-not-allowed">
-            Students
+            Share links
           </span>
           <span className="pb-2.5 text-sm font-medium text-muted-foreground/60 cursor-not-allowed">
-            System settings
+            Verifications
           </span>
           <Link
             to="/account"

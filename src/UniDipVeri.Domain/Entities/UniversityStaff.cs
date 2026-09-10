@@ -11,6 +11,7 @@ public class UniversityStaff : BaseEntity
     public string Name { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
+    public string SecurityStamp { get; private set; } = Guid.NewGuid().ToString("N");
     public StaffStatus Status { get; private set; } = StaffStatus.ACTIVE;
 
     public University? University { get; private set; }
@@ -139,6 +140,12 @@ public class UniversityStaff : BaseEntity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
         PasswordHash = passwordHash;
+        RotateSecurityStamp();
+    }
+
+    public void RotateSecurityStamp()
+    {
+        SecurityStamp = Guid.NewGuid().ToString("N");
         UpdatedAt = DateTime.UtcNow;
     }
 

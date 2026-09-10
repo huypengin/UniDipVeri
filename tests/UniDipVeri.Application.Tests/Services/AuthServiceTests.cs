@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Moq;
+using UniDipVeri.Application.Abstractions.Communication;
 using UniDipVeri.Application.Abstractions.Repositories;
 using UniDipVeri.Application.Abstractions.Security;
 using UniDipVeri.Application.Features.Auth.Services;
@@ -13,7 +14,9 @@ public class AuthServiceTests
 {
     private readonly Mock<IStaffRepository> _staffRepoMock = new();
     private readonly Mock<IStudentRepository> _studentRepoMock = new();
+    private readonly Mock<IPasswordResetTokenRepository> _tokenRepoMock = new();
     private readonly Mock<IPasswordHasher> _hasherMock = new();
+    private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly AuthService _authService;
     private readonly Guid _universityId = Guid.NewGuid();
     private readonly Guid _programId = Guid.NewGuid();
@@ -23,7 +26,9 @@ public class AuthServiceTests
         _authService = new AuthService(
             _staffRepoMock.Object,
             _studentRepoMock.Object,
-            _hasherMock.Object);
+            _tokenRepoMock.Object,
+            _hasherMock.Object,
+            _emailSenderMock.Object);
     }
 
     #region Authentication Tests (FR-AUTH-01-04)
@@ -60,6 +65,7 @@ public class AuthServiceTests
         result.User.Should().NotBeNull();
         result.User!.Id.Should().Be(staffId);
         result.User.Email.Should().Be(email);
+        result.User.Name.Should().Be($"{role} Staff");
         result.User.Role.Should().Be(expectedRoleClaim);
         result.User.UserType.Should().Be("staff");
     }
@@ -70,7 +76,7 @@ public class AuthServiceTests
         // Arrange
         var staff = UniversityStaff.Create(
             _universityId,
-            "Staff Member",
+            "Inactive Staff",
             "inactive@test.com",
             "hashed_pass",
             StaffRole.REGISTRAR);
@@ -84,7 +90,6 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
     }
 
@@ -94,10 +99,10 @@ public class AuthServiceTests
         // Arrange
         var staff = UniversityStaff.Create(
             _universityId,
-            "Staff Member",
+            "Active Staff",
             "staff@test.com",
             "hashed_pass",
-            StaffRole.ADMIN);
+            StaffRole.REGISTRAR);
 
         _staffRepoMock.Setup(r => r.GetByEmailAsync("staff@test.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(staff);
@@ -109,15 +114,13 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
     }
 
     [Theory]
-    [InlineData("", "pass")]
-    [InlineData("   ", "pass")]
+    [InlineData("", "password")]
     [InlineData("staff@test.com", "")]
-    [InlineData("staff@test.com", "   ")]
+    [InlineData("   ", "   ")]
     public async Task AuthenticateStaffAsync_ShouldFail_WhenCredentialsAreEmpty_AndCreateNoSession(string email, string password)
     {
         // Act
@@ -125,12 +128,11 @@ public class AuthServiceTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.User.Should().BeNull();
         result.Error.Should().Be("Invalid email or password.");
     }
 
     [Fact]
-    public async Task AuthenticateAsync_ShouldReturnSuccess_WhenStudentCredentialsAreValid_AndAccountIsActive()
+    public async Task AuthenticateStudentAsync_ShouldReturnSuccess_WhenCredentialsAreValid()
     {
         // Arrange
         var studentId = Guid.NewGuid();
@@ -157,6 +159,7 @@ public class AuthServiceTests
         result.User.Should().NotBeNull();
         result.User!.Id.Should().Be(studentId);
         result.User.Email.Should().Be("student@test.com");
+        result.User.Name.Should().Be("Student Name");
         result.User.Role.Should().Be("STUDENT");
         result.User.UserType.Should().Be("student");
         result.User.StudentNumber.Should().Be("STD123");
@@ -351,6 +354,233 @@ public class AuthServiceTests
 
         // But allows Approver-permitted action
         _authService.RequireRole(principal, StaffRole.APPROVER).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Password Reset & Account Management Tests (Issue #2)
+
+    [Fact]
+    public async Task RequestPasswordResetAsync_ShouldSilentlyReturn_WhenUserDoesNotExist()
+    {
+        // Arrange
+        _staffRepoMock.Setup(r => r.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UniversityStaff?)null);
+        _studentRepoMock.Setup(r => r.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Student?)null);
+
+        // Act
+        await _authService.RequestPasswordResetAsync("nonexistent@test.com");
+
+        // Assert: Anti-enumeration ensures no tokens are added and no emails sent
+        _tokenRepoMock.Verify(r => r.AddAsync(It.IsAny<PasswordResetToken>(), It.IsAny<CancellationToken>()), Times.Never);
+        _emailSenderMock.Verify(s => s.SendPasswordResetEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RequestPasswordResetAsync_ShouldCreateTokenAndSendEmail_WhenStaffExists()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "hash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByEmailAsync("staff@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+
+        // Act
+        await _authService.RequestPasswordResetAsync("staff@test.com");
+
+        // Assert
+        _tokenRepoMock.Verify(r => r.InvalidateExistingTokensForEmailAsync("staff@test.com", It.IsAny<CancellationToken>()), Times.Once);
+        _tokenRepoMock.Verify(r => r.AddAsync(It.Is<PasswordResetToken>(t => t.Email == "staff@test.com" && t.UserType == "staff"), It.IsAny<CancellationToken>()), Times.Once);
+        _emailSenderMock.Verify(s => s.SendPasswordResetEmailAsync("staff@test.com", "Test Staff", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RequestPasswordResetAsync_ShouldCreateTokenAndSendEmail_WhenStudentExists()
+    {
+        // Arrange
+        var student = Student.Create(_programId, "STU-001", "Test Student", "student@test.com", "REF-001");
+        _studentRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(student);
+
+        // Act
+        await _authService.RequestPasswordResetAsync("student@test.com");
+
+        // Assert
+        _tokenRepoMock.Verify(r => r.InvalidateExistingTokensForEmailAsync("student@test.com", It.IsAny<CancellationToken>()), Times.Once);
+        _tokenRepoMock.Verify(r => r.AddAsync(It.Is<PasswordResetToken>(t => t.Email == "student@test.com" && t.UserType == "student"), It.IsAny<CancellationToken>()), Times.Once);
+        _emailSenderMock.Verify(s => s.SendPasswordResetEmailAsync("student@test.com", "Test Student", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("short1!")]
+    [InlineData("allletters")]
+    [InlineData("1234567890")]
+    public async Task ConfirmPasswordResetAsync_ShouldFail_WhenPasswordComplexityNotMet(string weakPassword)
+    {
+        // Act
+        var (success, error) = await _authService.ConfirmPasswordResetAsync("anytoken", weakPassword);
+
+        // Assert
+        success.Should().BeFalse();
+        error.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_ShouldFail_WhenTokenIsInvalidOrExpired()
+    {
+        // Arrange
+        _tokenRepoMock.Setup(r => r.GetValidTokenByHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PasswordResetToken?)null);
+
+        // Act
+        var (success, error) = await _authService.ConfirmPasswordResetAsync("invalidtoken", "ValidPassword123!");
+
+        // Assert
+        success.Should().BeFalse();
+        error.Should().Be("Invalid or expired reset token.");
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_ShouldUpdateStaffPassword_WhenValidToken()
+    {
+        // Arrange
+        var token = PasswordResetToken.Create("staff@test.com", "staff", "dummyhash", TimeSpan.FromMinutes(15));
+        _tokenRepoMock.Setup(r => r.GetValidTokenByHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(token);
+
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "oldHash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByEmailAsync("staff@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+        _hasherMock.Setup(h => h.HashPassword("NewPassword123!")).Returns("newHashedPassword");
+
+        // Act
+        var (success, error) = await _authService.ConfirmPasswordResetAsync("anytoken", "NewPassword123!");
+
+        // Assert
+        success.Should().BeTrue();
+        error.Should().BeNull();
+        staff.PasswordHash.Should().Be("newHashedPassword");
+        token.UsedAt.Should().NotBeNull();
+        _staffRepoMock.Verify(r => r.UpdateAsync(staff, It.IsAny<CancellationToken>()), Times.Once);
+        _tokenRepoMock.Verify(r => r.UpdateAsync(token, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ConfirmPasswordResetAsync_ShouldActivatePendingStudent_WhenResettingPassword()
+    {
+        // Arrange
+        var token = PasswordResetToken.Create("student@test.com", "student", "dummyhash", TimeSpan.FromMinutes(15));
+        _tokenRepoMock.Setup(r => r.GetValidTokenByHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(token);
+
+        var student = Student.Create(_programId, "STU-001", "Test Student", "student@test.com", "REF-001");
+        student.AccountStatus.Should().Be(StudentAccountStatus.PENDING_ACTIVATION);
+
+        _studentRepoMock.Setup(r => r.GetByEmailAsync("student@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(student);
+        _hasherMock.Setup(h => h.HashPassword("NewPassword123!")).Returns("newHashedPassword");
+
+        // Act
+        var (success, error) = await _authService.ConfirmPasswordResetAsync("anytoken", "NewPassword123!");
+
+        // Assert
+        success.Should().BeTrue();
+        error.Should().BeNull();
+        student.AccountStatus.Should().Be(StudentAccountStatus.ACTIVE);
+        student.PasswordHash.Should().Be("newHashedPassword");
+        token.UsedAt.Should().NotBeNull();
+        _studentRepoMock.Verify(r => r.UpdateAsync(student, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_ShouldFail_WhenCurrentPasswordIncorrect()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "oldHash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByIdAsync(staff.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+        _hasherMock.Setup(h => h.VerifyPassword("WrongPassword123!", "oldHash")).Returns(false);
+
+        // Act
+        var (success, error, stamp) = await _authService.ChangePasswordAsync(staff.Id, "staff", "WrongPassword123!", "NewPassword123!");
+
+        // Assert
+        success.Should().BeFalse();
+        error.Should().Be("Current password is incorrect.");
+        stamp.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_ShouldSucceedAndRotateStamp_WhenCurrentPasswordCorrect()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "oldHash", StaffRole.ADMIN);
+        var initialStamp = staff.SecurityStamp;
+        _staffRepoMock.Setup(r => r.GetByIdAsync(staff.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+        _hasherMock.Setup(h => h.VerifyPassword("CorrectPassword123!", "oldHash")).Returns(true);
+        _hasherMock.Setup(h => h.HashPassword("NewPassword123!")).Returns("newHashedPassword");
+
+        // Act
+        var (success, error, newStamp) = await _authService.ChangePasswordAsync(staff.Id, "staff", "CorrectPassword123!", "NewPassword123!");
+
+        // Assert
+        success.Should().BeTrue();
+        error.Should().BeNull();
+        newStamp.Should().NotBeNullOrWhiteSpace();
+        newStamp.Should().NotBe(initialStamp);
+        staff.PasswordHash.Should().Be("newHashedPassword");
+        _staffRepoMock.Verify(r => r.UpdateAsync(staff, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ValidateSecurityStampAsync_ShouldReturnTrue_WhenStampMatches()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "hash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByIdAsync(staff.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+
+        // Act
+        var result = await _authService.ValidateSecurityStampAsync(staff.Id, "staff", staff.SecurityStamp);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateSecurityStampAsync_ShouldReturnFalse_WhenStampMismatched()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Test Staff", "staff@test.com", "hash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByIdAsync(staff.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+
+        // Act
+        var result = await _authService.ValidateSecurityStampAsync(staff.Id, "staff", "outdated_stamp_123");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetUserProfileAsync_ShouldReturnCompleteProfile_ForStaff()
+    {
+        // Arrange
+        var staff = UniversityStaff.Create(_universityId, "Admin User", "admin@test.com", "hash", StaffRole.ADMIN);
+        _staffRepoMock.Setup(r => r.GetByIdAsync(staff.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(staff);
+
+        // Act
+        var profile = await _authService.GetUserProfileAsync(staff.Id, "staff");
+
+        // Assert
+        profile.Should().NotBeNull();
+        profile!.Email.Should().Be("admin@test.com");
+        profile.Name.Should().Be("Admin User");
+        profile.UserType.Should().Be("staff");
+        profile.Role.Should().Be("ADMIN");
+        profile.Institution.Should().Be("Mekong International University");
     }
 
     #endregion

@@ -79,7 +79,7 @@ function LoginPage() {
       } else if (user.roles.includes("REGISTRAR")) {
         await router.navigate({ to: "/operations" });
       } else {
-        await router.navigate({ to: "/my/credentials" });
+        await router.navigate({ to: "/credentials" });
       }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err));

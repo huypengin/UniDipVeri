@@ -82,6 +82,7 @@ public class AuthenticationIntegrationTests : IDisposable
         var user = await response.Content.ReadFromJsonAsync<AuthUserInfo>(JsonOptions);
         user.Should().NotBeNull();
         user!.Email.Should().Be(_staffEmail);
+        user.Name.Should().Be("Jane Registrar");
         user.Role.Should().Be("REGISTRAR");
         user.UserType.Should().Be("staff");
 
@@ -103,6 +104,7 @@ public class AuthenticationIntegrationTests : IDisposable
         var user = await response.Content.ReadFromJsonAsync<AuthUserInfo>(JsonOptions);
         user.Should().NotBeNull();
         user!.Email.Should().Be(_studentEmail);
+        user.Name.Should().Be("John Doe");
         user.Role.Should().Be("STUDENT");
         user.UserType.Should().Be("student");
 

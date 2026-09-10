@@ -44,6 +44,11 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasMaxLength(255)
             .IsRequired();
 
+        builder.Property(s => s.SecurityStamp)
+            .HasColumnName("security_stamp")
+            .HasMaxLength(100)
+            .IsRequired();
+
         builder.Property(s => s.AccountStatus)
             .HasColumnName("account_status")
             .HasMaxLength(50)

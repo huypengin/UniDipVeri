@@ -59,7 +59,7 @@ public class StudentControllerTests
         // Arrange
         var studentId = Guid.NewGuid();
         var request = new LoginRequest("student@miu.edu", "Password123!");
-        var expectedUser = new AuthUserInfo(studentId, request.Email, "STUDENT", "student", "STU-001");
+        var expectedUser = new AuthUserInfo(studentId, request.Email, "STUDENT", "student", "STU-001", name: "Student Name");
 
         _authServiceMock.Setup(s => s.AuthenticateStudentAsync(request.Email, request.Password, It.IsAny<CancellationToken>()))
             .ReturnsAsync(AuthResult.Success(expectedUser));
@@ -75,6 +75,8 @@ public class StudentControllerTests
         var user = okResult.Value as AuthUserInfo;
         user.Should().NotBeNull();
         user!.Role.Should().Be("STUDENT");
+        user.Email.Should().Be(request.Email);
+        user.Name.Should().Be("Student Name");
         user.StudentNumber.Should().Be("STU-001");
 
         _authenticationServiceMock.Verify(a => a.SignInAsync(

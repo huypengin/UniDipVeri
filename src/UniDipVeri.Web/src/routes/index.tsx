@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
     } else if (user?.roles.includes("REGISTRAR")) {
       throw redirect({ to: "/operations" });
     } else {
-      throw redirect({ to: "/my/credentials" });
+      throw redirect({ to: "/credentials" });
     }
   },
   component: () => null,
