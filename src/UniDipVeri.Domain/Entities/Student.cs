@@ -10,6 +10,7 @@ public class Student : BaseEntity
     public string Name { get; private set; } = string.Empty;
     public string Email { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
+    public string SecurityStamp { get; private set; } = Guid.NewGuid().ToString("N");
     public StudentAccountStatus AccountStatus { get; private set; } = StudentAccountStatus.PENDING_ACTIVATION;
     public GraduationStatus GraduationStatus { get; private set; } = GraduationStatus.NOT_STARTED;
     public string SourceRecordRef { get; private set; } = string.Empty;
@@ -121,6 +122,12 @@ public class Student : BaseEntity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
         PasswordHash = passwordHash;
+        RotateSecurityStamp();
+    }
+
+    public void RotateSecurityStamp()
+    {
+        SecurityStamp = Guid.NewGuid().ToString("N");
         UpdatedAt = DateTime.UtcNow;
     }
 

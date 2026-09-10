@@ -36,8 +36,10 @@ public class StudentController(IAuthService authService) : ControllerBase
         {
             new(ClaimTypes.NameIdentifier, result.User.Id.ToString()),
             new(ClaimTypes.Email, result.User.Email),
+            new(ClaimTypes.Name, result.User.Name),
             new(ClaimTypes.Role, result.User.Role),
-            new("user_type", result.User.UserType)
+            new("user_type", result.User.UserType),
+            new("security_stamp", result.User.SecurityStamp)
         };
         if (!string.IsNullOrEmpty(result.User.StudentNumber))
         {

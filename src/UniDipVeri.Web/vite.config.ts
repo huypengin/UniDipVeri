@@ -12,6 +12,9 @@ export default defineConfig({
     },
   },
   server: {
+    // Make vite use ipv4 by default
+    host: "0.0.0.0",
+    port: 5173,
     proxy: {
       "/api": {
         target: "http://localhost:5172",
@@ -20,30 +23,30 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000, 
-    
+    chunkSizeWarningLimit: 1000,
+
     rolldownOptions: {
       output: {
         codeSplitting: {
           minSize: 20000,
           groups: [
             {
-              name: 'vendor-react',
+              name: "vendor-react",
               test: /node_modules[\\/](react|react-dom)/,
               priority: 40,
             },
             {
-              name: 'vendor-tanstack',
+              name: "vendor-tanstack",
               test: /node_modules[\\/]@tanstack/,
               priority: 30,
             },
             {
-              name: 'vendor-ui',
+              name: "vendor-ui",
               test: /node_modules[\\/](lucide-react|@radix-ui)/,
               priority: 20,
             },
             {
-              name: 'vendor',
+              name: "vendor",
               test: /node_modules/,
               priority: 10,
             },

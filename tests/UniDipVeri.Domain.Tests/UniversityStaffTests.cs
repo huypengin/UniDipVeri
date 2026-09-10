@@ -157,4 +157,17 @@ public class UniversityStaffTests
         staff.HasRole(StaffRole.APPROVER).Should().BeTrue();
         staff.HasRole(StaffRole.REGISTRAR).Should().BeFalse();
     }
+
+    [Fact]
+    public void SetPassword_ShouldUpdatePasswordHashAndRotateSecurityStamp()
+    {
+        var staff = UniversityStaff.Create(_universityId, "Name", "email@test.com", "hash", StaffRole.REGISTRAR);
+        var initialStamp = staff.SecurityStamp;
+
+        staff.SetPassword("newHash999");
+
+        staff.PasswordHash.Should().Be("newHash999");
+        staff.SecurityStamp.Should().NotBeNullOrWhiteSpace();
+        staff.SecurityStamp.Should().NotBe(initialStamp);
+    }
 }

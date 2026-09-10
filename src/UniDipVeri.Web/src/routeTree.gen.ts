@@ -12,12 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/_admin'
 import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as StudentRouteImport } from './routes/_student'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminStaffsRouteImport } from './routes/_admin/staffs'
 import { Route as ApproverApprovalsRouteImport } from './routes/_approver/approvals'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-password'
 import { Route as RegistrarOperationsRouteImport } from './routes/_registrar/operations'
-import { Route as MyCredentialsRouteImport } from './routes/my/credentials'
+import { Route as StudentCredentialsRouteImport } from './routes/_student/credentials'
+import { Route as AuthResetPasswordConfirmRouteImport } from './routes/_auth/reset-password.confirm'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -30,6 +33,15 @@ const AdminRoute = AdminRouteImport.update({
 } as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentRoute = StudentRouteImport.update({
+  id: '/_student',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminStaffsRoute = AdminStaffsRouteImport.update({
@@ -57,81 +69,102 @@ const RegistrarOperationsRoute = RegistrarOperationsRouteImport.update({
   path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MyCredentialsRoute = MyCredentialsRouteImport.update({
-  id: '/my/credentials',
-  path: '/my/credentials',
-  getParentRoute: () => rootRouteImport,
+const StudentCredentialsRoute = StudentCredentialsRouteImport.update({
+  id: '/credentials',
+  path: '/credentials',
+  getParentRoute: () => StudentRoute,
 } as any)
+const AuthResetPasswordConfirmRoute =
+  AuthResetPasswordConfirmRouteImport.update({
+    id: '/confirm',
+    path: '/confirm',
+    getParentRoute: () => AuthResetPasswordRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/staffs': typeof AdminStaffsRoute
   '/approvals': typeof ApproverApprovalsRoute
   '/login': typeof AuthLoginRoute
-  '/reset-password': typeof AuthResetPasswordRoute
+  '/reset-password': typeof AuthResetPasswordRouteWithChildren
   '/operations': typeof RegistrarOperationsRoute
-  '/my/credentials': typeof MyCredentialsRoute
+  '/credentials': typeof StudentCredentialsRoute
+  '/reset-password/confirm': typeof AuthResetPasswordConfirmRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/staffs': typeof AdminStaffsRoute
   '/approvals': typeof ApproverApprovalsRoute
   '/login': typeof AuthLoginRoute
-  '/reset-password': typeof AuthResetPasswordRoute
+  '/reset-password': typeof AuthResetPasswordRouteWithChildren
   '/operations': typeof RegistrarOperationsRoute
-  '/my/credentials': typeof MyCredentialsRoute
+  '/credentials': typeof StudentCredentialsRoute
+  '/reset-password/confirm': typeof AuthResetPasswordConfirmRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_admin': typeof AdminRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
+  '/_student': typeof StudentRouteWithChildren
+  '/account': typeof AccountRoute
   '/_admin/staffs': typeof AdminStaffsRoute
   '/_approver/approvals': typeof ApproverApprovalsRoute
   '/_auth/login': typeof AuthLoginRoute
-  '/_auth/reset-password': typeof AuthResetPasswordRoute
+  '/_auth/reset-password': typeof AuthResetPasswordRouteWithChildren
   '/_registrar/operations': typeof RegistrarOperationsRoute
-  '/my/credentials': typeof MyCredentialsRoute
+  '/_student/credentials': typeof StudentCredentialsRoute
+  '/_auth/reset-password/confirm': typeof AuthResetPasswordConfirmRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/staffs'
     | '/approvals'
     | '/login'
     | '/reset-password'
     | '/operations'
-    | '/my/credentials'
+    | '/credentials'
+    | '/reset-password/confirm'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
     | '/staffs'
     | '/approvals'
     | '/login'
     | '/reset-password'
     | '/operations'
-    | '/my/credentials'
+    | '/credentials'
+    | '/reset-password/confirm'
   id:
     | '__root__'
     | '/'
     | '/_admin'
     | '/_auth'
+    | '/_student'
+    | '/account'
     | '/_admin/staffs'
     | '/_approver/approvals'
     | '/_auth/login'
     | '/_auth/reset-password'
     | '/_registrar/operations'
-    | '/my/credentials'
+    | '/_student/credentials'
+    | '/_auth/reset-password/confirm'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
+  StudentRoute: typeof StudentRouteWithChildren
+  AccountRoute: typeof AccountRoute
   ApproverApprovalsRoute: typeof ApproverApprovalsRoute
   RegistrarOperationsRoute: typeof RegistrarOperationsRoute
-  MyCredentialsRoute: typeof MyCredentialsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -155,6 +188,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_student': {
+      id: '/_student'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof StudentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_admin/staffs': {
@@ -192,12 +239,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegistrarOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/my/credentials': {
-      id: '/my/credentials'
-      path: '/my/credentials'
-      fullPath: '/my/credentials'
-      preLoaderRoute: typeof MyCredentialsRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_student/credentials': {
+      id: '/_student/credentials'
+      path: '/credentials'
+      fullPath: '/credentials'
+      preLoaderRoute: typeof StudentCredentialsRouteImport
+      parentRoute: typeof StudentRoute
+    }
+    '/_auth/reset-password/confirm': {
+      id: '/_auth/reset-password/confirm'
+      path: '/confirm'
+      fullPath: '/reset-password/confirm'
+      preLoaderRoute: typeof AuthResetPasswordConfirmRouteImport
+      parentRoute: typeof AuthResetPasswordRoute
     }
   }
 }
@@ -212,25 +266,48 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface AuthResetPasswordRouteChildren {
+  AuthResetPasswordConfirmRoute: typeof AuthResetPasswordConfirmRoute
+}
+
+const AuthResetPasswordRouteChildren: AuthResetPasswordRouteChildren = {
+  AuthResetPasswordConfirmRoute: AuthResetPasswordConfirmRoute,
+}
+
+const AuthResetPasswordRouteWithChildren =
+  AuthResetPasswordRoute._addFileChildren(AuthResetPasswordRouteChildren)
+
 interface AuthRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRouteWithChildren
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRouteWithChildren,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
+interface StudentRouteChildren {
+  StudentCredentialsRoute: typeof StudentCredentialsRoute
+}
+
+const StudentRouteChildren: StudentRouteChildren = {
+  StudentCredentialsRoute: StudentCredentialsRoute,
+}
+
+const StudentRouteWithChildren =
+  StudentRoute._addFileChildren(StudentRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
+  StudentRoute: StudentRouteWithChildren,
+  AccountRoute: AccountRoute,
   ApproverApprovalsRoute: ApproverApprovalsRoute,
   RegistrarOperationsRoute: RegistrarOperationsRoute,
-  MyCredentialsRoute: MyCredentialsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

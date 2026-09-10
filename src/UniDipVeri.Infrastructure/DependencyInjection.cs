@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using UniDipVeri.Application.Abstractions.Communication;
 using UniDipVeri.Application.Abstractions.Repositories;
 using UniDipVeri.Application.Abstractions.Security;
 using UniDipVeri.Infrastructure.Persistence;
@@ -24,10 +25,12 @@ public static class DependencyInjection
 
         // Security
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddScoped<IEmailSender, EmailSender>();
 
         // Repositories
         services.AddScoped<IStaffRepository, PostgresStaffRepository>();
         services.AddScoped<IStudentRepository, PostgresStudentRepository>();
+        services.AddScoped<IPasswordResetTokenRepository, PostgresPasswordResetTokenRepository>();
 
         return services;
     }

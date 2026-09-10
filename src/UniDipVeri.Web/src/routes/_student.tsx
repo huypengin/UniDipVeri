@@ -1,13 +1,13 @@
+import { StudentHeader } from "@/components/header/StudentHeader";
+import { useAuth } from "@/context/AuthContext";
 import {
   createFileRoute,
   Outlet,
   redirect,
   useRouter,
 } from "@tanstack/react-router";
-import { useAuth } from "@/context/AuthContext";
-import { AdminHeader } from "@/components/header/AdminHeader";
 
-export const Route = createFileRoute("/_admin")({
+export const Route = createFileRoute("/_student")({
   beforeLoad: ({ context, location }) => {
     if (!context.auth.isAuthenticated) {
       throw redirect({
@@ -15,14 +15,14 @@ export const Route = createFileRoute("/_admin")({
         search: { redirect: location.href },
       });
     }
-    if (!context.auth.hasRole("ADMIN")) {
+    if (!context.auth.hasRole("STUDENT")) {
       throw redirect({ to: "/" });
     }
   },
-  component: AdminLayout,
+  component: StudenLayout,
 });
 
-function AdminLayout() {
+function StudenLayout() {
   const { logout, user } = useAuth();
   const router = useRouter();
 
@@ -34,7 +34,7 @@ function AdminLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8fafc] text-foreground">
-      <AdminHeader onLogout={handleLogout} user={user} />
+      <StudentHeader onLogout={handleLogout} user={user} />
 
       <Outlet />
     </div>

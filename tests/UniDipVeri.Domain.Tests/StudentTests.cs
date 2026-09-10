@@ -139,6 +139,19 @@ public class StudentTests
     }
 
     [Fact]
+    public void SetPassword_ShouldUpdatePasswordHashAndRotateSecurityStamp()
+    {
+        var student = Student.Create(_programId, "STD-001", "Name", "email@test.com", "REF");
+        var initialStamp = student.SecurityStamp;
+
+        student.SetPassword("newHashedPassword123");
+
+        student.PasswordHash.Should().Be("newHashedPassword123");
+        student.SecurityStamp.Should().NotBeNullOrWhiteSpace();
+        student.SecurityStamp.Should().NotBe(initialStamp);
+    }
+
+    [Fact]
     public void EntityEquality_ShouldBeBasedOnId()
     {
         var id = Guid.NewGuid();

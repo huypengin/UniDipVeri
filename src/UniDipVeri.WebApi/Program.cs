@@ -29,6 +29,26 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return Task.CompletedTask;
         };
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var principal = context.Principal;
+            var userIdStr = principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userType = principal?.FindFirst("user_type")?.Value;
+            var securityStamp = principal?.FindFirst("security_stamp")?.Value;
+
+            if (string.IsNullOrEmpty(userIdStr) || string.IsNullOrEmpty(userType) || string.IsNullOrEmpty(securityStamp) || !Guid.TryParse(userIdStr, out var userId))
+            {
+                context.RejectPrincipal();
+                return;
+            }
+
+            var authService = context.HttpContext.RequestServices.GetRequiredService<UniDipVeri.Application.Features.Auth.Abstractions.IAuthService>();
+            var isValid = await authService.ValidateSecurityStampAsync(userId, userType, securityStamp, context.HttpContext.RequestAborted);
+            if (!isValid)
+            {
+                context.RejectPrincipal();
+            }
+        };
     });
 
 builder.Services.AddAuthorization();

@@ -6,9 +6,11 @@ public sealed record AuthUserInfo
 {
     public Guid Id { get; init; }
     public string Email { get; init; }
+    public string Name { get; init; }
     public IReadOnlyList<string> Roles { get; init; }
     public string UserType { get; init; }
     public string? StudentNumber { get; init; }
+    public string SecurityStamp { get; init; }
 
     [JsonConstructor]
     public AuthUserInfo(
@@ -16,17 +18,28 @@ public sealed record AuthUserInfo
         string email,
         IReadOnlyList<string>? roles,
         string userType,
-        string? studentNumber = null)
+        string? name = null,
+        string? studentNumber = null,
+        string? securityStamp = null)
     {
         Id = id;
         Email = email;
+        Name = name ?? string.Empty;
         Roles = roles ?? [];
         UserType = userType;
         StudentNumber = studentNumber;
+        SecurityStamp = securityStamp ?? string.Empty;
     }
 
-    public AuthUserInfo(Guid id, string email, string role, string userType, string? studentNumber = null)
-        : this(id, email, string.IsNullOrEmpty(role) ? [] : [role], userType, studentNumber)
+    public AuthUserInfo(
+        Guid id,
+        string email,
+        string role,
+        string userType,
+        string? studentNumber = null,
+        string? securityStamp = null,
+        string? name = null)
+        : this(id, email, string.IsNullOrEmpty(role) ? [] : [role], userType, name, studentNumber, securityStamp)
     {
     }
 

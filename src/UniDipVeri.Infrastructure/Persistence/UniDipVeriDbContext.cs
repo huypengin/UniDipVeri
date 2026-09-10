@@ -10,6 +10,7 @@ public class UniDipVeriDbContext(DbContextOptions<UniDipVeriDbContext> options) 
     public DbSet<UniversityStaff> UniversityStaff => Set<UniversityStaff>();
     public DbSet<StaffRoleAssignment> StaffRoles => Set<StaffRoleAssignment>();
     public DbSet<Student> Students => Set<Student>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

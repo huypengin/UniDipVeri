@@ -189,17 +189,18 @@ In accordance with **FR-AUTH-04**, a valid session token does not imply authoriz
 
 ---
 
-## 2a. Password Reset & Account Management (Planned)
-
-> These endpoints are planned for implementation. The frontend reset-password page already exists.
+## 2a. Password Reset & Account Management
 
 ```http
 POST   /api/auth/reset-password
 POST   /api/auth/reset-password/confirm
 POST   /api/auth/change-password
+GET    /api/me
 ```
 
 **Request Password Reset (`AuthService.RequestPasswordReset`):**
+
+Generates a single-use, time-limited token (15 minutes). Features anti-enumeration: returns `200 OK` with identical generic message regardless of whether the email address exists in the system.
 
 ```json
 POST /api/auth/reset-password
@@ -218,6 +219,8 @@ Response (`200 OK`):
 
 **Confirm Password Reset (`AuthService.ConfirmPasswordReset`):**
 
+Validates the submitted single-use token against SHA-256 hashes in `password_reset_tokens`, enforces password complexity (min 8 chars, letter + number/symbol), updates the stored password hash, rotates the user's `security_stamp`, invalidates the token, and automatically transitions student accounts from `PENDING_ACTIVATION` to `ACTIVE`.
+
 ```json
 POST /api/auth/reset-password/confirm
 {
@@ -234,9 +237,17 @@ Response (`200 OK`):
 }
 ```
 
+Failure Response (`400 Bad Request`):
+
+```json
+{
+  "message": "Invalid or expired reset token."
+}
+```
+
 **Change Password (`AuthService.ChangePassword`):**
 
-Requires authenticated session.
+Requires authenticated session. Verifies the caller's current password, updates the password hash, rotates `security_stamp`, re-issues the caller's session cookie, and invalidates other concurrent active sessions on other devices.
 
 ```json
 POST /api/auth/change-password
@@ -259,6 +270,29 @@ Failure Response (`400 Bad Request`):
 ```json
 {
   "message": "Current password is incorrect."
+}
+```
+
+**Current User Profile (`GET /api/me`):**
+
+Requires authenticated session. Returns read-only personal summary including affiliated institution and assigned role(s).
+
+```http
+GET /api/me
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "id": "33333333-3333-3333-3333-333333333331",
+  "email": "admin@staff.miu.example",
+  "name": "System Administrator",
+  "role": "ADMIN",
+  "roles": ["ADMIN"],
+  "userType": "staff",
+  "studentNumber": null,
+  "institution": "Mekong International University"
 }
 ```
 
@@ -299,13 +333,13 @@ Response:
 
 ```json
 {
-    "id": "staff-uuid-1",
-    "staffId": "staff-uuid-1",
-    "name": "Nguyen Anh Minh",
-    "email": "minh.nguyen@staff.miu.example",
-    "roles": ["REGISTRAR"],
-    "status": "ACTIVE",
-    "createdAt": "2026-08-27T10:00:00Z"
+  "id": "staff-uuid-1",
+  "staffId": "staff-uuid-1",
+  "name": "Nguyen Anh Minh",
+  "email": "minh.nguyen@staff.miu.example",
+  "roles": ["REGISTRAR"],
+  "status": "ACTIVE",
+  "createdAt": "2026-08-27T10:00:00Z"
 }
 ```
 
@@ -313,8 +347,8 @@ Duplicate Email (`409 Conflict`):
 
 ```json
 {
-    "error": "DUPLICATE_EMAIL",
-    "message": "A staff member with this email already exists."
+  "error": "DUPLICATE_EMAIL",
+  "message": "A staff member with this email already exists."
 }
 ```
 
@@ -322,8 +356,8 @@ Role-Combination Restriction (`409 Conflict`) — when `AllowRegistrarApproverCo
 
 ```json
 {
-    "error": "ROLE_COMBINATION_NOT_ALLOWED",
-    "message": "Cannot assign both REGISTRAR and APPROVER roles to the same staff member."
+  "error": "ROLE_COMBINATION_NOT_ALLOWED",
+  "message": "Cannot assign both REGISTRAR and APPROVER roles to the same staff member."
 }
 ```
 
@@ -337,14 +371,14 @@ Response (`200 OK`):
 
 ```json
 {
-    "id": "staff-uuid-1",
-    "staffId": "staff-uuid-1",
-    "name": "Nguyen Anh Minh",
-    "email": "minh.nguyen@staff.miu.example",
-    "roles": ["REGISTRAR"],
-    "status": "ACTIVE",
-    "createdAt": "2026-08-27T10:00:00Z",
-    "updatedAt": "2026-08-27T10:00:00Z"
+  "id": "staff-uuid-1",
+  "staffId": "staff-uuid-1",
+  "name": "Nguyen Anh Minh",
+  "email": "minh.nguyen@staff.miu.example",
+  "roles": ["REGISTRAR"],
+  "status": "ACTIVE",
+  "createdAt": "2026-08-27T10:00:00Z",
+  "updatedAt": "2026-08-27T10:00:00Z"
 }
 ```
 
@@ -368,9 +402,9 @@ Response:
 
 ```json
 {
-    "staffId": "staff-uuid-1",
-    "status": "INACTIVE",
-    "updatedAt": "2026-08-27T10:30:00Z"
+  "staffId": "staff-uuid-1",
+  "status": "INACTIVE",
+  "updatedAt": "2026-08-27T10:30:00Z"
 }
 ```
 
@@ -395,23 +429,23 @@ Response:
 
 ```json
 {
-    "students": [
-        {
-            "studentId": "student-uuid-1",
-            "studentNumber": "MIU2026-001",
-            "name": "Nguyen Minh Anh",
-            "email": "anh.nguyen@student.miu.example",
-            "programId": "program-uuid",
-            "programName": "Computer Science",
-            "accountStatus": "ACTIVE",
-            "graduationStatus": "GRADUATED",
-            "walletStatus": "ACTIVE",
-            "importedAt": "2026-08-20T08:30:00Z"
-        }
-    ],
-    "total": 1,
-    "page": 1,
-    "limit": 20
+  "students": [
+    {
+      "studentId": "student-uuid-1",
+      "studentNumber": "MIU2026-001",
+      "name": "Nguyen Minh Anh",
+      "email": "anh.nguyen@student.miu.example",
+      "programId": "program-uuid",
+      "programName": "Computer Science",
+      "accountStatus": "ACTIVE",
+      "graduationStatus": "GRADUATED",
+      "walletStatus": "ACTIVE",
+      "importedAt": "2026-08-20T08:30:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20
 }
 ```
 
@@ -458,10 +492,10 @@ Response:
 
 ```json
 {
-    "studentId": "student-uuid-1",
-    "walletId": "walt-wallet-uuid-456",
-    "walletStatus": "ACTIVE",
-    "provisionedAt": "2026-08-27T11:00:00Z"
+  "studentId": "student-uuid-1",
+  "walletId": "walt-wallet-uuid-456",
+  "walletStatus": "ACTIVE",
+  "provisionedAt": "2026-08-27T11:00:00Z"
 }
 ```
 
@@ -542,13 +576,13 @@ Response:
 
 ```json
 {
-    "evaluationId": "eval-uuid",
-    "result": "NOT_ELIGIBLE",
-    "evaluatedAt": "2026-08-20T09:00:00Z",
-    "ruleSetVersion": 3,
-    "failedRequirements": [
-        { "type": "MIN_CREDITS", "required": 120, "actual": 114 }
-    ]
+  "evaluationId": "eval-uuid",
+  "result": "NOT_ELIGIBLE",
+  "evaluatedAt": "2026-08-20T09:00:00Z",
+  "ruleSetVersion": 3,
+  "failedRequirements": [
+    { "type": "MIN_CREDITS", "required": 120, "actual": 114 }
+  ]
 }
 ```
 
@@ -589,11 +623,11 @@ The backend checks the student's latest eligibility evaluation and wallet status
 
 ```json
 {
-    "error": "NOT_ELIGIBLE",
-    "message": "Student does not satisfy mandatory graduation requirements.",
-    "failedRequirements": [
-        { "type": "MIN_CREDITS", "required": 120, "actual": 114 }
-    ]
+  "error": "NOT_ELIGIBLE",
+  "message": "Student does not satisfy mandatory graduation requirements.",
+  "failedRequirements": [
+    { "type": "MIN_CREDITS", "required": 120, "actual": 114 }
+  ]
 }
 ```
 
@@ -601,11 +635,11 @@ Otherwise the request is created in `PENDING_APPROVAL`:
 
 ```json
 {
-    "requestId": "req-uuid",
-    "status": "PENDING_APPROVAL",
-    "eligibilityEvaluationId": "eval-uuid",
-    "requiredApprovals": 1,
-    "approvalsReceived": 0
+  "requestId": "req-uuid",
+  "status": "PENDING_APPROVAL",
+  "eligibilityEvaluationId": "eval-uuid",
+  "requiredApprovals": 1,
+  "approvalsReceived": 0
 }
 ```
 
@@ -683,16 +717,16 @@ GET /api/me/verification-events
 
 ```json
 {
-    "events": [
-        {
-            "shareId": "share-uuid",
-            "credentialId": "cred-uuid",
-            "credentialType": "AcademicDiploma",
-            "latestResult": "VERIFIED",
-            "attemptCount": 5,
-            "lastVerifiedAt": "2026-08-28T09:12:40Z"
-        }
-    ]
+  "events": [
+    {
+      "shareId": "share-uuid",
+      "credentialId": "cred-uuid",
+      "credentialType": "AcademicDiploma",
+      "latestResult": "VERIFIED",
+      "attemptCount": 5,
+      "lastVerifiedAt": "2026-08-28T09:12:40Z"
+    }
+  ]
 }
 ```
 
@@ -722,9 +756,9 @@ Response:
 
 ```json
 {
-    "shareId": "share-uuid",
-    "url": "https://verify.miu.example/s/7Kx92A",
-    "expiresAt": "2026-09-24T23:59:59Z"
+  "shareId": "share-uuid",
+  "url": "https://verify.miu.example/s/7Kx92A",
+  "expiresAt": "2026-09-24T23:59:59Z"
 }
 ```
 
@@ -742,8 +776,8 @@ GET /api/public/shares/{token}
 
 ```json
 {
-    "shareStatus": "ACTIVE",
-    "expiresAt": "2026-09-24T23:59:59Z"
+  "shareStatus": "ACTIVE",
+  "expiresAt": "2026-09-24T23:59:59Z"
 }
 ```
 
@@ -757,28 +791,28 @@ Backend flow:
 
 ```markdown
 Share token -> valid? -> credential exists? -> credential active?
-   -> walt.id verifier (IVCAdapter) -> issuer valid? -> VC valid in wallet?
-   -> log VERIFICATION_EVENT to PostgreSQL -> return result
+-> walt.id verifier (IVCAdapter) -> issuer valid? -> VC valid in wallet?
+-> log VERIFICATION_EVENT to PostgreSQL -> return result
 ```
 
 Response:
 
 ```json
 {
-    "result": "VERIFIED",
-    "credential": {
-        "type": "AcademicDiploma",
-        "holderName": "Nguyen Minh Anh",
-        "degree": "Bachelor of Computer Science",
-        "program": "Computer Science",
-        "institution": "Mekong International University",
-        "awardDate": "2026-06-15"
-    },
-    "issuer": {
-        "name": "Mekong International University",
-        "trusted": true
-    },
-    "status": "VALID"
+  "result": "VERIFIED",
+  "credential": {
+    "type": "AcademicDiploma",
+    "holderName": "Nguyen Minh Anh",
+    "degree": "Bachelor of Computer Science",
+    "program": "Computer Science",
+    "institution": "Mekong International University",
+    "awardDate": "2026-06-15"
+  },
+  "issuer": {
+    "name": "Mekong International University",
+    "trusted": true
+  },
+  "status": "VALID"
 }
 ```
 
@@ -798,20 +832,20 @@ Response:
 
 ```json
 {
-    "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://w3id.org/vc/status-list/2021/v1"
-    ],
-    "id": "https://verify.miu.example/api/status/1",
-    "type": ["VerifiableCredential", "StatusList2021Credential"],
-    "issuer": "did:jwk:...",
-    "issuanceDate": "2026-08-20T00:00:00Z",
-    "credentialSubject": {
-        "id": "https://verify.miu.example/api/status/1#list",
-        "type": "StatusList2021",
-        "statusPurpose": "revocation",
-        "encodedList": "H4sIC..."
-    }
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://w3id.org/vc/status-list/2021/v1"
+  ],
+  "id": "https://verify.miu.example/api/status/1",
+  "type": ["VerifiableCredential", "StatusList2021Credential"],
+  "issuer": "did:jwk:...",
+  "issuanceDate": "2026-08-20T00:00:00Z",
+  "credentialSubject": {
+    "id": "https://verify.miu.example/api/status/1#list",
+    "type": "StatusList2021",
+    "statusPurpose": "revocation",
+    "encodedList": "H4sIC..."
+  }
 }
 ```
 
