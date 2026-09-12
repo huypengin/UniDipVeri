@@ -31,6 +31,7 @@ public class Program : BaseEntity
 
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(fullTitle);
+        ValidateDegreeLevelKeyword(fullTitle, degreeLevel);
 
         var program = new Program
         {
@@ -57,14 +58,24 @@ public class Program : BaseEntity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(fullTitle);
+        ValidateDegreeLevelKeyword(fullTitle, degreeLevel);
 
-        // Cross-validation
+        Name = name.Trim();
+        FullTitle = fullTitle.Trim();
+        DegreeLevel = degreeLevel;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public static void ValidateDegreeLevelKeyword(string fullTitle, DegreeLevel degreeLevel)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullTitle);
+
         string[] validKeywords = degreeLevel.GetDescription().Split(',');
 
         bool isValidTitle = false;
         foreach (var keyword in validKeywords)
         {
-            if (fullTitle.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+            if (fullTitle.Contains(keyword.Trim(), StringComparison.OrdinalIgnoreCase))
             {
                 isValidTitle = true;
                 break;
@@ -76,11 +87,6 @@ public class Program : BaseEntity
             throw new ArgumentException(
                 $"The degree name '{fullTitle}' is invalid or does not match the degree level '{degreeLevel}'.", nameof(fullTitle));
         }
-
-        Name = name.Trim();
-        FullTitle = fullTitle.Trim();
-        DegreeLevel = degreeLevel;
-        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Deactivate()

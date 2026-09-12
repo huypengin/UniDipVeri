@@ -25,12 +25,15 @@ public static class DependencyInjection
 
         // Security
         services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+
+        // Communication
         services.AddScoped<IEmailSender, EmailSender>();
 
         // Repositories
         services.AddScoped<IStaffRepository, PostgresStaffRepository>();
         services.AddScoped<IStudentRepository, PostgresStudentRepository>();
         services.AddScoped<IPasswordResetTokenRepository, PostgresPasswordResetTokenRepository>();
+        services.AddScoped<IProgramRepository, PostgresProgramRepository>();
 
         return services;
     }
