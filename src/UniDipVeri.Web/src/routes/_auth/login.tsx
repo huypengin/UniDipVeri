@@ -77,7 +77,7 @@ function LoginPage() {
       } else if (user.roles.includes("APPROVER")) {
         await router.navigate({ to: "/approvals" });
       } else if (user.roles.includes("REGISTRAR")) {
-        await router.navigate({ to: "/operations" });
+        await router.navigate({ to: "/programs" });
       } else {
         await router.navigate({ to: "/credentials" });
       }

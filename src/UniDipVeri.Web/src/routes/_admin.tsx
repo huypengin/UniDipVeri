@@ -5,7 +5,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
-import { AdminHeader } from "@/components/header/AdminHeader";
+import { StaffHeader } from "@/components/header/StaffHeader";
 
 export const Route = createFileRoute("/_admin")({
   beforeLoad: ({ context, location }) => {
@@ -34,7 +34,7 @@ function AdminLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8fafc] text-foreground">
-      <AdminHeader onLogout={handleLogout} user={user} />
+      <StaffHeader onLogout={handleLogout} user={user} activeTab="staffs" />
 
       <Outlet />
     </div>

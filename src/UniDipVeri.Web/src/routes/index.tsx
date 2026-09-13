@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
     } else if (user?.roles.includes("APPROVER")) {
       throw redirect({ to: "/approvals" });
     } else if (user?.roles.includes("REGISTRAR")) {
-      throw redirect({ to: "/operations" });
+      throw redirect({ to: "/programs" });
     } else {
       throw redirect({ to: "/credentials" });
     }
