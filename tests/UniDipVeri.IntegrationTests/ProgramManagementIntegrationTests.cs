@@ -28,6 +28,8 @@ public class ProgramManagementIntegrationTests : IDisposable
     private readonly string _registrarPassword = "SecureRegistrarPassword123!";
     private readonly string _approverEmail;
     private readonly string _approverPassword = "SecureApproverPassword123!";
+    private readonly string _dualEmail;
+    private readonly string _dualPassword = "SecureDualPassword123!";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -46,6 +48,7 @@ public class ProgramManagementIntegrationTests : IDisposable
         _adminEmail = $"admin_prog_{suffix}@miu.edu";
         _registrarEmail = $"reg_prog_{suffix}@miu.edu";
         _approverEmail = $"appr_prog_{suffix}@miu.edu";
+        _dualEmail = $"dual_prog_{suffix}@miu.edu";
 
         SeedTestData(suffix);
     }
@@ -66,6 +69,10 @@ public class ProgramManagementIntegrationTests : IDisposable
         var apprHash = _passwordHasher.HashPassword(_approverPassword);
         var apprStaff = UniversityStaff.Create(_universityId, "Program Approver", _approverEmail, apprHash, StaffRole.APPROVER);
         _dbContext.UniversityStaff.Add(apprStaff);
+
+        var dualHash = _passwordHasher.HashPassword(_dualPassword);
+        var dualStaff = UniversityStaff.Create(_universityId, "Program Dual", _dualEmail, dualHash, [StaffRole.ADMIN, StaffRole.REGISTRAR]);
+        _dbContext.UniversityStaff.Add(dualStaff);
 
         _dbContext.SaveChanges();
     }
@@ -88,13 +95,18 @@ public class ProgramManagementIntegrationTests : IDisposable
         var approverResponse = await _client.GetAsync("/api/programs");
         approverResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        // 3. Registrar login allows CRUD operations
+        // 3. Admin-only login should return 403 Forbidden on /api/programs (Program CRUD is strictly REGISTRAR)
+        await LoginAsAsync(_adminEmail, _adminPassword);
+        var adminResponse = await _client.GetAsync("/api/programs");
+        adminResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // 4. Registrar login allows CRUD operations
         await LoginAsAsync(_registrarEmail, _registrarPassword);
 
         var listResponse = await _client.GetAsync("/api/programs");
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // 4. Creation with keyword mismatch (FR-PROG-05) should return 400 Bad Request
+        // 5. Creation with keyword mismatch (FR-PROG-05) should return 400 Bad Request
         var mismatchPayload = new CreateProgramRequest
         {
             Name = "Data Science Mismatch",
@@ -104,7 +116,7 @@ public class ProgramManagementIntegrationTests : IDisposable
         var mismatchResponse = await _client.PostAsJsonAsync("/api/programs", mismatchPayload);
         mismatchResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        // 5. Creation with valid keyword matching degree level should return 201 Created
+        // 6. Creation with valid keyword matching degree level should return 201 Created
         var uniqueName = $"Data Science {Guid.NewGuid().ToString("N")[..6]}";
         var createPayload = new CreateProgramRequest
         {
@@ -123,17 +135,17 @@ public class ProgramManagementIntegrationTests : IDisposable
         createdProgram.DegreeLevel.Should().Be("BACHELOR");
         createdProgram.Status.Should().Be("ACTIVE");
 
-        // 6. Duplicate program creation returns 409 Conflict
+        // 7. Duplicate program creation returns 409 Conflict
         var dupResponse = await _client.PostAsJsonAsync("/api/programs", createPayload);
         dupResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        // 7. Get by ID returns the program
+        // 8. Get by ID returns the program
         var getResponse = await _client.GetAsync($"/api/programs/{createdProgram.Id}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var fetchedProgram = await getResponse.Content.ReadFromJsonAsync<ProgramResponse>(JsonOptions);
         fetchedProgram!.Id.Should().Be(createdProgram.Id);
 
-        // 8. Patch updates program details and status
+        // 9. Patch updates program details and status
         var patchPayload = new UpdateProgramRequest
         {
             FullTitle = "Master of Science in Advanced Data Science",
@@ -146,12 +158,16 @@ public class ProgramManagementIntegrationTests : IDisposable
         updatedProgram!.DegreeLevel.Should().Be("MASTER");
         updatedProgram.Status.Should().Be("INACTIVE");
 
-        // 9. Admin login can also view and update programs
+        // 10. Admin-only login attempting to update program returns 403 Forbidden
         await LoginAsAsync(_adminEmail, _adminPassword);
-        var adminPatchPayload = new UpdateProgramRequest { Status = "ACTIVE" };
-        var adminPatchResponse = await _client.PatchAsJsonAsync($"/api/programs/{createdProgram.Id}", adminPatchPayload);
-        adminPatchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var reactivated = await adminPatchResponse.Content.ReadFromJsonAsync<ProgramResponse>(JsonOptions);
+        var adminForbiddenPatch = await _client.PatchAsJsonAsync($"/api/programs/{createdProgram.Id}", new UpdateProgramRequest { Status = "ACTIVE" });
+        adminForbiddenPatch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // 11. Dual-role staff (ADMIN + REGISTRAR) can view and update programs via REGISTRAR privilege
+        await LoginAsAsync(_dualEmail, _dualPassword);
+        var dualPatchResponse = await _client.PatchAsJsonAsync($"/api/programs/{createdProgram.Id}", new UpdateProgramRequest { Status = "ACTIVE" });
+        dualPatchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reactivated = await dualPatchResponse.Content.ReadFromJsonAsync<ProgramResponse>(JsonOptions);
         reactivated!.Status.Should().Be("ACTIVE");
     }
 

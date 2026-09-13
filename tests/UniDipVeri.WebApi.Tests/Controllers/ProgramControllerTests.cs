@@ -43,8 +43,8 @@ public class ProgramControllerTests
         var identity = new ClaimsIdentity(claims, "TestAuth");
         _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
 
-        _authServiceMock.Setup(a => a.RequireRole(It.IsAny<ClaimsPrincipal>(), StaffRole.REGISTRAR, StaffRole.ADMIN))
-            .Returns(roles.Contains(StaffRole.REGISTRAR) || roles.Contains(StaffRole.ADMIN));
+        _authServiceMock.Setup(a => a.RequireRole(It.IsAny<ClaimsPrincipal>(), StaffRole.REGISTRAR))
+            .Returns(roles.Contains(StaffRole.REGISTRAR));
     }
 
     private void SetUnauthenticatedUser()
@@ -65,9 +65,20 @@ public class ProgramControllerTests
     }
 
     [Fact]
-    public async Task CreateProgram_ShouldReturnForbidden_WhenUserIsNotRegistrarOrAdmin()
+    public async Task CreateProgram_ShouldReturnForbidden_WhenUserIsNotRegistrar()
     {
         SetAuthenticatedUser(StaffRole.APPROVER);
+
+        var result = await _controller.CreateProgram(new CreateProgramRequest());
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task CreateProgram_ShouldReturnForbidden_WhenUserIsAdminOnly()
+    {
+        SetAuthenticatedUser(StaffRole.ADMIN);
 
         var result = await _controller.CreateProgram(new CreateProgramRequest());
 
@@ -86,9 +97,20 @@ public class ProgramControllerTests
     }
 
     [Fact]
-    public async Task ListPrograms_ShouldReturnForbidden_WhenUserIsNotRegistrarOrAdmin()
+    public async Task ListPrograms_ShouldReturnForbidden_WhenUserIsNotRegistrar()
     {
         SetAuthenticatedUser(StaffRole.APPROVER);
+
+        var result = await _controller.ListPrograms();
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task ListPrograms_ShouldReturnForbidden_WhenUserIsAdminOnly()
+    {
+        SetAuthenticatedUser(StaffRole.ADMIN);
 
         var result = await _controller.ListPrograms();
 
@@ -162,9 +184,9 @@ public class ProgramControllerTests
     #region ListPrograms Tests
 
     [Fact]
-    public async Task ListPrograms_ShouldReturnOkWithPrograms_WhenAdminRole()
+    public async Task ListPrograms_ShouldReturnOkWithPrograms_WhenRegistrarRole()
     {
-        SetAuthenticatedUser(StaffRole.ADMIN);
+        SetAuthenticatedUser(StaffRole.REGISTRAR);
         var list = new List<ProgramResponse>
         {
             new() { Id = Guid.NewGuid(), Name = "CS" },
@@ -261,7 +283,7 @@ public class ProgramControllerTests
     [Fact]
     public async Task UpdateProgram_ShouldReturnConflict_WhenServiceReturnsConflict()
     {
-        SetAuthenticatedUser(StaffRole.ADMIN);
+        SetAuthenticatedUser(StaffRole.REGISTRAR);
         var id = Guid.NewGuid();
         var request = new UpdateProgramRequest { Name = "Existing Name" };
 

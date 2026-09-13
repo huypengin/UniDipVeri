@@ -15,10 +15,10 @@ public class ProgramController(IAuthService authService, IProgramService program
     private readonly IProgramService _programService = programService;
 
     [HttpPost]
-    [Authorize(Roles = "REGISTRAR,ADMIN")]
+    [Authorize(Roles = "REGISTRAR")]
     public async Task<IActionResult> CreateProgram([FromBody] CreateProgramRequest? request, CancellationToken ct = default)
     {
-        var authCheck = CheckRegistrarOrAdminAuthorization();
+        var authCheck = CheckRegistrarAuthorization();
         if (authCheck is not null)
         {
             return authCheck;
@@ -39,10 +39,10 @@ public class ProgramController(IAuthService authService, IProgramService program
     }
 
     [HttpGet]
-    [Authorize(Roles = "REGISTRAR,ADMIN")]
+    [Authorize(Roles = "REGISTRAR")]
     public async Task<IActionResult> ListPrograms(CancellationToken ct = default)
     {
-        var authCheck = CheckRegistrarOrAdminAuthorization();
+        var authCheck = CheckRegistrarAuthorization();
         if (authCheck is not null)
         {
             return authCheck;
@@ -53,10 +53,10 @@ public class ProgramController(IAuthService authService, IProgramService program
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "REGISTRAR,ADMIN")]
+    [Authorize(Roles = "REGISTRAR")]
     public async Task<IActionResult> GetProgramById(Guid id, CancellationToken ct = default)
     {
-        var authCheck = CheckRegistrarOrAdminAuthorization();
+        var authCheck = CheckRegistrarAuthorization();
         if (authCheck is not null)
         {
             return authCheck;
@@ -72,10 +72,10 @@ public class ProgramController(IAuthService authService, IProgramService program
     }
 
     [HttpPatch("{id:guid}")]
-    [Authorize(Roles = "REGISTRAR,ADMIN")]
+    [Authorize(Roles = "REGISTRAR")]
     public async Task<IActionResult> UpdateProgram(Guid id, [FromBody] UpdateProgramRequest? request, CancellationToken ct = default)
     {
-        var authCheck = CheckRegistrarOrAdminAuthorization();
+        var authCheck = CheckRegistrarAuthorization();
         if (authCheck is not null)
         {
             return authCheck;
@@ -95,16 +95,16 @@ public class ProgramController(IAuthService authService, IProgramService program
         return Ok(result.Data);
     }
 
-    private IActionResult? CheckRegistrarOrAdminAuthorization()
+    private IActionResult? CheckRegistrarAuthorization()
     {
         if (User.Identity is null || !User.Identity.IsAuthenticated)
         {
             return Unauthorized(new { message = "Not authenticated." });
         }
 
-        if (!_authService.RequireRole(User, StaffRole.REGISTRAR, StaffRole.ADMIN))
+        if (!_authService.RequireRole(User, StaffRole.REGISTRAR))
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Forbidden. REGISTRAR or ADMIN role required." });
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Forbidden. REGISTRAR role required." });
         }
 
         return null;
