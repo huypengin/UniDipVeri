@@ -52,7 +52,7 @@ public class AuthenticationIntegrationTests : IDisposable
         var university = University.Create($"Test University {uniqueSuffix}", universityCode, $"{uniqueSuffix}.tu.edu", id: _universityId);
         _dbContext.Universities.Add(university);
 
-        var program = DomainProgram.Create(_universityId, $"Computer Science {uniqueSuffix}", "B.S. in Computer Science", DegreeLevel.BACHELOR, id: _programId);
+        var program = DomainProgram.Create(_universityId, $"Computer Science {uniqueSuffix}", "Bachelor of Science in Computer Science", DegreeLevel.BACHELOR, id: _programId);
         _dbContext.Programs.Add(program);
 
         var staffHash = _passwordHasher.HashPassword(_staffPassword);

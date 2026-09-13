@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Services;
+using UniDipVeri.Application.Features.Programs.Abstractions;
+using UniDipVeri.Application.Features.Programs.Services;
 using UniDipVeri.Application.Features.Staff.Abstractions;
 using UniDipVeri.Application.Features.Staff.Services;
 
@@ -12,6 +14,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IProgramService, ProgramService>();
         return services;
     }
 }

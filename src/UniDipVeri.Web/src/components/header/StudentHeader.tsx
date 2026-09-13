@@ -30,7 +30,7 @@ export function StudentHeader({
                 UniDipVeri
               </span>
               <span className="text-xs text-muted-foreground leading-tight">
-                Student Portal
+                Student Interface
               </span>
             </div>
           </div>

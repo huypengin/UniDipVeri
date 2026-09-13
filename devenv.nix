@@ -51,6 +51,6 @@
 
   processes.unidipveri-api = {
     cwd = "./";
-    exec = "dotnet run --project src/UniDipVeri.WebApi";
+    exec = "dotnet watch --project src/UniDipVeri.WebApi";
   };
 }
