@@ -19,6 +19,7 @@ public class Student : BaseEntity
     public DateTime ImportedAt { get; private set; } = DateTime.UtcNow;
 
     public Program? Program { get; private set; }
+    public AcademicRecord? AcademicRecord { get; private set; }
 
     protected Student() { }
 

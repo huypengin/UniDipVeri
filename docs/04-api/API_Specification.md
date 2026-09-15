@@ -539,6 +539,9 @@ GET    /api/students/{studentId}/academic-record
 
 **Import (`AcademicRecordService.importRecord`):**
 
+- **Authorization:** `REGISTRAR` only.
+- **Request Body:**
+
 ```json
 POST /api/academic-records/import
 {
@@ -546,13 +549,68 @@ POST /api/academic-records/import
   "name": "Nguyen Minh Anh",
   "email": "anh.nguyen@student.miu.example",
   "programId": "program-uuid",
-  "credits": 128,
+  "creditsCompleted": 128,
   "gpa": 3.6,
-  "completedCourses": ["CS101", "CS499", "..."]
+  "completedCourses": ["CS101", "CS499"],
+  "sourceRecordRef": "SIS-REG-2026-001",
+  "sourceSnapshotAt": "2026-08-20T09:00:00Z"
 }
 ```
 
-This creates or updates the `STUDENT` record, provisions a server-managed custodial wallet in walt.id (via `IWalletAdapter`) if not already present, stores the associated `ACADEMIC_RECORD`, and automatically triggers eligibility evaluation (Architecture_Design.md Section 2). This is the **only** path by which student/academic data enters the system.
+*Notes on request fields:*
+- `sourceRecordRef`: Unique external reference from the source Student Information System (required for upsert matching).
+- `creditsCompleted`: Non-negative integer (alias `credits` is also supported for backward compatibility).
+- `gpa`: Decimal between `0.00` and `4.00`.
+- `completedCourses`: Array of strings (empty array `[]` permitted for new enrollments; cannot be `null`).
+- `sourceSnapshotAt`: ISO 8601 timestamp; defaults to UTC `now` if omitted.
+
+**Responses:**
+- `201 Created`: When a new student is matriculated. Response includes `Location: /api/students/{studentId}/academic-record` header and `isNewStudent: true`.
+- `200 OK`: When an existing student is matched by `sourceRecordRef` and their demographic/academic details are updated (`isNewStudent: false`).
+- `400 Bad Request`: Payload validation failures, unknown/inactive `programId`.
+- `409 Conflict`: Duplicate email/student number under a different source reference, or mismatched student number / program on re-import.
+
+```json
+{
+  "studentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "studentNumber": "MIU2026-001",
+  "name": "Nguyen Minh Anh",
+  "email": "anh.nguyen@student.miu.example",
+  "accountStatus": "PENDING_ACTIVATION",
+  "walletStatus": "PENDING",
+  "isNewStudent": true,
+  "academicRecord": {
+    "id": "7b8e5c12-3456-4abc-9def-0123456789ab",
+    "studentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "creditsCompleted": 128,
+    "gpa": 3.6,
+    "completedCourses": ["CS101", "CS499"],
+    "sourceSnapshotAt": "2026-08-20T09:00:00Z",
+    "importedAt": "2026-09-15T12:00:00Z"
+  }
+}
+```
+
+**Get Academic Record (`AcademicRecordService.getRecordByStudentId`):**
+
+- **Route:** `GET /api/students/{studentId}/academic-record`
+- **Authorization:** `REGISTRAR` or `STUDENT` (students may only access their own record matching their authenticated user ID; `ADMIN` and other roles receive `403 Forbidden`).
+- **Responses:**
+  - `200 OK`: Returns the `AcademicRecordResponse`.
+  - `403 Forbidden`: Unmatched student ID or non-Registrar staff (such as Admin or Approver).
+  - `404 Not Found`: Student or academic record not found.
+
+```json
+{
+  "id": "7b8e5c12-3456-4abc-9def-0123456789ab",
+  "studentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "creditsCompleted": 128,
+  "gpa": 3.6,
+  "completedCourses": ["CS101", "CS499"],
+  "sourceSnapshotAt": "2026-08-20T09:00:00Z",
+  "importedAt": "2026-09-15T12:00:00Z"
+}
+```
 
 ---
 

@@ -95,5 +95,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .WithMany(p => p.Students)
             .HasForeignKey(s => s.ProgramId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.AcademicRecord)
+            .WithOne(ar => ar.Student)
+            .HasForeignKey<AcademicRecord>(ar => ar.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

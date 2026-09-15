@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using UniDipVeri.Application.Features.AcademicRecords.Abstractions;
+using UniDipVeri.Application.Features.AcademicRecords.Services;
 using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Services;
 using UniDipVeri.Application.Features.Programs.Abstractions;
@@ -15,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IStaffService, StaffService>();
         services.AddScoped<IProgramService, ProgramService>();
+        services.AddScoped<IAcademicRecordService, AcademicRecordService>();
         return services;
     }
 }

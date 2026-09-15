@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IStudentRepository, PostgresStudentRepository>();
         services.AddScoped<IPasswordResetTokenRepository, PostgresPasswordResetTokenRepository>();
         services.AddScoped<IProgramRepository, PostgresProgramRepository>();
+        services.AddScoped<IAcademicRecordRepository, PostgresAcademicRecordRepository>();
 
         return services;
     }
