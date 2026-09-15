@@ -210,7 +210,7 @@ This comparison supports three claims worth stating explicitly in Section 1.2:
 
 This comparison is useful for two reasons beyond turnaround time:
 
-- It shows that a centralized trust broker for verification already exists in practice. Georgia State University's registrar office names its relationship with a nationwide clearinghouse explicitly, delegating verification on the university's behalf rather than answering every inquiry directly [10]. UniDipVeri's public verification portal is best framed as a decentralized, institution owned alternative to that same need, not as a wholly new category of service.
+- It shows that a centralized trust broker for verification already exists in practice. Georgia State University's registrar office names its relationship with a nationwide clearinghouse explicitly, delegating verification on the university's behalf rather than answering every inquiry directly [10]. UniDipVeri's public verification portal is best framed as an institution-owned, self-service alternative to that same need, not as a wholly new category of service.
 - It shows the gap the clearinghouse model itself does not close: institutions outside the clearinghouse network, and credentials issued abroad, still fall back to slow manual contact or third party credential evaluation services such as NACES member organizations [9]. This is the gap a self verifying, cryptographically signed credential is positioned to close without requiring universal enrollment in a shared database.
 
 **Sources:**
