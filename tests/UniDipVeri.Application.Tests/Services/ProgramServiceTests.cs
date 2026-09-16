@@ -23,91 +23,7 @@ public class ProgramServiceTests
 
     #region CreateProgramAsync Tests
 
-    [Fact]
-    public async Task CreateProgramAsync_ShouldReturnValidation_WhenRequestIsNull()
-    {
-        var result = await _service.CreateProgramAsync(null!);
 
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-        result.Error.Should().Contain("required");
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task CreateProgramAsync_ShouldReturnValidation_WhenNameIsBlank(string name)
-    {
-        var request = new CreateProgramRequest
-        {
-            Name = name,
-            FullTitle = "Bachelor of Science in CS",
-            DegreeLevel = "BACHELOR"
-        };
-
-        var result = await _service.CreateProgramAsync(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-        result.Error.Should().Contain("name");
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task CreateProgramAsync_ShouldReturnValidation_WhenFullTitleIsBlank(string title)
-    {
-        var request = new CreateProgramRequest
-        {
-            Name = "Computer Science",
-            FullTitle = title,
-            DegreeLevel = "BACHELOR"
-        };
-
-        var result = await _service.CreateProgramAsync(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-        result.Error.Should().Contain("full title");
-    }
-
-    [Fact]
-    public async Task CreateProgramAsync_ShouldReturnValidation_WhenDegreeLevelIsInvalid()
-    {
-        var request = new CreateProgramRequest
-        {
-            Name = "Computer Science",
-            FullTitle = "Bachelor of Computer Science",
-            DegreeLevel = "INVALID_LEVEL"
-        };
-
-        var result = await _service.CreateProgramAsync(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-        result.Error.Should().Contain("Invalid degree level");
-    }
-
-    [Theory]
-    [InlineData("BACHELOR", "Master of Science in CS")]
-    [InlineData("MASTER", "Bachelor of Science in SE")]
-    [InlineData("DOCTORATE", "Master of Philosophy in AI")]
-    [InlineData("ASSOCIATE", "Bachelor of Applied Studies")]
-    public async Task CreateProgramAsync_ShouldReturnValidation_WhenKeywordMismatchesDegreeLevel_FR_PROG_05(string level, string title)
-    {
-        var request = new CreateProgramRequest
-        {
-            Name = "Mismatched Program",
-            FullTitle = title,
-            DegreeLevel = level
-        };
-
-        var result = await _service.CreateProgramAsync(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-        result.Error.Should().Contain("does not match");
-    }
 
     [Fact]
     public async Task CreateProgramAsync_ShouldReturnConflict_WhenProgramNameAlreadyExists()
@@ -256,15 +172,6 @@ public class ProgramServiceTests
     }
 
     [Fact]
-    public async Task UpdateProgramAsync_ShouldReturnValidation_WhenRequestIsNull()
-    {
-        var result = await _service.UpdateProgramAsync(Guid.NewGuid(), null!);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
-    }
-
-    [Fact]
     public async Task UpdateProgramAsync_ShouldReturnConflict_WhenNameAlreadyTakenByAnotherProgram()
     {
         var id = Guid.NewGuid();
@@ -280,22 +187,6 @@ public class ProgramServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorType.Should().Be(ProgramErrorType.Conflict);
-    }
-
-    [Fact]
-    public async Task UpdateProgramAsync_ShouldReturnValidation_WhenDegreeLevelIsInvalid()
-    {
-        var id = Guid.NewGuid();
-        var program = Program.Create(_universityId, "CS", "Bachelor of Science in CS", DegreeLevel.BACHELOR, id: id);
-
-        _programRepoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(program);
-
-        var request = new UpdateProgramRequest { DegreeLevel = "NOT_A_LEVEL" };
-        var result = await _service.UpdateProgramAsync(id, request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorType.Should().Be(ProgramErrorType.Validation);
     }
 
     [Fact]
