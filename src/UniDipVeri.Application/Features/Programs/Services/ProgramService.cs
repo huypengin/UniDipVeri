@@ -12,47 +12,18 @@ public class ProgramService(IProgramRepository programRepository) : IProgramServ
 
     public async Task<ProgramResult<ProgramResponse>> CreateProgramAsync(CreateProgramRequest request, CancellationToken ct = default)
     {
-        if (request is null)
-        {
-            return ProgramResult<ProgramResponse>.Validation("Request body is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return ProgramResult<ProgramResponse>.Validation("Program name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.FullTitle))
-        {
-            return ProgramResult<ProgramResponse>.Validation("Program full title is required.");
-        }
-
-        if (!Enum.TryParse<DegreeLevel>(request.DegreeLevel, ignoreCase: true, out var degreeLevel) || !Enum.IsDefined(degreeLevel))
-        {
-            return ProgramResult<ProgramResponse>.Validation(
-                $"Invalid degree level '{request.DegreeLevel}'. Valid levels are: {string.Join(", ", Enum.GetNames<DegreeLevel>())}.");
-        }
-
-        try
-        {
-            Program.ValidateDegreeLevelKeyword(request.FullTitle, degreeLevel);
-        }
-        catch (ArgumentException ex)
-        {
-            return ProgramResult<ProgramResponse>.Validation(ex.Message);
-        }
-
+        var degreeLevel = Enum.Parse<DegreeLevel>(request.DegreeLevel.Trim(), ignoreCase: true);
         var universityId = await _programRepository.GetDefaultUniversityIdAsync(ct);
 
-        if (await _programRepository.ExistsByNameAsync(universityId, request.Name, ct: ct))
+        if (await _programRepository.ExistsByNameAsync(universityId, request.Name.Trim(), ct: ct))
         {
             return ProgramResult<ProgramResponse>.Conflict($"A program with the name '{request.Name}' already exists.");
         }
 
         var program = Program.Create(
             universityId,
-            request.Name,
-            request.FullTitle,
+            request.Name.Trim(),
+            request.FullTitle.Trim(),
             degreeLevel);
 
         await _programRepository.AddAsync(program, ct);
@@ -90,11 +61,6 @@ public class ProgramService(IProgramRepository programRepository) : IProgramServ
             return ProgramResult<ProgramResponse>.NotFound("Program not found.");
         }
 
-        if (request is null)
-        {
-            return ProgramResult<ProgramResponse>.Validation("Request body is required.");
-        }
-
         var program = await _programRepository.GetByIdAsync(id, ct);
         if (program is null)
         {
@@ -102,11 +68,6 @@ public class ProgramService(IProgramRepository programRepository) : IProgramServ
         }
 
         var newName = request.Name is not null ? request.Name.Trim() : program.Name;
-        if (string.IsNullOrWhiteSpace(newName))
-        {
-            return ProgramResult<ProgramResponse>.Validation("Program name cannot be empty.");
-        }
-
         if (!string.Equals(newName, program.Name, StringComparison.OrdinalIgnoreCase))
         {
             if (await _programRepository.ExistsByNameAsync(program.UniversityId, newName, excludeId: program.Id, ct: ct))
@@ -115,21 +76,11 @@ public class ProgramService(IProgramRepository programRepository) : IProgramServ
             }
         }
 
-        var newDegreeLevel = program.DegreeLevel;
-        if (!string.IsNullOrWhiteSpace(request.DegreeLevel))
-        {
-            if (!Enum.TryParse<DegreeLevel>(request.DegreeLevel, ignoreCase: true, out newDegreeLevel) || !Enum.IsDefined(newDegreeLevel))
-            {
-                return ProgramResult<ProgramResponse>.Validation(
-                    $"Invalid degree level '{request.DegreeLevel}'. Valid levels are: {string.Join(", ", Enum.GetNames<DegreeLevel>())}.");
-            }
-        }
+        var newDegreeLevel = !string.IsNullOrWhiteSpace(request.DegreeLevel)
+            ? Enum.Parse<DegreeLevel>(request.DegreeLevel.Trim(), ignoreCase: true)
+            : program.DegreeLevel;
 
         var newFullTitle = request.FullTitle is not null ? request.FullTitle.Trim() : program.FullTitle;
-        if (string.IsNullOrWhiteSpace(newFullTitle))
-        {
-            return ProgramResult<ProgramResponse>.Validation("Program full title cannot be empty.");
-        }
 
         try
         {
@@ -144,11 +95,7 @@ public class ProgramService(IProgramRepository programRepository) : IProgramServ
 
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
-            if (!Enum.TryParse<ProgramStatus>(request.Status, ignoreCase: true, out var newStatus) || !Enum.IsDefined(newStatus))
-            {
-                return ProgramResult<ProgramResponse>.Validation(
-                    $"Invalid status '{request.Status}'. Valid statuses are: {string.Join(", ", Enum.GetNames<ProgramStatus>())}.");
-            }
+            var newStatus = Enum.Parse<ProgramStatus>(request.Status.Trim(), ignoreCase: true);
 
             if (newStatus == ProgramStatus.INACTIVE && program.Status != ProgramStatus.INACTIVE)
             {

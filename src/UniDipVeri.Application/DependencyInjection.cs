@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using UniDipVeri.Application.Features.AcademicRecords.Abstractions;
 using UniDipVeri.Application.Features.AcademicRecords.Services;
@@ -18,6 +19,9 @@ public static class DependencyInjection
         services.AddScoped<IStaffService, StaffService>();
         services.AddScoped<IProgramService, ProgramService>();
         services.AddScoped<IAcademicRecordService, AcademicRecordService>();
+
+        services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
+
         return services;
     }
 }

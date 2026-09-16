@@ -19,58 +19,6 @@ public class AcademicRecordService(
         ImportAcademicRecordRequest request,
         CancellationToken ct = default)
     {
-        if (request is null)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Request body cannot be null.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.StudentNumber))
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Student number is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Student name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Email))
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Student email is required.");
-        }
-
-        var trimmedEmail = request.Email.Trim().ToLowerInvariant();
-        if (!System.Net.Mail.MailAddress.TryCreate(trimmedEmail, out var mailAddress) || mailAddress.Address != trimmedEmail)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Invalid email format.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.SourceRecordRef))
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Source record reference is required.");
-        }
-
-        if (request.ProgramId == Guid.Empty)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Program ID cannot be empty.");
-        }
-
-        var effectiveCredits = request.GetEffectiveCredits();
-        if (effectiveCredits < 0)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Credits completed cannot be negative or must be provided.");
-        }
-
-        if (request.Gpa < 0.0m || request.Gpa > 4.0m)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("GPA must be between 0.0 and 4.0.");
-        }
-
-        if (request.CompletedCourses is null)
-        {
-            return AcademicRecordResult<ImportResultResponse>.Validation("Completed courses cannot be null.");
-        }
-
         // Validate program
         var program = await _programRepository.GetByIdAsync(request.ProgramId, ct);
         if (program is null)
@@ -84,8 +32,11 @@ public class AcademicRecordService(
         }
 
         var trimmedStudentNumber = request.StudentNumber.Trim();
+        var trimmedEmail = request.Email.Trim().ToLowerInvariant();
         var trimmedSourceRef = request.SourceRecordRef.Trim();
         var snapshotAt = request.SourceSnapshotAt ?? DateTime.UtcNow;
+        var effectiveCredits = request.GetEffectiveCredits();
+        var completedCourses = request.CompletedCourses ?? [];
 
         // Check if student exists by SourceRecordRef
         var existingStudent = await _studentRepository.GetBySourceRecordRefAsync(trimmedSourceRef, ct);
@@ -124,7 +75,7 @@ public class AcademicRecordService(
             var record = await _academicRecordRepository.GetByStudentIdAsync(existingStudent.Id, ct);
             if (record is not null)
             {
-                record.UpdateRecord(effectiveCredits, request.Gpa, request.CompletedCourses, snapshotAt);
+                record.UpdateRecord(effectiveCredits, request.Gpa, completedCourses, snapshotAt);
                 await _academicRecordRepository.UpdateAsync(record, ct);
             }
             else
@@ -133,7 +84,7 @@ public class AcademicRecordService(
                     existingStudent.Id,
                     effectiveCredits,
                     request.Gpa,
-                    request.CompletedCourses,
+                    completedCourses,
                     snapshotAt);
                 await _academicRecordRepository.AddAsync(record, ct);
             }
@@ -179,7 +130,7 @@ public class AcademicRecordService(
             newStudent.Id,
             effectiveCredits,
             request.Gpa,
-            request.CompletedCourses,
+            completedCourses,
             snapshotAt);
 
         await _academicRecordRepository.AddAsync(newRecord, ct);

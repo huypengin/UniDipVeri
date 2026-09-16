@@ -20,36 +20,7 @@ public class StaffService(
 
     public async Task<StaffResult<StaffResponse>> CreateStaffAsync(CreateStaffRequest request, CancellationToken ct = default)
     {
-        if (request is null)
-        {
-            return StaffResult<StaffResponse>.Validation("Request body cannot be null.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return StaffResult<StaffResponse>.Validation("Name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Email))
-        {
-            return StaffResult<StaffResponse>.Validation("Email is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password))
-        {
-            return StaffResult<StaffResponse>.Validation("Password is required.");
-        }
-
-        if (request.Roles is null || request.Roles.Count == 0)
-        {
-            return StaffResult<StaffResponse>.Validation("At least one staff role must be assigned.");
-        }
-
-        var (parsedRoles, roleError) = ParseRoles(request.Roles);
-        if (roleError is not null)
-        {
-            return StaffResult<StaffResponse>.Validation(roleError);
-        }
+        var parsedRoles = ParseRoles(request.Roles);
 
         if (HasForbiddenRoleCombination(parsedRoles))
         {
@@ -99,11 +70,6 @@ public class StaffService(
 
     public async Task<StaffResult<StaffResponse>> UpdateStaffAsync(Guid id, UpdateStaffRequest request, CancellationToken ct = default)
     {
-        if (request is null)
-        {
-            return StaffResult<StaffResponse>.Validation("Request body cannot be null.");
-        }
-
         var staff = await _staffRepository.GetByIdAsync(id, ct);
         if (staff is null)
         {
@@ -127,16 +93,7 @@ public class StaffService(
         // Roles update & guards
         if (request.Roles is not null)
         {
-            if (request.Roles.Count == 0)
-            {
-                return StaffResult<StaffResponse>.Validation("At least one staff role must be assigned.");
-            }
-
-            var (parsedRoles, roleError) = ParseRoles(request.Roles);
-            if (roleError is not null)
-            {
-                return StaffResult<StaffResponse>.Validation(roleError);
-            }
+            var parsedRoles = ParseRoles(request.Roles);
 
             if (HasForbiddenRoleCombination(parsedRoles))
             {
@@ -206,32 +163,11 @@ public class StaffService(
         return roles.Contains(StaffRole.REGISTRAR) && roles.Contains(StaffRole.APPROVER);
     }
 
-    private static (List<StaffRole> Roles, string? Error) ParseRoles(IEnumerable<string> roles)
+    private static List<StaffRole> ParseRoles(IEnumerable<string> roles)
     {
-        var result = new List<StaffRole>();
-        foreach (var roleStr in roles)
-        {
-            if (string.IsNullOrWhiteSpace(roleStr))
-            {
-                return ([], "Role name cannot be empty.");
-            }
-
-            if (!Enum.TryParse<StaffRole>(roleStr.Trim(), ignoreCase: true, out var parsedRole))
-            {
-                return ([], $"Invalid role: '{roleStr}'. Valid roles are: ADMIN, REGISTRAR, APPROVER.");
-            }
-
-            if (!result.Contains(parsedRole))
-            {
-                result.Add(parsedRole);
-            }
-        }
-
-        if (result.Count == 0)
-        {
-            return ([], "At least one valid staff role must be specified.");
-        }
-
-        return (result, null);
+        return roles
+            .Select(r => Enum.Parse<StaffRole>(r.Trim(), ignoreCase: true))
+            .Distinct()
+            .ToList();
     }
 }
