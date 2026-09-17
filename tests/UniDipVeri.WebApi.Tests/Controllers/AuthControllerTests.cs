@@ -1,7 +1,9 @@
+using System.Reflection;
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -36,13 +38,11 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task GetCurrentUser_ShouldReturn401_WhenUserIsNotAuthenticated()
+    public void GetCurrentUser_ShouldHaveAuthorizeAttribute()
     {
-        // Act
-        var result = await _controller.GetCurrentUser();
-
-        // Assert
-        result.Should().BeOfType<UnauthorizedObjectResult>();
+        var method = typeof(AuthController).GetMethod(nameof(AuthController.GetCurrentUser));
+        method.Should().NotBeNull();
+        method!.GetCustomAttribute<AuthorizeAttribute>().Should().NotBeNull();
     }
 
     [Fact]
@@ -96,10 +96,10 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task ConfirmPasswordReset_ShouldReturn400_WhenRequestIsInvalid()
+    public async Task ConfirmPasswordReset_ShouldReturn400_WhenRequestBodyIsNull()
     {
         // Act
-        var result = await _controller.ConfirmPasswordReset(new ConfirmResetPasswordRequest("", ""));
+        var result = await _controller.ConfirmPasswordReset(null);
 
         // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
@@ -138,10 +138,10 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task ChangePassword_ShouldReturn400_WhenRequestIsMissingFields()
+    public async Task ChangePassword_ShouldReturn400_WhenRequestBodyIsNull()
     {
         // Act
-        var result = await _controller.ChangePassword(new ChangePasswordRequest("", ""));
+        var result = await _controller.ChangePassword(null);
 
         // Assert
         result.Should().BeOfType<BadRequestObjectResult>();

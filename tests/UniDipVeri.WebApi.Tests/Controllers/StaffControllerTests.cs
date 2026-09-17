@@ -95,23 +95,30 @@ public class StaffControllerTests
         postAttrs.Should().Contain(a => a.Template == "login");
     }
 
+    [Fact]
+    public void StaffController_ShouldHaveAuthorizeAdminAttributeAtClassLevel()
+    {
+        var authAttr = typeof(StaffController).GetCustomAttribute<AuthorizeAttribute>();
+        authAttr.Should().NotBeNull();
+        authAttr!.Roles.Should().Be("ADMIN");
+
+        var loginMethod = typeof(StaffController).GetMethod(nameof(StaffController.Login));
+        loginMethod.Should().NotBeNull();
+        loginMethod!.GetCustomAttribute<AllowAnonymousAttribute>().Should().NotBeNull();
+    }
+
     [Theory]
     [InlineData(nameof(StaffController.CreateStaff), typeof(HttpPostAttribute))]
     [InlineData(nameof(StaffController.ListStaff), typeof(HttpGetAttribute))]
     [InlineData(nameof(StaffController.GetStaffById), typeof(HttpGetAttribute))]
     [InlineData(nameof(StaffController.UpdateStaff), typeof(HttpPatchAttribute))]
     [InlineData(nameof(StaffController.DeactivateStaff), typeof(HttpPostAttribute))]
-    public void StaffEndpoints_ShouldHaveAuthorizeAdminAttribute_AndCorrectHttpMethods(
+    public void StaffEndpoints_ShouldHaveCorrectHttpMethods(
         string actionName, Type expectedHttpAttribute)
     {
         var method = typeof(StaffController).GetMethod(actionName);
         method.Should().NotBeNull();
-
-        var authAttr = method!.GetCustomAttribute<AuthorizeAttribute>();
-        authAttr.Should().NotBeNull();
-        authAttr!.Roles.Should().Be("ADMIN");
-
-        method.GetCustomAttribute(expectedHttpAttribute).Should().NotBeNull();
+        method!.GetCustomAttribute(expectedHttpAttribute).Should().NotBeNull();
     }
 
     #endregion
@@ -218,73 +225,6 @@ public class StaffControllerTests
         unauthorizedResult.StatusCode.Should().Be(401);
 
         _authServiceMock.Verify(s => s.AuthenticateStaffAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Theory]
-    [InlineData("", "pass")]
-    [InlineData("   ", "pass")]
-    [InlineData("staff@miu.edu", "")]
-    [InlineData("staff@miu.edu", "   ")]
-    public async Task Login_ShouldReturn401_WhenEmailOrPasswordIsEmptyOrWhitespace(string email, string password)
-    {
-        // Arrange
-        var request = new LoginRequest(email, password);
-
-        // Act
-        var result = await _controller.Login(request, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<UnauthorizedObjectResult>();
-        var unauthorizedResult = (UnauthorizedObjectResult)result;
-        unauthorizedResult.StatusCode.Should().Be(401);
-
-        _authServiceMock.Verify(s => s.AuthenticateStaffAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    #endregion
-
-    #region Authorization Guards on CRUD Endpoints
-
-    [Fact]
-    public async Task Endpoints_ShouldReturn401_WhenUserIsUnauthenticated()
-    {
-        // Arrange
-        SetUnauthenticatedUser();
-
-        // Act
-        var createResult = await _controller.CreateStaff(new CreateStaffRequest());
-        var listResult = await _controller.ListStaff();
-        var getResult = await _controller.GetStaffById(Guid.NewGuid());
-        var updateResult = await _controller.UpdateStaff(Guid.NewGuid(), new UpdateStaffRequest());
-        var deactivateResult = await _controller.DeactivateStaff(Guid.NewGuid());
-
-        // Assert
-        createResult.Should().BeOfType<UnauthorizedObjectResult>();
-        listResult.Should().BeOfType<UnauthorizedObjectResult>();
-        getResult.Should().BeOfType<UnauthorizedObjectResult>();
-        updateResult.Should().BeOfType<UnauthorizedObjectResult>();
-        deactivateResult.Should().BeOfType<UnauthorizedObjectResult>();
-    }
-
-    [Fact]
-    public async Task Endpoints_ShouldReturn403_WhenUserIsNotAdmin()
-    {
-        // Arrange
-        SetNonAdminUser(StaffRole.REGISTRAR);
-
-        // Act
-        var createResult = await _controller.CreateStaff(new CreateStaffRequest());
-        var listResult = await _controller.ListStaff();
-        var getResult = await _controller.GetStaffById(Guid.NewGuid());
-        var updateResult = await _controller.UpdateStaff(Guid.NewGuid(), new UpdateStaffRequest());
-        var deactivateResult = await _controller.DeactivateStaff(Guid.NewGuid());
-
-        // Assert
-        createResult.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        listResult.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        getResult.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        updateResult.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        deactivateResult.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
     }
 
     #endregion

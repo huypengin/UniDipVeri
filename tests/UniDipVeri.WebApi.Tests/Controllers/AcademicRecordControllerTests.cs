@@ -1,25 +1,46 @@
+using System.Reflection;
 using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using UniDipVeri.Application.Features.AcademicRecords.Abstractions;
 using UniDipVeri.Application.Features.AcademicRecords.Models;
-using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Domain.Enums;
+using UniDipVeri.WebApi.Authorization;
 using UniDipVeri.WebApi.Controllers;
 
 namespace UniDipVeri.WebApi.Tests.Controllers;
 
 public class AcademicRecordControllerTests
 {
-    private readonly Mock<IAuthService> _authServiceMock = new();
     private readonly Mock<IAcademicRecordService> _serviceMock = new();
+    private readonly Mock<IAuthorizationService> _authorizationServiceMock = new();
     private readonly AcademicRecordController _controller;
 
     public AcademicRecordControllerTests()
     {
-        _controller = new AcademicRecordController(_authServiceMock.Object, _serviceMock.Object)
+        var handler = new SameStudentHandler();
+
+        _authorizationServiceMock
+            .Setup(a => a.AuthorizeAsync(
+                It.IsAny<ClaimsPrincipal>(),
+                It.IsAny<object?>(),
+                AuthorizationPolicies.SameStudentOrRegistrar))
+            .Returns<ClaimsPrincipal, object?, string>(async (user, resource, _) =>
+            {
+                if (resource is Guid studentId)
+                {
+                    var req = new SameStudentRequirement(StaffRole.REGISTRAR);
+                    var context = new AuthorizationHandlerContext([req], user, studentId);
+                    await handler.HandleAsync(context);
+                    return context.HasSucceeded ? AuthorizationResult.Success() : AuthorizationResult.Failed();
+                }
+                return AuthorizationResult.Failed();
+            });
+
+        _controller = new AcademicRecordController(_serviceMock.Object, _authorizationServiceMock.Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -42,9 +63,6 @@ public class AcademicRecordControllerTests
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
         _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
-
-        _authServiceMock.Setup(a => a.RequireRole(It.IsAny<ClaimsPrincipal>(), StaffRole.REGISTRAR))
-            .Returns(roles.Contains(StaffRole.REGISTRAR));
     }
 
     private void SetStudentUser(Guid studentId)
@@ -58,9 +76,6 @@ public class AcademicRecordControllerTests
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
         _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
-
-        _authServiceMock.Setup(a => a.RequireRole(It.IsAny<ClaimsPrincipal>(), StaffRole.REGISTRAR))
-            .Returns(false);
     }
 
     private void SetUnauthenticatedUser()
@@ -71,36 +86,22 @@ public class AcademicRecordControllerTests
     #region Authorization Tests
 
     [Fact]
-    public async Task ImportRecord_ShouldReturnUnauthorized_WhenUserIsNotAuthenticated()
+    public void ImportRecord_ShouldHaveAuthorizeAttribute_RequiringRegistrarRole()
     {
-        SetUnauthenticatedUser();
-
-        var result = await _controller.ImportRecord(new ImportAcademicRecordRequest());
-
-        var unauthorized = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
-        unauthorized.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        var method = typeof(AcademicRecordController).GetMethod(nameof(AcademicRecordController.ImportRecord));
+        method.Should().NotBeNull();
+        var authAttr = method!.GetCustomAttribute<AuthorizeAttribute>();
+        authAttr.Should().NotBeNull();
+        authAttr!.Roles.Should().Be("REGISTRAR");
     }
 
     [Fact]
-    public async Task ImportRecord_ShouldReturnForbidden_WhenUserIsNotRegistrar()
+    public void GetRecordByStudentId_ShouldHaveAuthorizeAttribute()
     {
-        SetStaffUser(StaffRole.ADMIN);
-
-        var result = await _controller.ImportRecord(new ImportAcademicRecordRequest());
-
-        var forbidden = result.Should().BeOfType<ObjectResult>().Subject;
-        forbidden.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-    }
-
-    [Fact]
-    public async Task GetRecordByStudentId_ShouldReturnUnauthorized_WhenUserIsNotAuthenticated()
-    {
-        SetUnauthenticatedUser();
-
-        var result = await _controller.GetRecordByStudentId(Guid.NewGuid());
-
-        var unauthorized = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
-        unauthorized.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        var method = typeof(AcademicRecordController).GetMethod(nameof(AcademicRecordController.GetRecordByStudentId));
+        method.Should().NotBeNull();
+        var authAttr = method!.GetCustomAttribute<AuthorizeAttribute>();
+        authAttr.Should().NotBeNull();
     }
 
     [Fact]

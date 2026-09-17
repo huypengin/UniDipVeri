@@ -7,28 +7,28 @@ using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Models;
 using UniDipVeri.Application.Features.Staff.Abstractions;
 using UniDipVeri.Application.Features.Staff.Models;
-using UniDipVeri.Domain.Enums;
 
 namespace UniDipVeri.WebApi.Controllers;
 
 [ApiController]
 [Route("api/staffs")]
-public class StaffController(IAuthService authService, IStaffService staffService) : ControllerBase
+[Authorize(Roles = "ADMIN")]
+public class StaffController(
+    IAuthService authService,
+    IStaffService staffService) : ApiControllerBase
 {
     private readonly IAuthService _authService = authService;
     private readonly IStaffService _staffService = staffService;
 
+    // Login must be accessible without authentication because authorization
+    // can only be applied after the user has successfully signed in.
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest? request, CancellationToken ct = default)
     {
         if (request is null)
         {
             return Unauthorized(new { message = "Invalid email or password." });
-        }
-
-        if (!request.TryValidate(out var error))
-        {
-            return Unauthorized(new { message = error });
         }
 
         var result = await _authService.AuthenticateStaffAsync(request.Email, request.Password, ct);
@@ -65,15 +65,8 @@ public class StaffController(IAuthService authService, IStaffService staffServic
     }
 
     [HttpPost]
-    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> CreateStaff([FromBody] CreateStaffRequest? request, CancellationToken ct = default)
     {
-        var authCheck = CheckAdminAuthorization();
-        if (authCheck is not null)
-        {
-            return authCheck;
-        }
-
         if (request is null)
         {
             return BadRequest(new { message = "Request body is required." });
@@ -89,29 +82,15 @@ public class StaffController(IAuthService authService, IStaffService staffServic
     }
 
     [HttpGet]
-    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> ListStaff(CancellationToken ct = default)
     {
-        var authCheck = CheckAdminAuthorization();
-        if (authCheck is not null)
-        {
-            return authCheck;
-        }
-
         var result = await _staffService.ListStaffAsync(ct);
         return Ok(result.Data);
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> GetStaffById(Guid id, CancellationToken ct = default)
     {
-        var authCheck = CheckAdminAuthorization();
-        if (authCheck is not null)
-        {
-            return authCheck;
-        }
-
         var result = await _staffService.GetStaffByIdAsync(id, ct);
         if (!result.IsSuccess || result.Data is null)
         {
@@ -122,15 +101,8 @@ public class StaffController(IAuthService authService, IStaffService staffServic
     }
 
     [HttpPatch("{id:guid}")]
-    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> UpdateStaff(Guid id, [FromBody] UpdateStaffRequest? request, CancellationToken ct = default)
     {
-        var authCheck = CheckAdminAuthorization();
-        if (authCheck is not null)
-        {
-            return authCheck;
-        }
-
         if (request is null)
         {
             return BadRequest(new { message = "Request body is required." });
@@ -146,15 +118,8 @@ public class StaffController(IAuthService authService, IStaffService staffServic
     }
 
     [HttpPost("{id:guid}/deactivate")]
-    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> DeactivateStaff(Guid id, CancellationToken ct = default)
     {
-        var authCheck = CheckAdminAuthorization();
-        if (authCheck is not null)
-        {
-            return authCheck;
-        }
-
         var result = await _staffService.DeactivateStaffAsync(id, ct);
         if (!result.IsSuccess || result.Data is null)
         {
@@ -162,32 +127,5 @@ public class StaffController(IAuthService authService, IStaffService staffServic
         }
 
         return Ok(result.Data);
-    }
-
-    private IActionResult? CheckAdminAuthorization()
-    {
-        if (User.Identity is null || !User.Identity.IsAuthenticated)
-        {
-            return Unauthorized(new { message = "Not authenticated." });
-        }
-
-        if (!_authService.RequireRole(User, StaffRole.ADMIN))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Forbidden. ADMIN role required." });
-        }
-
-        return null;
-    }
-
-    private IActionResult MapErrorResult(StaffErrorType errorType, string? error)
-    {
-        var message = error ?? "An error occurred.";
-        return errorType switch
-        {
-            StaffErrorType.NotFound => NotFound(new { message }),
-            StaffErrorType.Conflict => Conflict(new { message }),
-            StaffErrorType.PolicyViolation => BadRequest(new { message }),
-            _ => BadRequest(new { message })
-        };
     }
 }

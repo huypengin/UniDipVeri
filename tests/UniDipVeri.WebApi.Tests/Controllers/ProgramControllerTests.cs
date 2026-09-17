@@ -1,9 +1,10 @@
+using System.Reflection;
 using System.Security.Claims;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
-using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Programs.Abstractions;
 using UniDipVeri.Application.Features.Programs.Models;
 using UniDipVeri.Domain.Enums;
@@ -13,13 +14,12 @@ namespace UniDipVeri.WebApi.Tests.Controllers;
 
 public class ProgramControllerTests
 {
-    private readonly Mock<IAuthService> _authServiceMock = new();
     private readonly Mock<IProgramService> _programServiceMock = new();
     private readonly ProgramController _controller;
 
     public ProgramControllerTests()
     {
-        _controller = new ProgramController(_authServiceMock.Object, _programServiceMock.Object)
+        _controller = new ProgramController(_programServiceMock.Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -42,9 +42,6 @@ public class ProgramControllerTests
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
         _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
-
-        _authServiceMock.Setup(a => a.RequireRole(It.IsAny<ClaimsPrincipal>(), StaffRole.REGISTRAR))
-            .Returns(roles.Contains(StaffRole.REGISTRAR));
     }
 
     private void SetUnauthenticatedUser()
@@ -52,70 +49,14 @@ public class ProgramControllerTests
         _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
     }
 
-    #region Authorization Tests
+    #region Authorization Attribute Tests
 
     [Fact]
-    public async Task CreateProgram_ShouldReturnUnauthorized_WhenUserIsNotAuthenticated()
+    public void ProgramController_ShouldBeDecoratedWithAuthorizeAttribute_RequiringRegistrarRole()
     {
-        SetUnauthenticatedUser();
-
-        var result = await _controller.CreateProgram(new CreateProgramRequest());
-
-        result.Should().BeOfType<UnauthorizedObjectResult>();
-    }
-
-    [Fact]
-    public async Task CreateProgram_ShouldReturnForbidden_WhenUserIsNotRegistrar()
-    {
-        SetAuthenticatedUser(StaffRole.APPROVER);
-
-        var result = await _controller.CreateProgram(new CreateProgramRequest());
-
-        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
-        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-    }
-
-    [Fact]
-    public async Task CreateProgram_ShouldReturnForbidden_WhenUserIsAdminOnly()
-    {
-        SetAuthenticatedUser(StaffRole.ADMIN);
-
-        var result = await _controller.CreateProgram(new CreateProgramRequest());
-
-        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
-        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-    }
-
-    [Fact]
-    public async Task ListPrograms_ShouldReturnUnauthorized_WhenUserIsNotAuthenticated()
-    {
-        SetUnauthenticatedUser();
-
-        var result = await _controller.ListPrograms();
-
-        result.Should().BeOfType<UnauthorizedObjectResult>();
-    }
-
-    [Fact]
-    public async Task ListPrograms_ShouldReturnForbidden_WhenUserIsNotRegistrar()
-    {
-        SetAuthenticatedUser(StaffRole.APPROVER);
-
-        var result = await _controller.ListPrograms();
-
-        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
-        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-    }
-
-    [Fact]
-    public async Task ListPrograms_ShouldReturnForbidden_WhenUserIsAdminOnly()
-    {
-        SetAuthenticatedUser(StaffRole.ADMIN);
-
-        var result = await _controller.ListPrograms();
-
-        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
-        statusResult.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        var authAttr = typeof(ProgramController).GetCustomAttribute<AuthorizeAttribute>();
+        authAttr.Should().NotBeNull();
+        authAttr!.Roles.Should().Be("REGISTRAR");
     }
 
     #endregion

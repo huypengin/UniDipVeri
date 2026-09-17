@@ -9,7 +9,7 @@ namespace UniDipVeri.WebApi.Controllers;
 
 [ApiController]
 [Route("api/students")]
-public class StudentController(IAuthService authService) : ControllerBase
+public class StudentController(IAuthService authService) : ApiControllerBase
 {
     private readonly IAuthService _authService = authService;
 
@@ -19,11 +19,6 @@ public class StudentController(IAuthService authService) : ControllerBase
         if (request is null)
         {
             return Unauthorized(new { message = "Invalid email or password." });
-        }
-
-        if (!request.TryValidate(out var error))
-        {
-            return Unauthorized(new { message = error });
         }
 
         var result = await _authService.AuthenticateStudentAsync(request.Email, request.Password, ct);

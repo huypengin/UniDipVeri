@@ -152,25 +152,4 @@ public class StudentControllerTests
 
         _authServiceMock.Verify(s => s.AuthenticateStudentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
-
-    [Theory]
-    [InlineData("", "pass")]
-    [InlineData("   ", "pass")]
-    [InlineData("student@miu.edu", "")]
-    [InlineData("student@miu.edu", "   ")]
-    public async Task Login_ShouldReturn401_WhenEmailOrPasswordIsEmptyOrWhitespace(string email, string password)
-    {
-        // Arrange
-        var request = new LoginRequest(email, password);
-
-        // Act
-        var result = await _controller.Login(request, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<UnauthorizedObjectResult>();
-        var unauthorizedResult = (UnauthorizedObjectResult)result;
-        unauthorizedResult.StatusCode.Should().Be(401);
-
-        _authServiceMock.Verify(s => s.AuthenticateStudentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
 }

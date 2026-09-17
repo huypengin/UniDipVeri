@@ -3,26 +3,24 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SharpGrip.FluentValidation.AutoValidation.Mvc.Attributes;
 using UniDipVeri.Application.Features.Auth.Abstractions;
 using UniDipVeri.Application.Features.Auth.Models;
+using UniDipVeri.Application.Features.Auth.Validators;
 
 namespace UniDipVeri.WebApi.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(IAuthService authService) : ControllerBase
+public class AuthController(IAuthService authService) : ApiControllerBase
 {
     private readonly IAuthService _authService = authService;
 
+    [Authorize]
     [HttpGet("me")]
     [HttpGet("/api/me")]
     public async Task<IActionResult> GetCurrentUser(CancellationToken ct = default)
     {
-        if (User.Identity is null || !User.Identity.IsAuthenticated)
-        {
-            return Unauthorized(new { message = "Not authenticated." });
-        }
-
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
         var nameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -64,12 +62,17 @@ public class AuthController(IAuthService authService) : ControllerBase
 
     [HttpPost("reset-password")]
     public async Task<IActionResult> RequestPasswordReset(
-        [FromBody] ResetPasswordRequest? request,
+        [FromBody][AutoValidateNever] ResetPasswordRequest? request,
         CancellationToken ct = default)
     {
-        if (request is not null && !string.IsNullOrWhiteSpace(request.Email))
+        if (request is not null)
         {
-            await _authService.RequestPasswordResetAsync(request.Email, ct);
+            var validator = new ResetPasswordRequestValidator();
+            var validationResult = await validator.ValidateAsync(request, ct);
+            if (validationResult.IsValid)
+            {
+                await _authService.RequestPasswordResetAsync(request.Email, ct);
+            }
         }
 
         // Anti-enumeration: always return 200 OK with identical message
@@ -84,7 +87,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         [FromBody] ConfirmResetPasswordRequest? request,
         CancellationToken ct = default)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+        if (request is null)
         {
             return BadRequest(new { message = "Token and new password are required." });
         }
@@ -107,7 +110,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         [FromBody] ChangePasswordRequest? request,
         CancellationToken ct = default)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+        if (request is null)
         {
             return BadRequest(new { message = "Current password and new password are required." });
         }
