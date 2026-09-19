@@ -20,6 +20,8 @@
     initialDatabases = [
       { name = "unidipveri"; }
     ];
+    # Enable TCP/IP connections
+    listen_addresses = "localhost";
     settings = {
       shared_buffers = "64MB";
       effective_cache_size = "256MB";
