@@ -1,0 +1,132 @@
+vct: "https://credentials.university.edu/types/graduation-record/v1"
+name: "Graduation Academic Record"
+description: "Official comprehensive graduation credential containing Diploma conferral and Final Academic Transcript."
+
+claims:
+  studentId:
+    type: string
+    required: true
+    sd: always_disclosed
+    description: "Internal university student identifier"
+
+  fullName:
+    type: string
+    required: true
+    sd: always_disclosed
+    description: "Full legal student name"
+
+  dateOfBirth:
+    type: string
+    format: date
+    required: false
+    sd: selectively_disclosable
+    description: "Date of birth (YYYY-MM-DD)"
+
+  nationalId:
+    type: string
+    required: false
+    sd: selectively_disclosable
+    description: "National ID / citizen number"
+
+  papers:
+    type: object
+    required: true
+    sd: always_disclosed
+    properties:
+      diploma:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        description: "Official university diploma record"
+        properties:
+          degreeName:
+            type: string
+            required: true
+            sd: always_disclosed
+            description: "Conferred degree title"
+          degreeType:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Degree classification"
+          programName:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Academic major/program"
+          major:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Primary academic major"
+          minor:
+            type: string
+            required: false
+            sd: selectively_disclosable
+            description: "Secondary academic minor"
+          graduationDate:
+            type: string
+            format: date
+            required: true
+            sd: always_disclosed
+            description: "Official graduation conferral date"
+          honours:
+            type: string
+            required: false
+            sd: selectively_disclosable
+            description: "Honours classification"
+
+      transcript:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        description: "Complete academic transcript record"
+        properties:
+          transcriptId:
+            type: string
+            required: true
+            sd: always_disclosed
+            description: "Official transcript serial number"
+          cumulativeGPA:
+            type: number
+            required: false
+            sd: selectively_disclosable
+            description: "Final cumulative GPA"
+          totalCredits:
+            type: number
+            required: false
+            sd: selectively_disclosable
+            description: "Total completed academic credits"
+          courses:
+            type: array
+            required: true
+            sd: selectively_disclosable
+            description: "Complete course-level results"
+            items:
+              type: object
+              properties:
+                code:
+                  type: string
+                  required: true
+                  sd: always_disclosed
+                  description: "Course code"
+                title:
+                  type: string
+                  required: true
+                  sd: always_disclosed
+                  description: "Course name"
+                credits:
+                  type: number
+                  required: true
+                  sd: always_disclosed
+                  description: "Course credits"
+                grade:
+                  type: number
+                  required: true
+                  sd: selectively_disclosable
+                  description: "Numerical course grade"
+                letterGrade:
+                  type: string
+                  required: false
+                  sd: selectively_disclosable
+                  description: "Letter grade"
