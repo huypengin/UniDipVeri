@@ -1,0 +1,56 @@
+vct: "https://credentials.university.edu/types/graduation-record/v1"
+name: "Graduation Academic Record"
+description: "Official comprehensive graduation credential containing Diploma conferral and Final Academic Transcript."
+
+claims:
+  studentId:
+    type: string
+    required: true
+    sd: always_disclosed
+  fullName:
+    type: string
+    required: true
+    sd: always_disclosed
+  papers:
+    type: object
+    required: true
+    sd: always_disclosed
+    properties:
+      diploma:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        properties:
+          degreeName:
+            type: string
+            required: true
+            sd: always_disclosed
+          graduationDate:
+            type: string
+            format: date
+            required: true
+            sd: always_disclosed
+      transcript:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        properties:
+          cumulativeGPA:
+            type: number
+            required: false
+            sd: selectively_disclosable
+          courses:
+            type: array
+            required: true
+            sd: selectively_disclosable
+            items:
+              type: object
+              properties:
+                code:
+                  type: string
+                  required: true
+                  sd: always_disclosed
+                grade:
+                  type: number
+                  required: true
+                  sd: selectively_disclosable
