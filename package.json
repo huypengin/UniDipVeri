@@ -1,0 +1,17 @@
+{
+  "name": "unidipveri-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "bun --filter \"*\" typecheck",
+    "test": "bun --filter \"*\" test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.2"
+  }
+}

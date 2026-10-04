@@ -1,0 +1,13 @@
+{
+  "name": "@unidipveri/playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Playground web application scheduled for implementation in Weeks 5-6' && exit 0"
+  },
+  "dependencies": {
+    "@unidipveri/core": "workspace:*",
+    "@unidipveri/did-resolver": "workspace:*"
+  }
+}
