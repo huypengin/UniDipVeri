@@ -13,3 +13,4 @@ export * from "./signing/signer.js";
 export * from "./sd-jwt/salt.js";
 export * from "./sd-jwt/disclosure.js";
 export * from "./sd-jwt/digest.js";
+export * from "./sd-jwt/transform.js";
