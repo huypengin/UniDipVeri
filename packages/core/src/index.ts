@@ -11,3 +11,4 @@ export * from "./signing/signer.js";
 
 // SD-JWT primitives
 export * from "./sd-jwt/salt.js";
+export * from "./sd-jwt/disclosure.js";
