@@ -60,7 +60,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
 
     // Build standard compact JWS representation
     const header = base64url.encode(
-      new TextEncoder().encode(JSON.stringify({ alg: "ES256", typ: "vc+sd-jwt" }))
+      new TextEncoder().encode(JSON.stringify({ alg: "ES256", typ: "dc+sd-jwt" }))
     );
     const payload = base64url.encode(
       new TextEncoder().encode(JSON.stringify(maskedPayload))

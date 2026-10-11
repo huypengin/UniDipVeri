@@ -473,7 +473,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
       // Construct a mock SD-JWT with our masked payload and all generated disclosures
       const jwtHeader = base64url.encode(
-        new TextEncoder().encode(JSON.stringify({ alg: "ES256", typ: "vc+sd-jwt" }))
+        new TextEncoder().encode(JSON.stringify({ alg: "ES256", typ: "dc+sd-jwt" }))
       );
       const jwtPayload = base64url.encode(
         new TextEncoder().encode(JSON.stringify(result.maskedPayload))
