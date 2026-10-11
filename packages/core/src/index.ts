@@ -8,6 +8,7 @@ export * from "./config/config.js";
 
 // Cryptographic signing abstraction
 export * from "./signing/signer.js";
+export * from "./signing/vc-issuer.js";
 
 // SD-JWT primitives
 export * from "./sd-jwt/salt.js";
