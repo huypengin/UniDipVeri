@@ -11,6 +11,10 @@ import {
 } from "../sd-jwt/transform.js";
 import type { SupportedDigestAlgorithm } from "../sd-jwt/digest.js";
 import type { CredentialTypeConfig, ClaimDef } from "../schema/types.js";
+import {
+  RESERVED_ROOT_CLAIM_NAMES,
+  type ReservedRootClaimName,
+} from "../schema/validator.js";
 
 /**
  * Standard media type for SD-JWT-based Verifiable Credentials
@@ -22,21 +26,23 @@ export const SD_JWT_VC_TYP = "dc+sd-jwt";
  * Reserved top-level claim names prohibited in caller raw claims.
  * Enforced per draft-ietf-oauth-sd-jwt-vc-19 Section 3 and RFC 9901 Section 4.2.1.
  */
-export const RESERVED_TOP_LEVEL_CLAIMS = [
-  "iss",
-  "vct",
-  "iat",
-  "nbf",
-  "exp",
-  "jti",
-  "cnf",
-  "status",
-  "_sd",
-  "_sd_alg",
-  "...",
-] as const;
+export const RESERVED_TOP_LEVEL_CLAIMS = RESERVED_ROOT_CLAIM_NAMES;
 
-export type ReservedTopLevelClaim = (typeof RESERVED_TOP_LEVEL_CLAIMS)[number];
+export type ReservedTopLevelClaim = ReservedRootClaimName;
+
+/**
+ * Standard JWK private key parameters per RFC 7517 and RFC 7518
+ * that must never appear in holder confirmation (cnf) public keys.
+ */
+export const JWK_PRIVATE_KEY_PROPERTIES = [
+  "d",
+  "p",
+  "q",
+  "dp",
+  "dq",
+  "qi",
+  "k",
+] as const;
 
 /**
  * Zod schema for Holder Confirmation (cnf) claim per RFC 9901 Section 4.3
@@ -53,7 +59,20 @@ export const CnfClaimSchema = z
   })
   .refine((data) => data.jwk !== undefined || data.kid !== undefined, {
     message: "cnf claim must contain at least one of 'jwk' or 'kid'",
-  });
+  })
+  .refine(
+    (data) => {
+      if (!data.jwk) {
+        return true;
+      }
+      const jwk = data.jwk as unknown as Record<string, unknown>;
+      return !JWK_PRIVATE_KEY_PROPERTIES.some((prop) => prop in jwk);
+    },
+    {
+      message:
+        "cnf.jwk must not contain private key material (d, p, q, dp, dq, qi, or k)",
+    }
+  );
 
 export type CnfClaim = z.infer<typeof CnfClaimSchema>;
 
@@ -138,7 +157,7 @@ export interface IssuedSdJwtVcResult {
   disclosures: string[];
 
   /** The full signed JWT payload (root metadata + masked claims) */
-  maskedPayload: Record<string, unknown>;
+  payload: Record<string, unknown>;
 }
 
 /**
@@ -190,6 +209,8 @@ async function resolvePrivateKey(
  * Requirements per draft-ietf-oauth-sd-jwt-vc-19:
  * - JWT header contains typ: "dc+sd-jwt" and alg matching signingKey.alg.
  * - JWT payload must contain mandatory 'iss' and 'vct' claims.
+ * - Validates 'cnf' and 'status' claims if present against schema constraints.
+ * - Enforces timestamp ordering if both 'nbf' and 'exp' are numeric.
  * - Output serialized as <signed-jwt>~<disc1>~...~<discN>~ per RFC 9901 Section 5.
  *
  * @param options Low-level signing options
@@ -212,6 +233,27 @@ export async function signSdJwtVc(
     throw new Error("Payload must contain a non-empty 'vct' claim");
   }
 
+  // Validate cnf claim if present in payload
+  if (payload.cnf !== undefined) {
+    CnfClaimSchema.parse(payload.cnf);
+  }
+
+  // Validate status claim if present in payload
+  if (payload.status !== undefined) {
+    TokenStatusListClaimSchema.parse(payload.status);
+  }
+
+  // Validate timestamp ordering if both nbf and exp are present
+  if (
+    typeof payload.exp === "number" &&
+    typeof payload.nbf === "number" &&
+    payload.nbf > payload.exp
+  ) {
+    throw new Error(
+      `Invalid timestamps: nbf (${payload.nbf}) cannot be greater than exp (${payload.exp})`
+    );
+  }
+
   const validatedAlg = SigningAlgorithmSchema.parse(signingKey.alg);
   const key = await resolvePrivateKey(signingKey.privateKey, validatedAlg);
 
@@ -232,7 +274,7 @@ export async function signSdJwtVc(
     compact,
     jwt,
     disclosures,
-    maskedPayload: payload,
+    payload,
   };
 }
 
@@ -288,6 +330,25 @@ export async function issueSdJwtVc(
     TokenStatusListClaimSchema.parse(options.status);
   }
 
+  // Validate timestamp parameters
+  if (options.validitySeconds !== undefined) {
+    if (
+      typeof options.validitySeconds !== "number" ||
+      !Number.isFinite(options.validitySeconds) ||
+      options.validitySeconds <= 0
+    ) {
+      throw new Error("options.validitySeconds must be a positive number (> 0)");
+    }
+  }
+
+  if (
+    options.notBeforeSeconds !== undefined &&
+    (typeof options.notBeforeSeconds !== "number" ||
+      !Number.isFinite(options.notBeforeSeconds))
+  ) {
+    throw new Error("options.notBeforeSeconds must be a finite number");
+  }
+
   // Step 2: Transform raw claims into masked payload and salted disclosures
   const transformOptions: TransformOptions = {
     algorithm: options.digestAlgorithm,
@@ -310,6 +371,13 @@ export async function issueSdJwtVc(
     options.validitySeconds !== undefined
       ? iat + options.validitySeconds
       : undefined;
+
+  if (exp !== undefined && nbf > exp) {
+    throw new Error(
+      `Invalid timestamps: nbf (${nbf}) cannot be greater than exp (${exp})`
+    );
+  }
+
   const jti = options.jti ?? crypto.randomUUID();
 
   const assembledPayload: Record<string, unknown> = {

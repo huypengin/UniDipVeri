@@ -267,4 +267,35 @@ claims:
       /Unrecognized top-level configuration directive/
     );
   });
+
+  it("fails when a top-level claim name uses a reserved protocol name", () => {
+    const reservedClaims = [
+      "iss",
+      "vct",
+      "iat",
+      "nbf",
+      "exp",
+      "jti",
+      "cnf",
+      "status",
+      "_sd",
+      "_sd_alg",
+      "...",
+    ];
+
+    for (const reserved of reservedClaims) {
+      const maliciousYaml = `
+vct: "https://credentials.university.edu/types/reserved-claim-test/v1"
+name: "Reserved Claim Collision Test"
+description: "Tries to declare a claim with reserved name"
+claims:
+  ${reserved}:
+    type: string
+    sd: selectively_disclosable
+`;
+      expect(() => parseSchemaYaml(maliciousYaml)).toThrow(
+        new RegExp(`Claim definition uses reserved top-level claim name.*${reserved.replace(".", "\\.")}`)
+      );
+    }
+  });
 });

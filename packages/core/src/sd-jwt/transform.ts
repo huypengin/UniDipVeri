@@ -89,6 +89,43 @@ export interface ReconstructOptions {
  * @param options Transformation options
  * @returns Masked claims payload and generated disclosure strings
  */
+/**
+ * Reserved SD-JWT claim/marker names prohibited anywhere in caller input claims.
+ * Enforced per RFC 9901 Section 4.2.1 and Section 4.2.4 to prevent injection
+ * of counterfeit digests or array element markers in mapped or unmapped structures.
+ */
+export const RESERVED_SD_TRANSFORM_KEYS = ["_sd", "_sd_alg", "..."] as const;
+
+/**
+ * Recursively asserts that input data contains no reserved SD-JWT keys (_sd, _sd_alg, ...).
+ * Prevents callers from smuggling fake disclosure digests or array markers into claims,
+ * including nested unmapped objects and arrays.
+ *
+ * @param val Value to inspect
+ * @param currentPath Path prefix for diagnostics
+ * @throws Error if any reserved key is found
+ */
+export function assertNoReservedSdKeys(val: unknown, currentPath = ""): void {
+  if (val === null || typeof val !== "object") {
+    return;
+  }
+  if (Array.isArray(val)) {
+    for (let i = 0; i < val.length; i++) {
+      assertNoReservedSdKeys(val[i], `${currentPath}[${i}]`);
+    }
+    return;
+  }
+  for (const [key, nestedVal] of Object.entries(val as Record<string, unknown>)) {
+    const fullPath = currentPath ? `${currentPath}.${key}` : key;
+    if (key === "_sd" || key === "_sd_alg" || key === "...") {
+      throw new Error(
+        `Input claims data must not contain reserved SD-JWT key '${key}' at path '${fullPath}'`
+      );
+    }
+    assertNoReservedSdKeys(nestedVal, fullPath);
+  }
+}
+
 export function transformClaims(
   claimsData: Record<string, unknown>,
   schema: CredentialTypeConfig | Record<string, ClaimDef>,
@@ -101,6 +138,9 @@ export function transformClaims(
   ) {
     throw new Error("claimsData must be a non-null object");
   }
+
+  // Recursive guard: reject _sd, _sd_alg, and ... in caller claims at any depth
+  assertNoReservedSdKeys(claimsData, "");
 
   const claimDefs: Record<string, ClaimDef> =
     "claims" in schema &&

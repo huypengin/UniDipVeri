@@ -87,7 +87,7 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         expect(result.jwt).toBeDefined();
         expect(result.disclosures).toBeArray();
         expect(result.disclosures.length).toBeGreaterThan(0);
-        expect(result.maskedPayload).toBeDefined();
+        expect(result.payload).toBeDefined();
 
         // 2. Wire format ends with delimiter "~" per RFC 9901 Section 5
         expect(result.compact.endsWith("~")).toBe(true);
@@ -200,6 +200,47 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
           holderConfirmation: {} as any,
         })
       ).rejects.toThrow();
+    });
+
+    it("rejects cnf.jwk containing private key material in issueSdJwtVc", async () => {
+      const schema = await loadSchemaFromFile(schemaPath);
+      const issuerKeys = await generateKeyPair("ES256");
+      const holderKeys = await generateKeyPair("ES256");
+
+      expect(
+        issueSdJwtVc(testStudentClaims, schema, {
+          issuer: "did:web:university.edu",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+          holderConfirmation: {
+            jwk: holderKeys.privateKeyJwk, // Contains private parameter 'd'
+          },
+        })
+      ).rejects.toThrow(/cnf\.jwk must not contain private key material/);
+    });
+
+    it("rejects payload.cnf containing private key material in signSdJwtVc", async () => {
+      const issuerKeys = await generateKeyPair("ES256");
+      const holderKeys = await generateKeyPair("ES256");
+
+      expect(
+        signSdJwtVc({
+          payload: {
+            iss: "did:web:university.edu",
+            vct: "https://credentials.university.edu/plain/v1",
+            cnf: {
+              jwk: holderKeys.privateKeyJwk, // Contains private parameter 'd'
+            },
+          },
+          disclosures: [],
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+        })
+      ).rejects.toThrow(/cnf\.jwk must not contain private key material/);
     });
   });
 
@@ -335,6 +376,71 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
       expect(verifyResult.payload.nbf).toBe(explicitIat + 5);
       expect(verifyResult.payload.exp).toBe(explicitIat + 3600);
       expect(verifyResult.payload.jti).toBe(explicitJti);
+    });
+
+    it("rejects non-positive validitySeconds in issueSdJwtVc", async () => {
+      const schema = await loadSchemaFromFile(schemaPath);
+      const issuerKeys = await generateKeyPair("ES256");
+
+      expect(
+        issueSdJwtVc(testStudentClaims, schema, {
+          issuer: "did:web:university.edu",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+          validitySeconds: 0,
+        })
+      ).rejects.toThrow(/options\.validitySeconds must be a positive number/);
+
+      expect(
+        issueSdJwtVc(testStudentClaims, schema, {
+          issuer: "did:web:university.edu",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+          validitySeconds: -60,
+        })
+      ).rejects.toThrow(/options\.validitySeconds must be a positive number/);
+    });
+
+    it("rejects when nbf > exp in issueSdJwtVc", async () => {
+      const schema = await loadSchemaFromFile(schemaPath);
+      const issuerKeys = await generateKeyPair("ES256");
+
+      expect(
+        issueSdJwtVc(testStudentClaims, schema, {
+          issuer: "did:web:university.edu",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+          validitySeconds: 100,
+          notBeforeSeconds: 200, // nbf = iat + 200 > exp = iat + 100
+        })
+      ).rejects.toThrow(/Invalid timestamps: nbf .* cannot be greater than exp/);
+    });
+
+    it("rejects when payload.nbf > payload.exp in signSdJwtVc", async () => {
+      const issuerKeys = await generateKeyPair("ES256");
+
+      expect(
+        signSdJwtVc({
+          payload: {
+            iss: "did:web:university.edu",
+            vct: "https://credentials.university.edu/plain/v1",
+            iat: 1000,
+            nbf: 1500,
+            exp: 1200,
+          },
+          disclosures: [],
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+        })
+      ).rejects.toThrow(/Invalid timestamps: nbf .* cannot be greater than exp/);
     });
   });
 
