@@ -51,6 +51,22 @@ export const ClaimDefSchema: z.ZodType<ClaimDef> = z.lazy(() =>
     })
 );
 
+export const RESERVED_ROOT_CLAIM_NAMES = [
+  "iss",
+  "vct",
+  "iat",
+  "nbf",
+  "exp",
+  "jti",
+  "cnf",
+  "status",
+  "_sd",
+  "_sd_alg",
+  "...",
+] as const;
+
+export type ReservedRootClaimName = (typeof RESERVED_ROOT_CLAIM_NAMES)[number];
+
 export const CredentialTypeConfigSchema: z.ZodType<CredentialTypeConfig> = z
   .object({
     vct: z
@@ -67,8 +83,15 @@ export const CredentialTypeConfigSchema: z.ZodType<CredentialTypeConfig> = z
         });
         return;
       }
-      // Every top-level named claim must have an explicit 'sd'
+      // Every top-level named claim must have an explicit 'sd' and must not collide with reserved names
       for (const [key, claim] of Object.entries(claims)) {
+        if ((RESERVED_ROOT_CLAIM_NAMES as readonly string[]).includes(key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Claim definition uses reserved top-level claim name "${key}" (RFC 9901 / draft-ietf-oauth-sd-jwt-vc-19).`,
+            path: [key],
+          });
+        }
         if (!claim.sd) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

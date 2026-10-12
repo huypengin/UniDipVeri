@@ -6,6 +6,8 @@ import { createHash } from "node:crypto";
 import { loadSchemaFromFile } from "../src/schema/loader.js";
 import type { CredentialTypeConfig } from "../src/schema/types.js";
 import {
+  assertNoReservedSdKeys,
+  RESERVED_SD_TRANSFORM_KEYS,
   reconstructClaims,
   transformClaims,
 } from "../src/sd-jwt/transform.js";
@@ -611,6 +613,59 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
       expect(() =>
         reconstructClaims(tamperedPayload, [disclosure.encoded])
       ).toThrow(/Collision detected: claim "email" already exists as a plain property/);
+    });
+
+    it("rejects reserved SD keys (_sd, _sd_alg, ...) at root level of claimsData", () => {
+      for (const reservedKey of RESERVED_SD_TRANSFORM_KEYS) {
+        const payloadWithReserved = {
+          mandatoryId: "ID-1",
+          mandatorySecret: "sec",
+          [reservedKey]: "injected",
+        };
+
+        expect(() => transformClaims(payloadWithReserved, strictSchema)).toThrow(
+          new RegExp(`Input claims data must not contain reserved SD-JWT key '${reservedKey.replace(".", "\\.")}'`)
+        );
+      }
+    });
+
+    it("rejects reserved SD keys nested deeply in unmapped objects and arrays", () => {
+      const nestedInUnmappedObject = {
+        mandatoryId: "ID-1",
+        mandatorySecret: "sec",
+        unmappedMetadata: {
+          subSection: {
+            _sd: ["fake-digest"],
+          },
+        },
+      };
+
+      expect(() =>
+        transformClaims(nestedInUnmappedObject, strictSchema)
+      ).toThrow(
+        /Input claims data must not contain reserved SD-JWT key '_sd' at path 'unmappedMetadata\.subSection\._sd'/
+      );
+
+      const nestedInArray = {
+        mandatoryId: "ID-1",
+        mandatorySecret: "sec",
+        itemsList: [
+          { validProp: 1 },
+          { "...": "fake-marker-digest" },
+        ],
+      };
+
+      expect(() => transformClaims(nestedInArray, strictSchema)).toThrow(
+        /Input claims data must not contain reserved SD-JWT key '\.\.\.' at path 'itemsList\[1\]/
+      );
+    });
+
+    it("assertNoReservedSdKeys handles primitive values and null safely without error", () => {
+      expect(() => assertNoReservedSdKeys(null)).not.toThrow();
+      expect(() => assertNoReservedSdKeys("string")).not.toThrow();
+      expect(() => assertNoReservedSdKeys(123)).not.toThrow();
+      expect(() => assertNoReservedSdKeys(true)).not.toThrow();
+      expect(() => assertNoReservedSdKeys({ clean: { nested: [1, 2, 3] } })).not.toThrow();
     });
   });
 });
