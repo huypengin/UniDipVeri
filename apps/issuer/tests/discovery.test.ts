@@ -1,0 +1,240 @@
+import { describe, expect, it } from "bun:test";
+import { join } from "node:path";
+import { loadSchemaFromFile, resolveVct } from "@unidipveri/core";
+import { loadIssuerConfig } from "../src/config.js";
+import {
+  deriveCredentialConfigurationId,
+  deriveJsonSchema,
+  deriveOid4vciClaims,
+  deriveScope,
+  formatClaimDisplayName,
+  generateIssuerMetadata,
+  generateTypeMetadata,
+  type Oid4vciIssuerMetadata,
+  type SdJwtVcTypeMetadata,
+} from "../src/services/claims-metadata.js";
+import { handleMetadataRequest } from "../src/routes/metadata.js";
+import { handleVctRequest } from "../src/routes/vct.js";
+
+const schemaPath = join(
+  import.meta.dir,
+  "../../../schemas/graduation-record.yaml"
+);
+const schemaConfig = await loadSchemaFromFile(schemaPath);
+const issuerConfig = loadIssuerConfig({
+  ISSUER_BASE_URL: "https://issuer.university.edu",
+  SCHEMA_PATH: schemaPath,
+});
+
+describe("OID4VCI & SD-JWT VC Discovery Engine (Tasks 2.2 & 2.3)", () => {
+
+  describe("Claim Display & Formatting Helpers", () => {
+    it("formats camelCase identifiers into human-readable display labels", () => {
+      expect(formatClaimDisplayName("studentId")).toBe("Student ID");
+      expect(formatClaimDisplayName("fullName")).toBe("Full Name");
+      expect(formatClaimDisplayName("dateOfBirth")).toBe("Date Of Birth");
+      expect(formatClaimDisplayName("nationalId")).toBe("National ID");
+      expect(formatClaimDisplayName("cumulativeGPA")).toBe("Cumulative GPA");
+      expect(formatClaimDisplayName("totalCredits")).toBe("Total Credits");
+      expect(formatClaimDisplayName("degreeName")).toBe("Degree Name");
+      expect(formatClaimDisplayName("letterGrade")).toBe("Letter Grade");
+    });
+
+    it("derives normalized configuration ID from vctPath", () => {
+      const configId = deriveCredentialConfigurationId(
+        schemaConfig.vctPath,
+        schemaConfig.name
+      );
+      expect(configId).toBe("graduation_record_sd_jwt_vc");
+    });
+
+    it("derives scope identifier from credential name", () => {
+      const scope = deriveScope(schemaConfig.name);
+      expect(scope).toBe("GraduationAcademicRecord");
+    });
+  });
+
+  describe("OID4VCI Claims Metadata (Task 2.2 - OID4VCI 1.0 Final Section 11.2.3)", () => {
+    it("derives mandatory and optional claims accurately from schema definition", () => {
+      const oid4vciClaims = deriveOid4vciClaims(schemaConfig.claims);
+
+      // Mandatory claims
+      expect(oid4vciClaims.studentId.mandatory).toBe(true);
+      expect(oid4vciClaims.studentId.value_type).toBe("string");
+      expect(oid4vciClaims.studentId.display?.[0].name).toBe("Student ID");
+      expect(oid4vciClaims.studentId.display?.[0].locale).toBe("en-US");
+
+      expect(oid4vciClaims.fullName.mandatory).toBe(true);
+      expect(oid4vciClaims.papers.mandatory).toBe(true);
+      expect(oid4vciClaims.papers.value_type).toBe("object");
+
+      // Selectively disclosable / optional claims
+      expect(oid4vciClaims.dateOfBirth.mandatory).toBe(false);
+      expect(oid4vciClaims.dateOfBirth.value_type).toBe("string");
+      expect(oid4vciClaims.dateOfBirth.display?.[0].name).toBe("Date Of Birth");
+
+      expect(oid4vciClaims.nationalId.mandatory).toBe(false);
+    });
+
+    it("generates full compliant OID4VCI Credential Issuer Metadata document", () => {
+      const metadata = generateIssuerMetadata(issuerConfig, schemaConfig);
+
+      expect(metadata.credential_issuer).toBe("https://issuer.university.edu");
+      expect(metadata.credential_endpoint).toBe(
+        "https://issuer.university.edu/credential"
+      );
+      expect(metadata.token_endpoint).toBe("https://issuer.university.edu/token");
+
+      const configId = "graduation_record_sd_jwt_vc";
+      const config = metadata.credential_configurations_supported[configId];
+      expect(config).toBeDefined();
+
+      // draft-ietf-oauth-sd-jwt-vc-19 updated format media type to dc+sd-jwt
+      expect(config.format).toBe("dc+sd-jwt");
+      expect(config.vct).toBe(
+        resolveVct(schemaConfig.vctPath, issuerConfig.vctBaseUrl)
+      );
+      expect(config.cryptographic_binding_methods_supported).toEqual(["jwk"]);
+      expect(config.credential_signing_alg_values_supported).toEqual([
+        "ES256",
+        "EdDSA",
+        "ES384",
+      ]);
+      expect(
+        config.proof_types_supported.jwt.proof_signing_alg_values_supported
+      ).toEqual(["ES256", "EdDSA", "ES384"]);
+
+      expect(config.display[0].name).toBe("Graduation Academic Record");
+      expect(config.display[0].locale).toBe("en-US");
+
+      expect(config.claims.studentId).toBeDefined();
+      expect(config.claims.studentId.mandatory).toBe(true);
+    });
+
+    it("handleMetadataRequest returns 200 OK with application/json and CORS headers", async () => {
+      const response = handleMetadataRequest(issuerConfig, schemaConfig);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("application/json");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+      const body = (await response.json()) as Oid4vciIssuerMetadata;
+      expect(body.credential_issuer).toBe("https://issuer.university.edu");
+      expect(
+        body.credential_configurations_supported.graduation_record_sd_jwt_vc
+      ).toBeDefined();
+    });
+  });
+
+  describe("SD-JWT VC Type Metadata (Task 2.3 - draft-ietf-oauth-sd-jwt-vc-19 Section 5)", () => {
+    it("derives valid Draft 2020-12 JSON Schema matching schema hierarchy", () => {
+      const jsonSchema = deriveJsonSchema(schemaConfig);
+
+      expect(jsonSchema.$schema).toBe(
+        "https://json-schema.org/draft/2020-12/schema"
+      );
+      expect(jsonSchema.type).toBe("object");
+
+      const props = jsonSchema.properties as Record<string, any>;
+      expect(props.studentId.type).toBe("string");
+      expect(props.dateOfBirth.type).toBe("string");
+      expect(props.dateOfBirth.format).toBe("date");
+      expect(props.papers.type).toBe("object");
+
+      // Verify nested object properties under papers.diploma
+      expect(props.papers.properties.diploma.type).toBe("object");
+      expect(props.papers.properties.diploma.properties.degreeName.type).toBe(
+        "string"
+      );
+
+      // Verify array items under papers.transcript.courses
+      const courses =
+        props.papers.properties.transcript.properties.courses;
+      expect(courses.type).toBe("array");
+      expect(courses.items.type).toBe("object");
+      expect(courses.items.properties.code.type).toBe("string");
+      expect(courses.items.properties.credits.type).toBe("number");
+
+      // Required properties list
+      expect(jsonSchema.required).toContain("studentId");
+      expect(jsonSchema.required).toContain("fullName");
+      expect(jsonSchema.required).toContain("papers");
+      expect(jsonSchema.required).not.toContain("dateOfBirth");
+    });
+
+    it("generates Draft-19 Section 5 Type Metadata document with selective disclosure policies", () => {
+      const typeMetadata = generateTypeMetadata(
+        schemaConfig,
+        issuerConfig.vctBaseUrl
+      );
+
+      expect(typeMetadata.vct).toBe(
+        resolveVct(schemaConfig.vctPath, issuerConfig.vctBaseUrl)
+      );
+      expect(typeMetadata.name).toBe("Graduation Academic Record");
+      expect(typeMetadata.description).toContain("Official comprehensive graduation");
+      expect(typeMetadata.schema).toBeDefined();
+      expect(typeMetadata.claims).toBeDefined();
+
+      // Verify selective disclosure policies preserved in Type Metadata
+      expect(typeMetadata.claims.studentId.sd).toBe("always_disclosed");
+      expect(typeMetadata.claims.dateOfBirth.sd).toBe("selectively_disclosable");
+      expect(typeMetadata.claims.nationalId.sd).toBe("selectively_disclosable");
+
+      const diploma = typeMetadata.claims.papers.properties?.diploma;
+      expect(diploma?.sd).toBe("selectively_disclosable");
+      expect(diploma?.properties?.degreeName.sd).toBe("always_disclosed");
+      expect(diploma?.properties?.honours?.sd).toBe("selectively_disclosable");
+    });
+
+    it("handleVctRequest serves Type Metadata on exact vct path and /types prefix", async () => {
+      // Exact path from vctPath (/types/graduation-record/v1)
+      const resExact = handleVctRequest(
+        schemaConfig.vctPath,
+        schemaConfig,
+        issuerConfig.vctBaseUrl
+      );
+      expect(resExact.status).toBe(200);
+      expect(resExact.headers.get("Content-Type")).toBe("application/json");
+      expect(resExact.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      const bodyExact = (await resExact.json()) as SdJwtVcTypeMetadata;
+      expect(bodyExact.vct).toBe(
+        resolveVct(schemaConfig.vctPath, issuerConfig.vctBaseUrl)
+      );
+
+      // Generic /types path
+      const resGeneral = handleVctRequest(
+        "/types",
+        schemaConfig,
+        issuerConfig.vctBaseUrl
+      );
+      expect(resGeneral.status).toBe(200);
+      const bodyGeneral = (await resGeneral.json()) as SdJwtVcTypeMetadata;
+      expect(bodyGeneral.vct).toBe(
+        resolveVct(schemaConfig.vctPath, issuerConfig.vctBaseUrl)
+      );
+
+      // Trailing slash
+      const resSlash = handleVctRequest(
+        `${schemaConfig.vctPath}/`,
+        schemaConfig,
+        issuerConfig.vctBaseUrl
+      );
+      expect(resSlash.status).toBe(200);
+    });
+
+    it("handleVctRequest returns 404 for unknown type paths", async () => {
+      const resNotFound = handleVctRequest(
+        "/types/unregistered-license-type/v2",
+        schemaConfig,
+        issuerConfig.vctBaseUrl
+      );
+      expect(resNotFound.status).toBe(404);
+      expect(resNotFound.headers.get("Content-Type")).toBe("application/json");
+      expect(resNotFound.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+      const body = (await resNotFound.json()) as { error: string };
+      expect(body.error).toBe("not_found");
+    });
+  });
+});

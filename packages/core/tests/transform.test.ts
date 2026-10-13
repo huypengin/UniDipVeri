@@ -61,7 +61,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
   describe("Basic Object and Field Transformation", () => {
     const simpleSchema: CredentialTypeConfig = {
-      vct: "https://example.com/simple/v1",
+      vctPath: "/types/simple/v1",
       name: "Simple Credential",
       description: "Simple test credential",
       claims: {
@@ -113,7 +113,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
     it("does not create an _sd array when no selectively disclosable claims are present", () => {
       const schemaNoSd: CredentialTypeConfig = {
-        vct: "https://example.com/no-sd/v1",
+        vctPath: "/types/no-sd/v1",
         name: "No SD Credential",
         description: "All claims always disclosed",
         claims: {
@@ -154,7 +154,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
   describe("Array Element Selective Disclosure (RFC 9901 Section 4.2.4.2)", () => {
     const arraySchema: CredentialTypeConfig = {
-      vct: "https://example.com/array/v1",
+      vctPath: "/types/array/v1",
       name: "Array Credential",
       description: "Testing array disclosures",
       claims: {
@@ -499,7 +499,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
   describe("Algorithm Agility (_sd_alg)", () => {
     const testSchema: CredentialTypeConfig = {
-      vct: "https://example.com/alg/v1",
+      vctPath: "/types/alg/v1",
       name: "Alg Credential",
       description: "Testing algorithm agility",
       claims: {
@@ -557,7 +557,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
 
   describe("Validation & Error Enforcements", () => {
     const strictSchema: CredentialTypeConfig = {
-      vct: "https://example.com/strict/v1",
+      vctPath: "/types/strict/v1",
       name: "Strict Credential",
       description: "Testing strict validations",
       claims: {

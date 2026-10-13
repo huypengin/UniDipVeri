@@ -1,4 +1,4 @@
-vct: "https://credentials.university.edu/types/graduation-record/v1"
+vctPath: "/types/graduation-record/v1"
 name: "Graduation Academic Record"
 description: "Official comprehensive graduation credential containing Diploma conferral and Final Academic Transcript."
 

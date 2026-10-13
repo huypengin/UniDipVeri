@@ -69,9 +69,12 @@ export type ReservedRootClaimName = (typeof RESERVED_ROOT_CLAIM_NAMES)[number];
 
 export const CredentialTypeConfigSchema: z.ZodType<CredentialTypeConfig> = z
   .object({
-    vct: z
+    vctPath: z
       .string()
-      .url("vct must be a valid resolvable URL (e.g. https://credentials.example.edu/types/...)"),
+      .min(1, "vctPath cannot be empty")
+      .refine((val) => val.startsWith("/"), {
+        message: "vctPath must start with '/' (e.g. /types/graduation-record/v1)",
+      }),
     name: z.string().min(1, "name cannot be empty"),
     description: z.string().min(1, "description cannot be empty"),
     claims: z.record(ClaimDefSchema).superRefine((claims, ctx) => {

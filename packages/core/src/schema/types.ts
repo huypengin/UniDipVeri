@@ -17,7 +17,8 @@ export interface ClaimDef {
 }
 
 export interface CredentialTypeConfig {
-  vct: string;
+  /** Relative URL path of the credential type (e.g. "/types/graduation-record/v1", must start with '/') */
+  vctPath: string;
   name: string;
   description: string;
   claims: Record<string, ClaimDef>;
