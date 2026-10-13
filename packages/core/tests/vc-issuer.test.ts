@@ -16,6 +16,7 @@ import {
   SD_JWT_VC_TYP,
   RESERVED_TOP_LEVEL_CLAIMS,
 } from "../src/signing/vc-issuer.js";
+import { resolveVct } from "../src/schema/vct.js";
 import { transformClaims } from "../src/sd-jwt/transform.js";
 
 describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & RFC 9901)", () => {
@@ -106,7 +107,9 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         const verifyResult = await verifyJwt(result.jwt, publicKeyJwk, alg);
         expect(verifyResult.payload).toBeDefined();
         expect(verifyResult.payload.iss).toBe(issuerDid);
-        expect(verifyResult.payload.vct).toBe(schema.vct);
+        expect(verifyResult.payload.vct).toBe(
+          resolveVct(schema.vctPath, "https://credentials.university.edu")
+        );
         expect(verifyResult.payload.iat).toBeNumber();
         expect(verifyResult.payload.nbf).toBeNumber();
         expect(verifyResult.payload.exp).toBeNumber();
@@ -459,7 +462,7 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
       const assembledPayload: Record<string, unknown> = {
         ...transformResult.maskedPayload,
         iss: "did:web:university.edu",
-        vct: schema.vct,
+        vct: resolveVct(schema.vctPath, "https://university.edu"),
         iat: 1750000000,
       };
 
@@ -527,6 +530,47 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
           },
         })
       ).rejects.toThrow(/Payload must contain a non-empty 'vct' claim/);
+    });
+
+    it("resolves vct using explicit vctBaseUrl correctly", async () => {
+      const issuerKeys = await generateKeyPair("ES256");
+      const schema = await loadSchemaFromFile(schemaPath);
+
+      const result = await issueSdJwtVc(
+        testStudentClaims,
+        schema,
+        {
+          issuer: "did:web:example.com",
+          vctBaseUrl: "http://localhost:3000",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+        }
+      );
+
+      expect(result.payload.vct).toBe("http://localhost:3000/types/graduation-record/v1");
+    });
+
+    it("resolves vct with explicit relative vct path in options", async () => {
+      const issuerKeys = await generateKeyPair("ES256");
+      const schema = await loadSchemaFromFile(schemaPath);
+
+      const result = await issueSdJwtVc(
+        testStudentClaims,
+        schema,
+        {
+          issuer: "did:web:example.com",
+          vctBaseUrl: "https://custom-host.edu",
+          vct: "/types/special-award/v1",
+          signingKey: {
+            privateKey: issuerKeys.privateKeyJwk,
+            alg: "ES256",
+          },
+        }
+      );
+
+      expect(result.payload.vct).toBe("https://custom-host.edu/types/special-award/v1");
     });
   });
 });

@@ -11,6 +11,8 @@ import {
 } from "../sd-jwt/transform.js";
 import type { SupportedDigestAlgorithm } from "../sd-jwt/digest.js";
 import type { CredentialTypeConfig, ClaimDef } from "../schema/types.js";
+import { resolveVct } from "../schema/vct.js";
+import { didWebToUrl } from "../did/did-resolver.js";
 import {
   RESERVED_ROOT_CLAIM_NAMES,
   type ReservedRootClaimName,
@@ -62,10 +64,10 @@ export const CnfClaimSchema = z
   })
   .refine(
     (data) => {
-      if (!data.jwk) {
+      const { jwk } = data;
+      if (!jwk) {
         return true;
       }
-      const jwk = data.jwk as unknown as Record<string, unknown>;
       return !JWK_PRIVATE_KEY_PROPERTIES.some((prop) => prop in jwk);
     },
     {
@@ -115,7 +117,10 @@ export interface IssueSdJwtVcOptions {
   /** Issuer signing key configuration */
   signingKey: IssuerSigningKey;
 
-  /** Optional VCT override (defaults to schema.vct) */
+  /** Optional base URL used to resolve schema.vctPath into an absolute vct URI (defaults to options.issuer) */
+  vctBaseUrl?: string;
+
+  /** Optional explicit VCT URI or path override (defaults to resolving schema.vctPath) */
   vct?: string;
 
   /** Optional Holder Key Confirmation (sets 'cnf' claim) */
@@ -310,13 +315,46 @@ export async function issueSdJwtVc(
     throw new Error("options.issuer must be a non-empty string");
   }
 
-  // Determine VCT from options or schema
-  let vct: string | undefined = options.vct;
-  if (!vct && "vct" in schema && typeof (schema as CredentialTypeConfig).vct === "string") {
-    vct = (schema as CredentialTypeConfig).vct;
-  }
+  // Determine VCT from options or schema using resolveVct
+  const resolveBaseUrl = (): string => {
+    if (options.vctBaseUrl && options.vctBaseUrl.trim().length > 0) {
+      return options.vctBaseUrl;
+    }
+    if (options.issuer.startsWith("did:web:")) {
+      try {
+        const urlStr = didWebToUrl(options.issuer);
+        return new URL(urlStr).origin;
+      } catch {
+        // Fall back to options.issuer
+      }
+    }
+    return options.issuer;
+  };
 
-  if (!vct || vct.trim().length === 0) {
+  let vct: string;
+  if (options.vct) {
+    if (options.vct.startsWith("/")) {
+      vct = resolveVct(options.vct, resolveBaseUrl());
+    } else {
+      try {
+        new URL(options.vct);
+      } catch (err) {
+        throw new Error(
+          `Explicit options.vct '${options.vct}' is not a valid URL: ${(err as Error).message}`
+        );
+      }
+      vct = options.vct;
+    }
+  } else if ("vctPath" in schema && typeof (schema as CredentialTypeConfig).vctPath === "string") {
+    vct = resolveVct((schema as CredentialTypeConfig).vctPath, resolveBaseUrl());
+  } else if ("vct" in (schema as any) && typeof (schema as any).vct === "string") {
+    const rawVct = (schema as any).vct;
+    if (rawVct.startsWith("/")) {
+      vct = resolveVct(rawVct, resolveBaseUrl());
+    } else {
+      vct = rawVct;
+    }
+  } else {
     throw new Error("Credential type 'vct' must be provided in options or schema");
   }
 

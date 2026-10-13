@@ -5,7 +5,7 @@ import { parseSchemaYaml, loadSchemaFromFile } from "../src/schema/loader.js";
 describe("Schema Loader & Validator", () => {
   it("parses valid YAML string into CredentialTypeConfig", () => {
     const yaml = `
-vct: "https://example.com/v1"
+vctPath: "/types/test/v1"
 name: "Test"
 description: "Test description"
 claims:
@@ -15,15 +15,15 @@ claims:
     sd: always_disclosed
 `;
     const config = parseSchemaYaml(yaml);
-    expect(config.vct).toBe("https://example.com/v1");
+    expect(config.vctPath).toBe("/types/test/v1");
     expect(config.name).toBe("Test");
     expect(config.claims.testField.type).toBe("string");
     expect(config.claims.testField.sd).toBe("always_disclosed");
   });
 
-  it("throws validation error for invalid vct URL", () => {
+  it("throws validation error for invalid vctPath not starting with /", () => {
     const yaml = `
-vct: "not-a-url"
+vctPath: "not-a-valid-path"
 name: "Test"
 description: "Test description"
 claims:
@@ -31,12 +31,12 @@ claims:
     type: string
     sd: always_disclosed
 `;
-    expect(() => parseSchemaYaml(yaml)).toThrow(/vct must be a valid resolvable URL/);
+    expect(() => parseSchemaYaml(yaml)).toThrow(/vctPath must start with '\/'/);
   });
 
   it("throws validation error for top-level claim missing sd policy", () => {
     const yaml = `
-vct: "https://example.com/v1"
+vctPath: "/types/test/v1"
 name: "Test"
 description: "Test description"
 claims:
@@ -48,7 +48,7 @@ claims:
 
   it("throws validation error for nested child claim missing sd policy", () => {
     const yaml = `
-vct: "https://example.com/v1"
+vctPath: "/types/test/v1"
 name: "Test"
 description: "Test description"
 claims:
@@ -64,7 +64,7 @@ claims:
 
   it("throws validation error for object claim missing properties", () => {
     const yaml = `
-vct: "https://example.com/v1"
+vctPath: "/types/test/v1"
 name: "Test"
 description: "Test description"
 claims:
@@ -77,7 +77,7 @@ claims:
 
   it("throws validation error for array claim missing items", () => {
     const yaml = `
-vct: "https://example.com/v1"
+vctPath: "/types/test/v1"
 name: "Test"
 description: "Test description"
 claims:
@@ -93,7 +93,7 @@ claims:
     const config = await loadSchemaFromFile(fixturePath);
 
     expect(config.name).toBe("Graduation Academic Record");
-    expect(config.vct).toBe("https://credentials.university.edu/types/graduation-record/v1");
+    expect(config.vctPath).toBe("/types/graduation-record/v1");
 
     // Check root claims
     expect(config.claims.studentId.sd).toBe("always_disclosed");
@@ -122,7 +122,7 @@ claims:
 describe("Declarative Schema Extensibility (Thesis Requirement)", () => {
   it("allows defining a completely novel credential type declaratively without modifying core code", () => {
     const novelSchemaYaml = `
-vct: "https://credentials.university.edu/types/enrollment-certificate/v1"
+vctPath: "/types/enrollment-certificate/v1"
 name: "Certificate of Enrollment"
 description: "Official attestation of active student enrollment status."
 claims:
@@ -163,7 +163,7 @@ claims:
         sd: always_disclosed
 `;
     const config = parseSchemaYaml(novelSchemaYaml);
-    expect(config.vct).toBe("https://credentials.university.edu/types/enrollment-certificate/v1");
+    expect(config.vctPath).toBe("/types/enrollment-certificate/v1");
     expect(config.name).toBe("Certificate of Enrollment");
     expect(config.claims.isFullTime.type).toBe("boolean");
     expect(config.claims.activeSemesters.items?.type).toBe("string");
@@ -172,7 +172,7 @@ claims:
 
   it("allows modifying and extending credential fields declaratively without code changes", () => {
     const extendedGraduationYaml = `
-vct: "https://credentials.university.edu/types/graduation-record/v2"
+vctPath: "/types/graduation-record/v2"
 name: "Graduation Academic Record v2"
 description: "Extended with co-curricular and scholastic honor distinctions."
 claims:
@@ -201,7 +201,7 @@ claims:
     sd: selectively_disclosable
 `;
     const config = parseSchemaYaml(extendedGraduationYaml);
-    expect(config.vct).toBe("https://credentials.university.edu/types/graduation-record/v2");
+    expect(config.vctPath).toBe("/types/graduation-record/v2");
     expect(config.claims.coCurricularActivities.items?.properties?.hoursCompleted.sd).toBe(
       "selectively_disclosable"
     );
@@ -212,7 +212,7 @@ claims:
 describe("Semantic Safety & Engine Boundary Enforcement (Thesis Requirement)", () => {
   it("fails when an unrecognized semantic feature or directive is introduced in a claim", () => {
     const unsupportedFeatureYaml = `
-vct: "https://credentials.university.edu/types/unsupported/v1"
+vctPath: "/types/unsupported/v1"
 name: "Unsupported Feature Attempt"
 description: "Tries to invoke an engine feature that does not exist"
 claims:
@@ -228,7 +228,7 @@ claims:
 
   it("fails when an unsupported SD policy is specified", () => {
     const unsupportedSdPolicyYaml = `
-vct: "https://credentials.university.edu/types/unsupported/v1"
+vctPath: "/types/unsupported/v1"
 name: "Unsupported SD Policy Attempt"
 description: "Tries to use a cryptographic policy the engine does not support"
 claims:
@@ -241,7 +241,7 @@ claims:
 
   it("fails when an unsupported data type outside the engine capability is specified", () => {
     const unsupportedTypeYaml = `
-vct: "https://credentials.university.edu/types/unsupported/v1"
+vctPath: "/types/unsupported/v1"
 name: "Unsupported Type Attempt"
 description: "Tries to declare a type the engine cannot merklize/disclose"
 claims:
@@ -254,7 +254,7 @@ claims:
 
   it("fails when an unknown top-level engine directive is introduced", () => {
     const unknownTopLevelYaml = `
-vct: "https://credentials.university.edu/types/unsupported/v1"
+vctPath: "/types/unsupported/v1"
 name: "Unknown Directive Attempt"
 description: "Tries to set a top-level engine flag"
 engineHook: "post_issuance_wasm_pipeline" # Unknown key
@@ -285,7 +285,7 @@ claims:
 
     for (const reserved of reservedClaims) {
       const maliciousYaml = `
-vct: "https://credentials.university.edu/types/reserved-claim-test/v1"
+vctPath: "/types/reserved-claim-test/v1"
 name: "Reserved Claim Collision Test"
 description: "Tries to declare a claim with reserved name"
 claims:

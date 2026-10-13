@@ -14,6 +14,12 @@
       "version": "0.1.0",
       "dependencies": {
         "@unidipveri/core": "workspace:*",
+        "jose": "^5.9.6",
+        "zod": "^3.23.8",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.6.2",
       },
     },
     "apps/playground": {
@@ -21,7 +27,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@unidipveri/core": "workspace:*",
-        "@unidipveri/did-resolver": "workspace:*",
       },
     },
     "packages/core": {
@@ -34,17 +39,6 @@
         "jose": "^5.9.6",
         "yaml": "^2.6.1",
         "zod": "^3.23.8",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-        "typescript": "^5.6.2",
-      },
-    },
-    "packages/did-resolver": {
-      "name": "@unidipveri/did-resolver",
-      "version": "0.1.0",
-      "dependencies": {
-        "jose": "^5.9.6",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -73,8 +67,6 @@
 
     "@unidipveri/core": ["@unidipveri/core@workspace:packages/core"],
 
-    "@unidipveri/did-resolver": ["@unidipveri/did-resolver@workspace:packages/did-resolver"],
-
     "@unidipveri/issuer": ["@unidipveri/issuer@workspace:apps/issuer"],
 
     "@unidipveri/playground": ["@unidipveri/playground@workspace:apps/playground"],
@@ -96,5 +88,13 @@
     "yaml": ["yaml@2.9.1", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw=="],
 
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+
+    "@unidipveri/core/@types/bun": ["@types/bun@1.4.3", "", { "dependencies": { "bun-types": "1.4.3" } }, "sha512-N67Pqy8JXbAY/j0tNraS3V5mubGvc6rrrNDmDCtZLlFzccbUJPDb0tvgUBC5q4m8ybkP93Jcn1QB+RYQ6PvBhw=="],
+
+    "@unidipveri/issuer/@types/bun": ["@types/bun@1.4.3", "", { "dependencies": { "bun-types": "1.4.3" } }, "sha512-N67Pqy8JXbAY/j0tNraS3V5mubGvc6rrrNDmDCtZLlFzccbUJPDb0tvgUBC5q4m8ybkP93Jcn1QB+RYQ6PvBhw=="],
+
+    "@unidipveri/core/@types/bun/bun-types": ["bun-types@1.4.3", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-tinRJNGOmUN+tEAsn2y2e942n9JHRHR42iUYzDH75NmhJqVBokGSQkkfSFdNWwsANIdrK6ACH9t01M452YyTwg=="],
+
+    "@unidipveri/issuer/@types/bun/bun-types": ["bun-types@1.4.3", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-tinRJNGOmUN+tEAsn2y2e942n9JHRHR42iUYzDH75NmhJqVBokGSQkkfSFdNWwsANIdrK6ACH9t01M452YyTwg=="],
   }
 }
