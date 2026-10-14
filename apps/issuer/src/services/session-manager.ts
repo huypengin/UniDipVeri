@@ -20,6 +20,7 @@ export interface PreAuthorizedCodeSession {
   studentId: string;
   credentialConfigurationId: string;
   txCode?: string;
+  claims?: Record<string, unknown>;
   createdAt: number;
   expiresAt: number;
 }
@@ -31,6 +32,7 @@ export interface AccessTokenSession {
   accessToken: string;
   studentId: string;
   credentialConfigurationId: string;
+  claims?: Record<string, unknown>;
   cNonce: string;
   cNonceExpiresAt: number;
   createdAt: number;
@@ -52,6 +54,7 @@ export interface CreatePreAuthorizedCodeOptions {
   studentId: string;
   credentialConfigurationId: string;
   txCode?: string;
+  claims?: Record<string, unknown>;
   /** TTL in seconds (default: 600 - 10 minutes) */
   ttlSeconds?: number;
 }
@@ -129,6 +132,7 @@ export class SessionManager {
       studentId: options.studentId.trim(),
       credentialConfigurationId: options.credentialConfigurationId.trim(),
       txCode: options.txCode?.trim(),
+      claims: options.claims,
       createdAt: now,
       expiresAt: now + ttl * 1000,
     };
@@ -186,6 +190,7 @@ export class SessionManager {
       accessToken,
       studentId: session.studentId,
       credentialConfigurationId: session.credentialConfigurationId,
+      claims: session.claims,
       cNonce,
       cNonceExpiresAt: now + cNonceTtl * 1000,
       createdAt: now,

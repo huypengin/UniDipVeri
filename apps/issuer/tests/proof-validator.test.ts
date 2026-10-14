@@ -1,0 +1,210 @@
+import { describe, expect, it } from "bun:test";
+import * as jose from "jose";
+import {
+  verifyHolderProof,
+  InvalidProofError,
+  sanitizePublicJwk,
+  type HolderProofParameter,
+} from "../src/services/proof-validator.js";
+
+describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final Section 7.2.1)", () => {
+  const issuerBaseUrl = "https://issuer.university.edu";
+  const issuerDid = "did:web:issuer.university.edu";
+  const cNonce = "cnonce_test_challenge_1234567890abcdef";
+
+  async function createValidProof(options?: {
+    alg?: "ES256" | "EdDSA" | "ES384";
+    typ?: string;
+    aud?: string | string[];
+    nonce?: string;
+    iat?: number;
+    includePrivateD?: boolean;
+    tamperSignature?: boolean;
+  }): Promise<{ proof: HolderProofParameter; publicJwk: jose.JWK }> {
+    const alg = options?.alg ?? "ES256";
+    const keyPair = await jose.generateKeyPair(alg, { extractable: true });
+    const fullJwk = await jose.exportJWK(keyPair.privateKey);
+    const publicJwk = await jose.exportJWK(keyPair.publicKey);
+
+    const headerJwk = options?.includePrivateD ? fullJwk : publicJwk;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+
+    const jwt = await new jose.SignJWT({
+      aud: options?.aud ?? issuerBaseUrl,
+      nonce: options?.nonce ?? cNonce,
+      iat: options?.iat ?? nowSeconds,
+    })
+      .setProtectedHeader({
+        alg,
+        typ: options?.typ ?? "openid-credential-proof+jwt",
+        jwk: headerJwk,
+      })
+      .sign(keyPair.privateKey);
+
+    const finalJwt = options?.tamperSignature
+      ? jwt.slice(0, -6) + "xxxxxx"
+      : jwt;
+
+    return {
+      proof: {
+        proof_type: "jwt",
+        jwt: finalJwt,
+      },
+      publicJwk,
+    };
+  }
+
+  it("verifies valid proof successfully across ES256, EdDSA, and ES384 algorithms", async () => {
+    const algorithms: Array<"ES256" | "EdDSA" | "ES384"> = [
+      "ES256",
+      "EdDSA",
+      "ES384",
+    ];
+
+    for (const alg of algorithms) {
+      const { proof, publicJwk } = await createValidProof({ alg });
+      const result = await verifyHolderProof(proof, issuerBaseUrl, cNonce);
+
+      expect(result.holderJwk.kty).toBe(publicJwk.kty);
+      expect(result.holderJwk.crv).toBe(publicJwk.crv);
+      expect(result.payload.nonce).toBe(cNonce);
+      expect(result.payload.aud).toBe(issuerBaseUrl);
+    }
+  });
+
+  it("accepts both openid-credential-proof+jwt and jwt typ header values", async () => {
+    for (const typ of ["openid-credential-proof+jwt", "jwt"]) {
+      const { proof } = await createValidProof({ typ });
+      const result = await verifyHolderProof(proof, issuerBaseUrl, cNonce);
+      expect(result.header.typ).toBe(typ);
+    }
+  });
+
+  it("verifies proof against array of allowed audiences matching either baseUrl or DID", async () => {
+    const { proof } = await createValidProof({ aud: issuerDid });
+    const result = await verifyHolderProof(
+      proof,
+      [issuerBaseUrl, issuerDid],
+      cNonce
+    );
+    expect(result.payload.aud).toBe(issuerDid);
+  });
+
+  it("rejects missing or non-object proof parameter with invalid_or_missing_proof error", async () => {
+    for (const invalid of [null, undefined, "not-an-object", 12345]) {
+      expect(
+        verifyHolderProof(invalid, issuerBaseUrl, cNonce)
+      ).rejects.toThrow(InvalidProofError);
+    }
+  });
+
+  it("rejects proof with unsupported proof_type parameter", async () => {
+    const { proof } = await createValidProof();
+    proof.proof_type = "cwt";
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("Unsupported proof_type");
+  });
+
+  it("rejects malformed JWT string", async () => {
+    const badProof: HolderProofParameter = {
+      proof_type: "jwt",
+      jwt: "this.is.not.a.valid.jwt",
+    };
+
+    expect(
+      verifyHolderProof(badProof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow(InvalidProofError);
+  });
+
+  it("rejects unsupported signature algorithm in protected header", async () => {
+    const key = new TextEncoder().encode("secret-key-too-short");
+    const badJwt = await new jose.SignJWT({ aud: issuerBaseUrl, nonce: cNonce, iat: Math.floor(Date.now() / 1000) })
+      .setProtectedHeader({ alg: "HS256", typ: "jwt", jwk: { kty: "oct", k: "secret" } as any })
+      .sign(key);
+
+    expect(
+      verifyHolderProof({ proof_type: "jwt", jwt: badJwt }, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("Unsupported proof algorithm");
+  });
+
+  it("rejects proof header omitting public jwk object", async () => {
+    const keyPair = await jose.generateKeyPair("ES256");
+    const jwtWithoutJwk = await new jose.SignJWT({
+      aud: issuerBaseUrl,
+      nonce: cNonce,
+      iat: Math.floor(Date.now() / 1000),
+    })
+      .setProtectedHeader({
+        alg: "ES256",
+        typ: "openid-credential-proof+jwt",
+      })
+      .sign(keyPair.privateKey);
+
+    expect(
+      verifyHolderProof(
+        { proof_type: "jwt", jwt: jwtWithoutJwk },
+        issuerBaseUrl,
+        cNonce
+      )
+    ).rejects.toThrow("must include a valid 'jwk' object");
+  });
+
+  it("rejects proof containing private key parameter in header jwk", async () => {
+    const { proof } = await createValidProof({ includePrivateD: true });
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("must not contain private key property 'd'");
+  });
+
+  it("rejects proof with forged or tampered signature", async () => {
+    const { proof } = await createValidProof({ tamperSignature: true });
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("Proof cryptographic verification failed");
+  });
+
+  it("rejects proof with audience mismatch", async () => {
+    const { proof } = await createValidProof({ aud: "https://attacker.com" });
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("does not match expected issuer audience");
+  });
+
+  it("rejects proof with nonce mismatch against session c_nonce", async () => {
+    const { proof } = await createValidProof({ nonce: "cnonce_wrong_nonce" });
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("does not match session c_nonce challenge");
+  });
+
+  it("rejects proof with timestamp outside acceptable clock skew", async () => {
+    const expiredTimestamp = Math.floor(Date.now() / 1000) - 400; // 400s ago (>300s)
+    const { proof } = await createValidProof({ iat: expiredTimestamp });
+
+    expect(
+      verifyHolderProof(proof, issuerBaseUrl, cNonce, 300)
+    ).rejects.toThrow("outside acceptable clock skew");
+  });
+
+  it("sanitizes public jwk properly by removing any extraneous private properties", () => {
+    const jwkWithPrivate = {
+      kty: "EC",
+      crv: "P-256",
+      x: "test-x",
+      y: "test-y",
+      d: "secret-d",
+      p: "secret-p",
+    } as any;
+
+    const sanitized = sanitizePublicJwk(jwkWithPrivate);
+    expect(sanitized.kty).toBe("EC");
+    expect((sanitized as any).d).toBeUndefined();
+    expect((sanitized as any).p).toBeUndefined();
+  });
+});

@@ -54,6 +54,7 @@ export async function handleOfferRequest(
   let studentId: string | null = null;
   let credentialConfigurationId: string | null = null;
   let txCode: string | undefined = undefined;
+  let claims: Record<string, unknown> | undefined = undefined;
 
   const url = new URL(req.url);
 
@@ -79,6 +80,13 @@ export async function handleOfferRequest(
           txCode = body.tx_code;
         } else if (typeof body.txCode === "string") {
           txCode = body.txCode;
+        }
+        if (
+          body.claims &&
+          typeof body.claims === "object" &&
+          !Array.isArray(body.claims)
+        ) {
+          claims = body.claims as Record<string, unknown>;
         }
       } catch {
         return Response.json(
@@ -160,6 +168,7 @@ export async function handleOfferRequest(
     studentId: studentId.trim(),
     credentialConfigurationId: targetConfigId,
     txCode: txCode?.trim(),
+    claims,
   });
 
   // Construct OpenID4VCI 1.0 Final Section 4.1.1 Credential Offer structure

@@ -131,6 +131,28 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
       }
     });
 
+    it("preserves custom claims across pre-authorized code exchange into access token session", () => {
+      const customClaims = {
+        fullName: "Custom Student",
+        papers: { diploma: { degreeName: "Custom Degree" } },
+      };
+      const session = sessionManager.createPreAuthorizedCode({
+        studentId: "STU-CUSTOM",
+        credentialConfigurationId: "graduation_record_sd_jwt_vc",
+        claims: customClaims,
+      });
+
+      expect(session.claims).toEqual(customClaims);
+
+      const { accessToken } = sessionManager.exchangePreAuthorizedCode({
+        code: session.code,
+      });
+
+      const accessSession = sessionManager.getAccessTokenSession(accessToken);
+      expect(accessSession).toBeDefined();
+      expect(accessSession?.claims).toEqual(customClaims);
+    });
+
     it("rejects non-existent code", () => {
       expect(() =>
         sessionManager.exchangePreAuthorizedCode({
