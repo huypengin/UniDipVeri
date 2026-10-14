@@ -1,9 +1,12 @@
 import type { CredentialTypeConfig } from "@unidipveri/core";
 import type { IssuerConfig } from "./config.js";
 import type { KeyContext } from "./services/key-manager.js";
+import { SessionManager } from "./services/session-manager.js";
 import { handleMetadataRequest } from "./routes/metadata.js";
 import { handleDidRequest } from "./routes/did.js";
 import { handleVctRequest } from "./routes/vct.js";
+import { handleOfferRequest } from "./routes/offer.js";
+import { handleTokenRequest } from "./routes/token.js";
 
 /**
  * Standard CORS headers applied to all responses to support web wallets and browser verifiers.
@@ -36,12 +39,14 @@ export function withCors(response: Response): Response {
  * @param config Validated IssuerConfig
  * @param keyContext Initialized cryptographic KeyContext
  * @param schemaConfig Validated CredentialTypeConfig
+ * @param sessionManager Optional SessionManager instance (defaults to new instance)
  * @returns Pure request handler function
  */
 export function createApp(
   config: IssuerConfig,
   keyContext: KeyContext,
-  schemaConfig: CredentialTypeConfig
+  schemaConfig: CredentialTypeConfig,
+  sessionManager: SessionManager = new SessionManager()
 ): (req: Request) => Promise<Response> {
   const bootTimeMs = Date.now();
 
@@ -100,40 +105,29 @@ export function createApp(
         );
       }
 
-      // Phase 3 stubs: GET /credential-offer, POST /token, POST /credential
-      if (method === "GET" && pathname === "/credential-offer") {
+      // Route: /credential-offer (GET and POST)
+      if (
+        (method === "GET" || method === "POST") &&
+        pathname === "/credential-offer"
+      ) {
         return withCors(
-          Response.json(
-            {
-              error: "not_implemented",
-              error_description:
-                "Credential offer endpoint is scheduled for implementation in Phase 3",
-            },
-            { status: 501 }
-          )
+          await handleOfferRequest(req, config, sessionManager, schemaConfig)
         );
       }
 
-      if (method === "POST" && pathname === "/token") {
-        return withCors(
-          Response.json(
-            {
-              error: "not_implemented",
-              error_description:
-                "OAuth token endpoint is scheduled for implementation in Phase 3",
-            },
-            { status: 501 }
-          )
-        );
+      // Route: /token (POST)
+      if (pathname === "/token") {
+        return withCors(await handleTokenRequest(req, sessionManager));
       }
 
+      // Phase 4 stub: POST /credential
       if (method === "POST" && pathname === "/credential") {
         return withCors(
           Response.json(
             {
               error: "not_implemented",
               error_description:
-                "Credential issuance endpoint is scheduled for implementation in Phase 3",
+                "Credential issuance endpoint is scheduled for implementation in Phase 4",
             },
             { status: 501 }
           )

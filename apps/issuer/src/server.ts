@@ -1,6 +1,7 @@
 import { loadSchemaFromFile, resolveVct } from "@unidipveri/core";
 import { loadIssuerConfig } from "./config.js";
 import { initializeKeyManager } from "./services/key-manager.js";
+import { SessionManager } from "./services/session-manager.js";
 import { createApp } from "./app.js";
 
 /**
@@ -15,8 +16,9 @@ export async function startServer(
   const config = loadIssuerConfig(configOverrides);
   const schemaConfig = await loadSchemaFromFile(config.schemaPath);
   const keyContext = await initializeKeyManager(config);
+  const sessionManager = new SessionManager();
 
-  const app = createApp(config, keyContext, schemaConfig);
+  const app = createApp(config, keyContext, schemaConfig, sessionManager);
 
   const server = Bun.serve({
     port: config.port,
@@ -28,6 +30,7 @@ export async function startServer(
     config,
     keyContext,
     schemaConfig,
+    sessionManager,
   };
 }
 
@@ -40,10 +43,12 @@ if (import.meta.main) {
       console.log(`[UniDipVeri Issuer] Issuer DID: ${config.issuerDid} (${keyContext.alg}, kid: ${keyContext.keyId})`);
       console.log(`[UniDipVeri Issuer] Credential VCT: ${resolveVct(schemaConfig.vctPath, config.vctBaseUrl)}`);
       console.log(`[UniDipVeri Issuer] Discovery Endpoints:`);
-      console.log(`  - OID4VCI Metadata: ${config.baseUrl}/.well-known/openid-credential-issuer`);
-      console.log(`  - DID Document:     ${config.baseUrl}/.well-known/did.json`);
-      console.log(`  - Type Metadata:    ${config.baseUrl}/types/*`);
-      console.log(`  - Health Check:     ${config.baseUrl}/health`);
+      console.log(`  - OID4VCI Metadata:  ${config.baseUrl}/.well-known/openid-credential-issuer`);
+      console.log(`  - DID Document:      ${config.baseUrl}/.well-known/did.json`);
+      console.log(`  - Type Metadata:     ${config.baseUrl}/types/*`);
+      console.log(`  - Credential Offer:  ${config.baseUrl}/credential-offer`);
+      console.log(`  - Token Endpoint:    ${config.baseUrl}/token`);
+      console.log(`  - Health Check:      ${config.baseUrl}/health`);
     })
     .catch((err) => {
       console.error("[UniDipVeri Issuer] Startup failed:", err);
