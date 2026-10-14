@@ -120,14 +120,14 @@ export function createApp(
         return withCors(await handleTokenRequest(req, sessionManager));
       }
 
-      // Phase 4 stub: POST /credential
+      // Stub: POST /credential
       if (method === "POST" && pathname === "/credential") {
         return withCors(
           Response.json(
             {
               error: "not_implemented",
               error_description:
-                "Credential issuance endpoint is scheduled for implementation in Phase 4",
+                "Credential issuance endpoint is not yet implemented",
             },
             { status: 501 }
           )

@@ -26,7 +26,7 @@ const issuerConfig = loadIssuerConfig({
   SCHEMA_PATH: schemaPath,
 });
 
-describe("OID4VCI & SD-JWT VC Discovery Engine (Tasks 2.2 & 2.3)", () => {
+describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
 
   describe("Claim Display & Formatting Helpers", () => {
     it("formats camelCase identifiers into human-readable display labels", () => {
@@ -54,7 +54,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine (Tasks 2.2 & 2.3)", () => {
     });
   });
 
-  describe("OID4VCI Claims Metadata (Task 2.2 - OID4VCI 1.0 Final Section 11.2.3)", () => {
+  describe("OID4VCI Claims Metadata (OID4VCI 1.0 Final Section 11.2.3)", () => {
     it("derives mandatory and optional claims accurately from schema definition", () => {
       const oid4vciClaims = deriveOid4vciClaims(schemaConfig.claims);
 
@@ -126,7 +126,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine (Tasks 2.2 & 2.3)", () => {
     });
   });
 
-  describe("SD-JWT VC Type Metadata (Task 2.3 - draft-ietf-oauth-sd-jwt-vc-19 Section 5)", () => {
+  describe("SD-JWT VC Type Metadata (draft-ietf-oauth-sd-jwt-vc-19 Section 5)", () => {
     it("derives valid Draft 2020-12 JSON Schema matching schema hierarchy", () => {
       const jsonSchema = deriveJsonSchema(schemaConfig);
 

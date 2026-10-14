@@ -31,8 +31,8 @@ const config = loadIssuerConfig({
 const keyContext = await initializeKeyManager(config);
 const app = createApp(config, keyContext, schemaConfig);
 
-describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", () => {
-  describe("Task 2.4: DID Document Route (/.well-known/did.json)", () => {
+describe("Issuer Application Dispatcher, Routing & Server", () => {
+  describe("DID Document Route (/.well-known/did.json)", () => {
     it("handleDidRequest returns 200 OK with W3C-compliant DID Document", async () => {
       const res = handleDidRequest(config, keyContext);
       expect(res.status).toBe(200);
@@ -100,7 +100,7 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
     });
   });
 
-  describe("Task 2.5: Routing Dispatcher & Endpoints", () => {
+  describe("Routing Dispatcher & Endpoints", () => {
     it("serves GET /health with 200 OK and uptime metadata", async () => {
       const res = await app(
         new Request("https://issuer.university.edu/health", { method: "GET" })
@@ -204,7 +204,7 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
       expect(resDid.status).toBe(200);
     });
 
-    it("serves live /credential-offer and /token routes, and returns 501 for Phase 4 /credential", async () => {
+    it("serves live /credential-offer and /token routes, and returns 501 for unimplemented /credential", async () => {
       const resOffer = await app(
         new Request(
           "https://issuer.university.edu/credential-offer?studentId=student-123",
@@ -237,7 +237,7 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
     });
   });
 
-  describe("Task 2.5: CORS & Preflight Handling", () => {
+  describe("CORS & Preflight Handling", () => {
     it("handles OPTIONS preflight requests with 204 No Content and CORS headers", async () => {
       const res = await app(
         new Request("https://issuer.university.edu/health", {
@@ -267,7 +267,7 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
     });
   });
 
-  describe("Task 2.5: Error Handling", () => {
+  describe("Error Handling", () => {
     it("returns 404 with structured JSON for unrecognized routes", async () => {
       const res = await app(
         new Request("https://issuer.university.edu/api/unknown-endpoint", {
@@ -286,7 +286,7 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
     });
   });
 
-  describe("Task 2.5: Server Startup & Network Listener", () => {
+  describe("Server Startup & Network Listener", () => {
     it("boots Bun HTTP server on an available port and serves actual network requests", async () => {
       const runtime = await startServer({
         PORT: "34567",

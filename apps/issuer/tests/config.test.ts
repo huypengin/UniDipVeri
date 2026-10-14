@@ -13,7 +13,7 @@ import {
   sanitizePublicJwk,
 } from "../src/services/key-manager.js";
 
-describe("Issuer Configuration (Task 2.1)", () => {
+describe("Issuer Configuration Loading & Validation", () => {
   const fixtureSchemaPath = join(
     import.meta.dir,
     "../../../schemas/graduation-record.yaml"
@@ -201,7 +201,7 @@ describe("Issuer Configuration (Task 2.1)", () => {
   });
 });
 
-describe("Issuer KeyManager & Cryptographic Caching (Task 2.1)", () => {
+describe("Issuer KeyManager & Cryptographic Caching", () => {
   const fixtureSchemaPath = join(
     import.meta.dir,
     "../../../schemas/graduation-record.yaml"

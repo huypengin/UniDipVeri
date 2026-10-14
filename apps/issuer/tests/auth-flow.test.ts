@@ -22,7 +22,7 @@ const keyContext = await initializeKeyManager(config);
 const sessionManager = new SessionManager();
 const app = createApp(config, keyContext, schemaConfig, sessionManager);
 
-describe("Phase 3.5: End-to-End Authorization & Security Flow (Task 3.5)", () => {
+describe("End-to-End Authorization & Security Flow", () => {
   describe("Happy Path: Standard Pre-Authorized Code Issuance Flow", () => {
     it("completes full offer -> token exchange and issues bearer access token with c_nonce", async () => {
       // Step 1: Wallet triggers /credential-offer GET
@@ -105,7 +105,7 @@ describe("Phase 3.5: End-to-End Authorization & Security Flow (Task 3.5)", () =>
       expect(tokenBody.c_nonce.length).toBeGreaterThanOrEqual(32);
       expect(tokenBody.c_nonce_expires_in).toBe(86400);
 
-      // Step 3: Validate session manager state for downstream Phase 4 credential issuance
+      // Step 3: Validate session manager state for downstream credential issuance
       const session = sessionManager.getAccessTokenSession(tokenBody.access_token);
       expect(session).toBeDefined();
       expect(session?.studentId).toBe("STU-2026-FINAL");

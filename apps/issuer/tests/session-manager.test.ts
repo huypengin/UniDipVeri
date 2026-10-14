@@ -6,7 +6,7 @@ import {
   generateSecureToken,
 } from "../src/services/session-manager.js";
 
-describe("SessionManager (Task 3.1 - OID4VCI Authorization & Session Store)", () => {
+describe("SessionManager OID4VCI Authorization & Session Store", () => {
   let sessionManager: SessionManager;
 
   beforeEach(() => {
