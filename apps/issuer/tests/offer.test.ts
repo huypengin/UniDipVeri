@@ -10,7 +10,7 @@ const FIXTURE_SCHEMA_PATH = join(
   "../../../schemas/graduation-record.yaml"
 );
 
-describe("Credential Offer Endpoint (Task 3.2 - OpenID4VCI 1.0 Final Section 4.1)", () => {
+describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final Section 4.1)", () => {
   let sessionManager: SessionManager;
   let schemaConfig: Awaited<ReturnType<typeof loadSchemaFromFile>>;
 
