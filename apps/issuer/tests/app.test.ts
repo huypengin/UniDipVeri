@@ -204,18 +204,29 @@ describe("Issuer Application Dispatcher, Routing & Server (Tasks 2.4 & 2.5)", ()
       expect(resDid.status).toBe(200);
     });
 
-    it("returns 501 Not Implemented for Phase 3 stubs", async () => {
+    it("serves live /credential-offer and /token routes, and returns 501 for Phase 4 /credential", async () => {
       const resOffer = await app(
-        new Request("https://issuer.university.edu/credential-offer", {
-          method: "GET",
-        })
+        new Request(
+          "https://issuer.university.edu/credential-offer?studentId=student-123",
+          { method: "GET" }
+        )
       );
-      expect(resOffer.status).toBe(501);
+      expect(resOffer.status).toBe(200);
+      const offerData = (await resOffer.json()) as {
+        credential_offer: { credential_issuer: string };
+      };
+      expect(offerData.credential_offer.credential_issuer).toBe(
+        "https://issuer.university.edu"
+      );
 
       const resToken = await app(
-        new Request("https://issuer.university.edu/token", { method: "POST" })
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=non-existent-code",
+        })
       );
-      expect(resToken.status).toBe(501);
+      expect(resToken.status).toBe(400);
 
       const resCredential = await app(
         new Request("https://issuer.university.edu/credential", {
