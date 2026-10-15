@@ -204,7 +204,7 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resDid.status).toBe(200);
     });
 
-    it("serves live /credential-offer and /token routes, and returns 501 for unimplemented /credential", async () => {
+    it("serves live /credential-offer and /token routes, and enforces authorization on /credential", async () => {
       const resOffer = await app(
         new Request(
           "https://issuer.university.edu/credential-offer?studentId=student-123",
@@ -233,7 +233,81 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
           method: "POST",
         })
       );
-      expect(resCredential.status).toBe(501);
+      expect(resCredential.status).toBe(401);
+    });
+
+    it("serves interactive registrar portal HTML on GET / and GET /issue", async () => {
+      const resRoot = await app(
+        new Request("https://issuer.university.edu/", { method: "GET" })
+      );
+      expect(resRoot.status).toBe(200);
+      expect(resRoot.headers.get("Content-Type")).toContain("text/html");
+      const rootHtml = await resRoot.text();
+      expect(rootHtml).toContain("UniDipVeri Registrar Portal");
+
+      const resIssue = await app(
+        new Request("https://issuer.university.edu/issue", { method: "GET" })
+      );
+      expect(resIssue.status).toBe(200);
+      expect(resIssue.headers.get("Content-Type")).toContain("text/html");
+    });
+
+    it("serves Swagger UI and OpenAPI 3.0 specification", async () => {
+      const resDocs = await app(
+        new Request("https://issuer.university.edu/docs", { method: "GET" })
+      );
+      expect(resDocs.status).toBe(200);
+      expect(resDocs.headers.get("Content-Type")).toContain("text/html");
+      const docsHtml = await resDocs.text();
+      expect(docsHtml).toContain("swagger-ui");
+
+      const resSpec = await app(
+        new Request("https://issuer.university.edu/docs/openapi.json", {
+          method: "GET",
+        })
+      );
+      expect(resSpec.status).toBe(200);
+      expect(resSpec.headers.get("Content-Type")).toContain("application/json");
+      const spec = (await resSpec.json()) as { openapi: string; paths: Record<string, unknown> };
+      expect(spec.openapi).toStartWith("3.0");
+      expect(spec.paths["/credential"]).toBeDefined();
+      expect(spec.paths["/status/{id}"]).toBeDefined();
+    });
+
+    it("serves Token Status List document and processes admin revocation", async () => {
+      const resStatus = await app(
+        new Request("https://issuer.university.edu/status/status-list-1", {
+          method: "GET",
+        })
+      );
+      expect(resStatus.status).toBe(200);
+      expect(resStatus.headers.get("Content-Type")).toBe(
+        "application/statuslist+jwt"
+      );
+      const token = await resStatus.text();
+      expect(token.split(".").length).toBe(3);
+
+      const resRevoke = await app(
+        new Request("https://issuer.university.edu/admin/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idx: 0 }),
+        })
+      );
+      expect(resRevoke.status).toBe(200);
+      const revokeBody = (await resRevoke.json()) as { status: string; idx: number; revoked: boolean };
+      expect(revokeBody.status).toBe("revoked");
+      expect(revokeBody.idx).toBe(0);
+      expect(revokeBody.revoked).toBe(true);
+
+      const resCheck = await app(
+        new Request("https://issuer.university.edu/admin/status/0", {
+          method: "GET",
+        })
+      );
+      expect(resCheck.status).toBe(200);
+      const checkBody = (await resCheck.json()) as { idx: number; revoked: boolean; status: string };
+      expect(checkBody.revoked).toBe(true);
     });
   });
 

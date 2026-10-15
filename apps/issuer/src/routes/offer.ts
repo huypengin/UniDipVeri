@@ -8,6 +8,7 @@ import type { SessionManager } from "../services/session-manager.js";
 export interface Oid4vciCredentialOffer {
   credential_issuer: string;
   credential_configuration_ids: string[];
+  credentials?: string[];
   grants: {
     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
       "pre-authorized_code": string;
@@ -176,6 +177,7 @@ export async function handleOfferRequest(
     // Strictly isolate from incoming Host header (using config.baseUrl)
     credential_issuer: config.baseUrl,
     credential_configuration_ids: [targetConfigId],
+    credentials: [targetConfigId],
     grants: {
       "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
         "pre-authorized_code": session.code,
@@ -203,6 +205,10 @@ export async function handleOfferRequest(
     credential_offer_uri: credentialOfferUri,
     expires_in: Math.floor((session.expiresAt - session.createdAt) / 1000),
   };
+
+  console.log(
+    `[Offer Endpoint ✅] Generated credential offer: studentId="${studentId}", config="${targetConfigId}", code=${session.code.slice(0, 10)}... (PIN: ${session.txCode ?? "none"})`
+  );
 
   return Response.json(responseBody, {
     status: 200,
