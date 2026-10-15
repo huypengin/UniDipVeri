@@ -1,5 +1,6 @@
 import * as jose from "jose";
 import * as zlib from "node:zlib";
+import { resolveIssuerKeyId } from "@unidipveri/core";
 import type { KeyContext } from "./key-manager.js";
 
 /**
@@ -189,7 +190,7 @@ export class StatusListService {
       .setProtectedHeader({
         alg: keyContext.alg,
         typ: STATUS_LIST_TOKEN_TYP,
-        kid: keyContext.keyId,
+        kid: resolveIssuerKeyId(issuer, keyContext.keyId),
       })
       .sign(keyContext.privateKey);
   }

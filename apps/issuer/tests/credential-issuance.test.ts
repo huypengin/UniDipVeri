@@ -160,7 +160,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     const header = jose.decodeProtectedHeader(jwtString);
     expect(header.typ).toBe(SD_JWT_VC_TYP);
     expect(header.alg).toBe(mockConfig.signingAlgorithm);
-    expect(header.kid).toBe(mockConfig.keyId);
+    expect(header.kid).toBe(`${mockConfig.issuerDid}#${mockConfig.keyId}`);
 
     // Verify outer JWS using issuer's public key
     const importedIssuerKey = await jose.importJWK(keyContext.publicKeyJwk, "ES256");

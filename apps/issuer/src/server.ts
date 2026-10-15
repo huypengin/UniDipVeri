@@ -1,4 +1,8 @@
-import { loadSchemaFromFile, resolveVct } from "@unidipveri/core";
+import {
+  loadSchemaFromFile,
+  resolveVct,
+  resolveIssuerKeyId,
+} from "@unidipveri/core";
 import { loadIssuerConfig } from "./config.js";
 import { initializeKeyManager } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
@@ -53,12 +57,14 @@ if (import.meta.main) {
     .then(({ server, config, schemaConfig, keyContext }) => {
       console.log(`[UniDipVeri Issuer] Running at http://localhost:${server.port}`);
       console.log(`[UniDipVeri Issuer] Base URL: ${config.baseUrl}`);
-      console.log(`[UniDipVeri Issuer] Issuer DID: ${config.issuerDid} (${keyContext.alg}, kid: ${keyContext.keyId})`);
+      const effectiveKid = resolveIssuerKeyId(config.issuerDid, keyContext.keyId);
+      console.log(`[UniDipVeri Issuer] Issuer DID: ${config.issuerDid} (${keyContext.alg}, kid: ${effectiveKid})`);
       console.log(`[UniDipVeri Issuer] Credential VCT: ${resolveVct(schemaConfig.vctPath, config.vctBaseUrl)}`);
       console.log(`[UniDipVeri Issuer] Available Endpoints:`);
       console.log(`  - Registrar Portal:  ${config.baseUrl}/`);
       console.log(`  - Swagger UI & Docs: ${config.baseUrl}/docs`);
       console.log(`  - OID4VCI Metadata:  ${config.baseUrl}/.well-known/openid-credential-issuer`);
+      console.log(`  - OAuth Metadata:    ${config.baseUrl}/.well-known/oauth-authorization-server`);
       console.log(`  - DID Document:      ${config.baseUrl}/.well-known/did.json`);
       console.log(`  - Type Metadata:     ${config.baseUrl}/types/*`);
       console.log(`  - Credential Offer:  ${config.baseUrl}/credential-offer`);

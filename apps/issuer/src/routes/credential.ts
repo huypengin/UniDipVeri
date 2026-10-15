@@ -1,5 +1,6 @@
 import {
   issueSdJwtVc,
+  resolveIssuerKeyId,
   type CredentialTypeConfig,
 } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
@@ -311,12 +312,14 @@ export async function handleCredentialRequest(
 
   // 9. Issue SD-JWT VC via Core Engine
   try {
+    const effectiveKeyId = resolveIssuerKeyId(config.issuerDid, keyContext.keyId);
+
     const issued = await issueSdJwtVc(rawClaims, schemaConfig, {
       issuer: config.issuerDid,
       signingKey: {
         privateKey: keyContext.privateKey,
         alg: keyContext.alg,
-        keyId: keyContext.keyId,
+        keyId: effectiveKeyId,
       },
       vctBaseUrl: config.vctBaseUrl,
       holderConfirmation: {

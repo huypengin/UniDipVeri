@@ -133,6 +133,30 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(body.credential_issuer).toBe("https://issuer.university.edu");
     });
 
+    it("serves GET /.well-known/oauth-authorization-server and /.well-known/openid-configuration", async () => {
+      const resOAuth = await app(
+        new Request(
+          "https://issuer.university.edu/.well-known/oauth-authorization-server",
+          { method: "GET" }
+        )
+      );
+      expect(resOAuth.status).toBe(200);
+      const oauthBody = (await resOAuth.json()) as any;
+      expect(oauthBody.issuer).toBe("https://issuer.university.edu");
+      expect(oauthBody.token_endpoint).toBe("https://issuer.university.edu/token");
+
+      const resOidc = await app(
+        new Request(
+          "https://issuer.university.edu/.well-known/openid-configuration",
+          { method: "GET" }
+        )
+      );
+      expect(resOidc.status).toBe(200);
+      const oidcBody = (await resOidc.json()) as any;
+      expect(oidcBody.issuer).toBe("https://issuer.university.edu");
+      expect(oidcBody.token_endpoint).toBe("https://issuer.university.edu/token");
+    });
+
     it("serves GET /types/graduation-record/v1 through app dispatcher", async () => {
       const res = await app(
         new Request(

@@ -3,6 +3,7 @@ import {
   didWebToUrl,
   resolveDidVerificationKey,
   resolveDidWeb,
+  resolveIssuerKeyId,
   type DidDocument,
   type FetchLike,
 } from "../src/did/did-resolver.js";
@@ -246,4 +247,31 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/does not contain a 'publicKeyJwk'/);
     });
   });
+
+  describe("resolveIssuerKeyId", () => {
+    it("formats bare keyId as absolute DID URL when issuer is a DID", () => {
+      expect(
+        resolveIssuerKeyId("did:web:example.edu", "key-1")
+      ).toBe("did:web:example.edu#key-1");
+    });
+
+    it("formats relative fragment keyId as absolute DID URL when issuer is a DID", () => {
+      expect(
+        resolveIssuerKeyId("did:web:example.edu", "#key-1")
+      ).toBe("did:web:example.edu#key-1");
+    });
+
+    it("preserves already fully-qualified DID URL keyId", () => {
+      expect(
+        resolveIssuerKeyId("did:web:example.edu", "did:web:example.edu#key-1")
+      ).toBe("did:web:example.edu#key-1");
+    });
+
+    it("preserves bare keyId when issuer is an HTTPS URL", () => {
+      expect(
+        resolveIssuerKeyId("https://issuer.example.edu", "key-1")
+      ).toBe("key-1");
+    });
+  });
 });
+

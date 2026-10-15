@@ -4,7 +4,10 @@ import type { KeyContext } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { StudentRecordService } from "./services/student-records.js";
 import { StatusListService } from "./services/status-list.js";
-import { handleMetadataRequest } from "./routes/metadata.js";
+import {
+  handleMetadataRequest,
+  handleOAuthMetadataRequest,
+} from "./routes/metadata.js";
 import { handleDidRequest } from "./routes/did.js";
 import { handleVctRequest } from "./routes/vct.js";
 import { handleOfferRequest } from "./routes/offer.js";
@@ -130,6 +133,15 @@ export function createApp(
         pathname === "/.well-known/openid-credential-issuer"
       ) {
         return respond(handleMetadataRequest(config, schemaConfig));
+      }
+
+      // Route: GET /.well-known/oauth-authorization-server, GET /.well-known/openid-configuration
+      if (
+        method === "GET" &&
+        (pathname === "/.well-known/oauth-authorization-server" ||
+          pathname === "/.well-known/openid-configuration")
+      ) {
+        return respond(handleOAuthMetadataRequest(config));
       }
 
       // Route: GET /.well-known/did.json
