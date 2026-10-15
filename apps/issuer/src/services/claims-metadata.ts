@@ -55,6 +55,7 @@ export interface Oid4vciIssuerMetadata {
   credential_issuer: string;
   credential_endpoint: string;
   token_endpoint: string;
+  nonce_endpoint?: string;
   credential_configurations_supported: Record<
     string,
     CredentialConfigurationSupported
@@ -295,8 +296,13 @@ export function generateIssuerMetadata(
     credential_issuer: config.baseUrl,
     credential_endpoint: `${config.baseUrl}/credential`,
     token_endpoint: `${config.baseUrl}/token`,
+    nonce_endpoint: `${config.baseUrl}/nonce`,
     credential_configurations_supported: {
       [configId]: configuration,
+      [`${configId}_legacy`]: {
+        ...configuration,
+        format: "vc+sd-jwt" as unknown as "dc+sd-jwt",
+      },
     },
   };
 }

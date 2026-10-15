@@ -232,6 +232,37 @@ export class SessionManager {
     return session;
   }
 
+  private readonly standaloneNonces = new Map<string, number>();
+
+  /**
+   * Generates a fresh standalone c_nonce challenge per OpenID4VCI 1.0 Final Section 7.
+   */
+  generateStandaloneNonce(ttlSeconds: number = DEFAULT_C_NONCE_TTL_SECONDS): {
+    cNonce: string;
+    cNonceExpiresIn: number;
+  } {
+    const cNonce = generateSecureToken("cnonce_", 32);
+    this.standaloneNonces.set(cNonce, Date.now() + ttlSeconds * 1000);
+    return {
+      cNonce,
+      cNonceExpiresIn: ttlSeconds,
+    };
+  }
+
+  /**
+   * Generates and assigns a fresh c_nonce to an active access token session.
+   */
+  rotateSessionNonce(token: string): string | undefined {
+    const session = this.getAccessTokenSession(token);
+    if (!session) {
+      return undefined;
+    }
+    const newNonce = generateSecureToken("cnonce_", 32);
+    session.cNonce = newNonce;
+    session.cNonceExpiresAt = Date.now() + DEFAULT_C_NONCE_TTL_SECONDS * 1000;
+    return newNonce;
+  }
+
   /**
    * Validates a c_nonce against an active access token session and generates a fresh nonce.
    *
@@ -255,7 +286,20 @@ export class SessionManager {
       return { valid: false, error: "expired_nonce" };
     }
 
-    if (!timingSafeCompare(session.cNonce, nonce)) {
+    let nonceValid = false;
+
+    // Check against session cNonce
+    if (session.cNonce && timingSafeCompare(session.cNonce, nonce)) {
+      nonceValid = true;
+    } else if (this.standaloneNonces.has(nonce)) {
+      const exp = this.standaloneNonces.get(nonce)!;
+      this.standaloneNonces.delete(nonce); // single use
+      if (now <= exp) {
+        nonceValid = true;
+      }
+    }
+
+    if (!nonceValid) {
       return { valid: false, error: "mismatched_nonce" };
     }
 

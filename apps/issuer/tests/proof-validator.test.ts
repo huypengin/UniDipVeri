@@ -207,4 +207,76 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final Section 7.2
     expect((sanitized as any).d).toBeUndefined();
     expect((sanitized as any).p).toBeUndefined();
   });
+
+  it("verifies proof from modern OpenID4VCI 1.0 Final proofs.jwt array structure", async () => {
+    const { proof } = await createValidProof({ typ: "openid4vci-proof+jwt" });
+    const requestBody = {
+      credential_configuration_id: "graduation_record_sd_jwt_vc",
+      proofs: {
+        jwt: [proof.jwt],
+      },
+    };
+
+    const result = await verifyHolderProof(requestBody, issuerBaseUrl, cNonce);
+    expect(result.payload.nonce).toBe(cNonce);
+    expect(result.header.typ).toBe("openid4vci-proof+jwt");
+  });
+
+  it("verifies proof from single proofs.jwt string and direct compact JWT string", async () => {
+    const { proof } = await createValidProof({ typ: "jwt" });
+
+    // proofs: { jwt: "..." }
+    const resultFromObj = await verifyHolderProof(
+      { proofs: { jwt: proof.jwt } },
+      issuerBaseUrl,
+      cNonce
+    );
+    expect(resultFromObj.payload.nonce).toBe(cNonce);
+
+    // Direct JWT string
+    const resultFromStr = await verifyHolderProof(
+      proof.jwt,
+      issuerBaseUrl,
+      cNonce
+    );
+    expect(resultFromStr.payload.nonce).toBe(cNonce);
+  });
+
+  it("verifies proof when audience points to /credential endpoint with trailing slashes", async () => {
+    const credAudience = `${issuerBaseUrl}/credential/`;
+    const { proof } = await createValidProof({ aud: credAudience });
+
+    const result = await verifyHolderProof(
+      proof,
+      [issuerBaseUrl, `${issuerBaseUrl}/credential`, issuerDid],
+      cNonce
+    );
+    expect(result.payload.aud).toBe(credAudience);
+  });
+
+  it("extracts and verifies holder public key from did:jwk kid parameter", async () => {
+    const keyPair = await jose.generateKeyPair("ES256", { extractable: true });
+    const publicJwk = await jose.exportJWK(keyPair.publicKey);
+    const didJwkString = `did:jwk:${Buffer.from(JSON.stringify(publicJwk)).toString("base64url")}#0`;
+
+    const jwtWithDidJwk = await new jose.SignJWT({
+      aud: issuerBaseUrl,
+      nonce: cNonce,
+      iat: Math.floor(Date.now() / 1000),
+    })
+      .setProtectedHeader({
+        alg: "ES256",
+        typ: "openid4vci-proof+jwt",
+        kid: didJwkString,
+      })
+      .sign(keyPair.privateKey);
+
+    const result = await verifyHolderProof(
+      { proofs: { jwt: [jwtWithDidJwk] } },
+      issuerBaseUrl,
+      cNonce
+    );
+    expect(result.holderJwk.crv).toBe("P-256");
+    expect(result.payload.nonce).toBe(cNonce);
+  });
 });

@@ -41,8 +41,10 @@ export const SUPPORTED_PROOF_ALGORITHMS = ["ES256", "EdDSA", "ES384"] as const;
  * Permitted typ header values for holder proof tokens.
  */
 export const PERMITTED_PROOF_TYP_VALUES = [
+  "openid4vci-proof+jwt",
   "openid-credential-proof+jwt",
   "jwt",
+  "JWT",
 ] as const;
 
 /**
@@ -54,64 +56,164 @@ export function sanitizePublicJwk(jwk: jose.JWK): jose.JWK {
 }
 
 /**
- * Verifies an incoming holder proof-of-possession JWT per OpenID4VCI 1.0 Final Section 7.2.1.
+ * Robustly extracts the holder proof JWT string from an incoming OID4VCI Credential Request body
+ * or proof parameter.
+ *
+ * Supports both modern OpenID4VCI 1.0 Final Section 8.2 structures (proofs.jwt array or string)
+ * and legacy Draft 11/13 structures (proof object or direct string).
+ *
+ * @param input Parsed Credential Request JSON body or raw proof object/string
+ * @returns Compact serialized JWT string, or null if missing
+ */
+export function extractProofJwt(input: unknown): string | null {
+  if (!input) {
+    return null;
+  }
+
+  // 1. Direct compact JWT string
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed.length > 0 && trimmed.split(".").length === 3) {
+      return trimmed;
+    }
+  }
+
+  if (typeof input !== "object") {
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+
+  // 2. Check input.proofs (OpenID4VCI 1.0 Final Section 8.2)
+  if (record.proofs !== undefined && record.proofs !== null) {
+    // Case 2a: proofs: { jwt: ["..."] } or proofs: { jwt: "..." }
+    if (typeof record.proofs === "object" && !Array.isArray(record.proofs)) {
+      const proofsObj = record.proofs as Record<string, unknown>;
+      if (Array.isArray(proofsObj.jwt) && proofsObj.jwt.length > 0) {
+        const candidate = proofsObj.jwt[0];
+        if (typeof candidate === "string" && candidate.trim().length > 0) {
+          return candidate.trim();
+        }
+      }
+      if (typeof proofsObj.jwt === "string" && proofsObj.jwt.trim().length > 0) {
+        return proofsObj.jwt.trim();
+      }
+    }
+    // Case 2b: proofs: [ { jwt: "..." } ] or proofs: [ "..." ]
+    if (Array.isArray(record.proofs) && record.proofs.length > 0) {
+      const first = record.proofs[0];
+      if (typeof first === "string" && first.trim().length > 0) {
+        return first.trim();
+      }
+      if (first && typeof first === "object" && !Array.isArray(first)) {
+        const item = first as Record<string, unknown>;
+        if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
+          return item.jwt.trim();
+        }
+      }
+    }
+  }
+
+  // 3. Check input.proof (OpenID4VCI Draft 11/13 / common wallet implementations)
+  if (record.proof !== undefined && record.proof !== null) {
+    // Case 3a: proof: "eyJ..." (direct compact JWT)
+    if (typeof record.proof === "string" && record.proof.trim().length > 0) {
+      return record.proof.trim();
+    }
+    // Case 3b: proof: { proof_type: "jwt", jwt: "..." } or proof: { jwt: "..." }
+    if (typeof record.proof === "object" && !Array.isArray(record.proof)) {
+      const proofObj = record.proof as Record<string, unknown>;
+      if (typeof proofObj.jwt === "string" && proofObj.jwt.trim().length > 0) {
+        return proofObj.jwt.trim();
+      }
+    }
+    // Case 3c: proof: [ { jwt: "..." } ] or proof: [ "..." ]
+    if (Array.isArray(record.proof) && record.proof.length > 0) {
+      const first = record.proof[0];
+      if (typeof first === "string" && first.trim().length > 0) {
+        return first.trim();
+      }
+      if (first && typeof first === "object" && !Array.isArray(first)) {
+        const item = first as Record<string, unknown>;
+        if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
+          return item.jwt.trim();
+        }
+      }
+    }
+  }
+
+  // 4. Check if the object itself is a proof object { jwt: "..." }
+  if (typeof record.jwt === "string" && record.jwt.trim().length > 0) {
+    return record.jwt.trim();
+  }
+
+  return null;
+}
+
+/**
+ * Verifies an incoming holder proof-of-possession JWT per OpenID4VCI 1.0 Final Section 7.2.1 / Section 8.2.
  *
  * Validates:
- * 1. Proof structure (proof_type === "jwt" and jwt string).
+ * 1. Proof extraction (supports proofs.jwt, proof.jwt, compact JWT strings, and proof objects).
  * 2. Header typ and supported algorithm.
- * 3. Header jwk presence and absence of private key material.
+ * 3. Header jwk presence (or did:jwk in kid) and absence of private key material.
  * 4. JWS cryptographic signature using the embedded public JWK.
- * 5. Audience matching issuer base URL or issuer DID.
+ * 5. Audience matching issuer base URL, issuer DID, or credential endpoint URL.
  * 6. Nonce matching the session c_nonce challenge.
  * 7. Issuance timestamp freshness within maximum allowed clock skew.
  *
- * @param proof Raw proof parameter from Credential Request body
- * @param expectedAudience Expected audience URI(s) (e.g. issuer base URL or DID)
+ * @param proofOrBody Raw proof parameter, compact JWT string, or full Credential Request body
+ * @param expectedAudience Expected audience URI(s) (e.g. issuer base URL, DID, or /credential endpoint)
  * @param expectedNonce Expected c_nonce from active authorization session
  * @param maxClockSkewSeconds Maximum allowed clock skew in seconds (default: 300)
  * @returns VerifiedProofResult with sanitized holder public JWK
  * @throws InvalidProofError on any validation or cryptographic failure
  */
 export async function verifyHolderProof(
-  proof: unknown,
+  proofOrBody: unknown,
   expectedAudience: string | string[],
   expectedNonce: string,
   maxClockSkewSeconds = 300
 ): Promise<VerifiedProofResult> {
-  if (!proof || typeof proof !== "object" || Array.isArray(proof)) {
+  const jwtString = extractProofJwt(proofOrBody);
+  if (!jwtString) {
     throw new InvalidProofError("Missing or malformed proof object");
   }
 
-  const proofObj = proof as Partial<HolderProofParameter>;
-
-  if (proofObj.proof_type !== "jwt") {
-    throw new InvalidProofError(
-      `Unsupported proof_type: expected 'jwt', received '${String(proofObj.proof_type)}'`
-    );
-  }
-
-  if (typeof proofObj.jwt !== "string" || proofObj.jwt.trim().length === 0) {
-    throw new InvalidProofError("Proof parameter must contain a non-empty 'jwt' string");
+  // If proof_type is explicitly supplied on a wrapper object, enforce supported value
+  if (
+    proofOrBody &&
+    typeof proofOrBody === "object" &&
+    !Array.isArray(proofOrBody)
+  ) {
+    const raw = proofOrBody as Record<string, unknown>;
+    const explicitType = raw.proof_type ?? (raw.proof && typeof raw.proof === "object" ? (raw.proof as Record<string, unknown>).proof_type : undefined);
+    if (explicitType !== undefined && explicitType !== "jwt") {
+      throw new InvalidProofError(
+        `Unsupported proof_type: expected 'jwt', received '${String(explicitType)}'`
+      );
+    }
   }
 
   let decodedHeader: jose.ProtectedHeaderParameters;
   try {
-    decodedHeader = jose.decodeProtectedHeader(proofObj.jwt);
+    decodedHeader = jose.decodeProtectedHeader(jwtString);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new InvalidProofError(`Malformed proof protected header: ${message}`);
   }
 
-  // Check typ header
+  // Check typ header (case-insensitive against allowed OID4VCI proof typ identifiers)
   const typ = decodedHeader.typ;
-  if (
-    !typ ||
-    !PERMITTED_PROOF_TYP_VALUES.includes(
-      typ as (typeof PERMITTED_PROOF_TYP_VALUES)[number]
-    )
-  ) {
+  const normalizedTyp = typ ? typ.toLowerCase() : "";
+  const allowedTypes = [
+    "openid4vci-proof+jwt",
+    "openid-credential-proof+jwt",
+    "jwt",
+  ];
+  if (!typ || !allowedTypes.includes(normalizedTyp)) {
     throw new InvalidProofError(
-      `Invalid proof typ header: expected 'openid-credential-proof+jwt' or 'jwt', received '${String(typ)}'`
+      `Invalid proof typ header: expected one of [${allowedTypes.join(", ")}], received '${String(typ)}'`
     );
   }
 
@@ -128,8 +230,18 @@ export async function verifyHolderProof(
     );
   }
 
-  // Check holder JWK presence
-  const jwk = decodedHeader.jwk;
+  // Extract holder public key from decoded header (jwk or did:jwk in kid)
+  let jwk = decodedHeader.jwk;
+  if (!jwk && typeof decodedHeader.kid === "string" && decodedHeader.kid.startsWith("did:jwk:")) {
+    try {
+      const b64 = decodedHeader.kid.slice("did:jwk:".length).split("#")[0];
+      const jsonStr = Buffer.from(b64, "base64url").toString("utf-8");
+      jwk = JSON.parse(jsonStr) as jose.JWK;
+    } catch {
+      // ignore parse failure and let jwk check fail below
+    }
+  }
+
   if (!jwk || typeof jwk !== "object" || Array.isArray(jwk)) {
     throw new InvalidProofError(
       "Proof protected header must include a valid 'jwk' object"
@@ -158,7 +270,7 @@ export async function verifyHolderProof(
   // Verify JWS signature
   let verifiedPayload: jose.JWTPayload;
   try {
-    const verified = await jose.jwtVerify(proofObj.jwt, publicKey, {
+    const verified = await jose.jwtVerify(jwtString, publicKey, {
       algorithms: [alg],
     });
     verifiedPayload = verified.payload;
@@ -167,18 +279,18 @@ export async function verifyHolderProof(
     throw new InvalidProofError(`Proof cryptographic verification failed: ${message}`);
   }
 
-  // Validate audience
-  const audiences = Array.isArray(expectedAudience)
-    ? expectedAudience
-    : [expectedAudience];
+  // Validate audience with trailing slash normalization
+  const expectedList = (
+    Array.isArray(expectedAudience) ? expectedAudience : [expectedAudience]
+  ).map((a) => a.replace(/\/+$/, ""));
 
   const payloadAud = verifiedPayload.aud;
   let audMatched = false;
   if (typeof payloadAud === "string") {
-    audMatched = audiences.includes(payloadAud);
+    audMatched = expectedList.includes(payloadAud.replace(/\/+$/, ""));
   } else if (Array.isArray(payloadAud)) {
-    audMatched = payloadAud.some((aud) =>
-      typeof aud === "string" && audiences.includes(aud)
+    audMatched = payloadAud.some(
+      (aud) => typeof aud === "string" && expectedList.includes(aud.replace(/\/+$/, ""))
     );
   }
 
