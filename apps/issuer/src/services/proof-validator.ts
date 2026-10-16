@@ -164,7 +164,7 @@ export function extractProofJwt(input: unknown): string | null {
  *
  * @param proofOrBody Raw proof parameter, compact JWT string, or full Credential Request body
  * @param expectedAudience Expected audience URI(s) (e.g. issuer base URL, DID, or /credential endpoint)
- * @param expectedNonce Expected c_nonce from active authorization session
+ * @param expectedNonce Expected c_nonce challenge(s) or validator function
  * @param maxClockSkewSeconds Maximum allowed clock skew in seconds (default: 300)
  * @returns VerifiedProofResult with sanitized holder public JWK
  * @throws InvalidProofError on any validation or cryptographic failure
@@ -172,7 +172,7 @@ export function extractProofJwt(input: unknown): string | null {
 export async function verifyHolderProof(
   proofOrBody: unknown,
   expectedAudience: string | string[],
-  expectedNonce: string,
+  expectedNonce: string | string[] | ((nonce: string | undefined) => boolean),
   maxClockSkewSeconds = 300
 ): Promise<VerifiedProofResult> {
   const jwtString = extractProofJwt(proofOrBody);
@@ -301,7 +301,17 @@ export async function verifyHolderProof(
   }
 
   // Validate nonce
-  if (verifiedPayload.nonce !== expectedNonce) {
+  const payloadNonce = verifiedPayload.nonce as string | undefined;
+  let nonceValid = false;
+  if (typeof expectedNonce === "function") {
+    nonceValid = expectedNonce(payloadNonce);
+  } else if (Array.isArray(expectedNonce)) {
+    nonceValid = typeof payloadNonce === "string" && expectedNonce.includes(payloadNonce);
+  } else if (typeof expectedNonce === "string") {
+    nonceValid = typeof payloadNonce === "string" && payloadNonce === expectedNonce;
+  }
+
+  if (!nonceValid) {
     throw new InvalidProofError(
       `Proof nonce does not match session c_nonce challenge`
     );

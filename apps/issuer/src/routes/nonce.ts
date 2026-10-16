@@ -30,12 +30,34 @@ export function handleNonceRequest(
     );
   }
 
-  const nonce = sessionManager.generateStandaloneNonce();
+  const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
+  let bearerToken: string | undefined;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    bearerToken = authHeader.slice(7).trim();
+  }
+
+  let cNonce: string;
+  let cNonceExpiresIn = 86400;
+
+  if (bearerToken) {
+    const rotated = sessionManager.rotateSessionNonce(bearerToken);
+    if (rotated) {
+      cNonce = rotated;
+    } else {
+      const standalone = sessionManager.generateStandaloneNonce();
+      cNonce = standalone.cNonce;
+      cNonceExpiresIn = standalone.cNonceExpiresIn;
+    }
+  } else {
+    const standalone = sessionManager.generateStandaloneNonce();
+    cNonce = standalone.cNonce;
+    cNonceExpiresIn = standalone.cNonceExpiresIn;
+  }
 
   return Response.json(
     {
-      c_nonce: nonce.cNonce,
-      c_nonce_expires_in: nonce.cNonceExpiresIn,
+      c_nonce: cNonce,
+      c_nonce_expires_in: cNonceExpiresIn,
     },
     {
       status: 200,

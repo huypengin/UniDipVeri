@@ -264,6 +264,35 @@ export class SessionManager {
   }
 
   /**
+   * Checks whether a nonce challenge is valid for the given session or as an unexpired standalone nonce,
+   * without consuming or mutating it.
+   *
+   * @param session Active AccessTokenSession
+   * @param nonce Nonce string presented in holder proof
+   * @returns true if valid and unexpired, false otherwise
+   */
+  isValidNonce(session: AccessTokenSession, nonce: string): boolean {
+    if (!nonce || typeof nonce !== "string") {
+      return false;
+    }
+    const now = Date.now();
+    if (
+      session.cNonce &&
+      timingSafeCompare(session.cNonce, nonce) &&
+      now <= session.cNonceExpiresAt
+    ) {
+      return true;
+    }
+    if (this.standaloneNonces.has(nonce)) {
+      const exp = this.standaloneNonces.get(nonce)!;
+      if (now <= exp) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Validates a c_nonce against an active access token session and generates a fresh nonce.
    *
    * Conforms to OID4VCI Section 7.2 requirement for nonce rotation during credential requests.

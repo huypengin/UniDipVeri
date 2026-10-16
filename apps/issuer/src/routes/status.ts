@@ -69,7 +69,7 @@ export async function handleStatusListRequest(
 
   try {
     const token = await statusListService.generateStatusListToken({
-      issuer: config.baseUrl,
+      issuer: config.issuerDid ?? config.baseUrl,
       statusListUri,
       keyContext,
       ttlSeconds: 300,

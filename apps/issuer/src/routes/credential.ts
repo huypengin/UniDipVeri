@@ -225,7 +225,7 @@ export async function handleCredentialRequest(
     verifiedProof = await verifyHolderProof(
       body,
       validAudiences,
-      session.cNonce
+      (nonce) => sessionManager.isValidNonce(session, nonce ?? "")
     );
 
     console.log(
@@ -313,6 +313,7 @@ export async function handleCredentialRequest(
   // 9. Issue SD-JWT VC via Core Engine
   try {
     const effectiveKeyId = resolveIssuerKeyId(config.issuerDid, keyContext.keyId);
+    const requestedTyp = body.format === "vc+sd-jwt" ? "vc+sd-jwt" : "dc+sd-jwt";
 
     const issued = await issueSdJwtVc(rawClaims, schemaConfig, {
       issuer: config.issuerDid,
@@ -332,6 +333,7 @@ export async function handleCredentialRequest(
         },
       },
       validitySeconds: 31536000, // 1 year
+      typ: requestedTyp,
     });
 
     const responseBody: Oid4vciCredentialResponse = {

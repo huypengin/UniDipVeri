@@ -563,4 +563,169 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     );
     expect(badMethodRes.status).toBe(405);
   });
+
+  it("serves POST /nonce with Bearer token and rotates session c_nonce", async () => {
+    const offerRes = await app(
+      new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+        method: "GET",
+      })
+    );
+    const offerData = (await offerRes.json()) as any;
+    const preAuthCode =
+      offerData.credential_offer.grants[
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+      ]["pre-authorized_code"];
+
+    const tokenRes = await app(
+      new Request("https://issuer.university.edu/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+          preAuthCode
+        )}`,
+      })
+    );
+    const { access_token, c_nonce: tokenNonce } = (await tokenRes.json()) as any;
+
+    const nonceRes = await app(
+      new Request("https://issuer.university.edu/nonce", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${access_token}` },
+      })
+    );
+    expect(nonceRes.status).toBe(200);
+    const nonceBody = (await nonceRes.json()) as any;
+    expect(nonceBody.c_nonce).toStartWith("cnonce_");
+    expect(nonceBody.c_nonce).not.toBe(tokenNonce);
+  });
+
+  it("accepts proof signed with standalone nonce from POST /nonce", async () => {
+    const offerRes = await app(
+      new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+        method: "GET",
+      })
+    );
+    const offerData = (await offerRes.json()) as any;
+    const preAuthCode =
+      offerData.credential_offer.grants[
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+      ]["pre-authorized_code"];
+
+    const tokenRes = await app(
+      new Request("https://issuer.university.edu/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+          preAuthCode
+        )}`,
+      })
+    );
+    const { access_token } = (await tokenRes.json()) as any;
+
+    // Wallet requests a fresh standalone nonce without Bearer token
+    const nonceRes = await app(
+      new Request("https://issuer.university.edu/nonce", {
+        method: "POST",
+      })
+    );
+    const { c_nonce: standaloneNonce } = (await nonceRes.json()) as any;
+
+    // Wallet signs proof using standalone nonce
+    const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+    const proofJwt = await createHolderProof(holderKeyPair, standaloneNonce, {
+      typ: "openid4vci-proof+jwt",
+      aud: "https://issuer.university.edu",
+    });
+
+    const credRes = await app(
+      new Request("https://issuer.university.edu/credential", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credential_configuration_id: "graduation_record_sd_jwt_vc",
+          proofs: {
+            jwt: [proofJwt],
+          },
+        }),
+      })
+    );
+
+    expect(credRes.status).toBe(200);
+    const credData = (await credRes.json()) as any;
+    expect(credData.credential).toBeDefined();
+
+    // Verify _sd_alg: "sha-256" is present in the issued SD-JWT payload
+    const outerJwt = credData.credential.split("~")[0];
+    const decodedPayload = jose.decodeJwt(outerJwt) as any;
+    expect(decodedPayload._sd_alg).toBe("sha-256");
+  });
+
+  it("issues SD-JWT VC with typ vc+sd-jwt when requested by legacy wallet format", async () => {
+    const offerRes = await app(
+      new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+        method: "GET",
+      })
+    );
+    const offerData = (await offerRes.json()) as any;
+    const preAuthCode =
+      offerData.credential_offer.grants[
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+      ]["pre-authorized_code"];
+
+    const tokenRes = await app(
+      new Request("https://issuer.university.edu/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+          preAuthCode
+        )}`,
+      })
+    );
+    const { access_token, c_nonce } = (await tokenRes.json()) as any;
+
+    const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+    const proofJwt = await createHolderProof(holderKeyPair, c_nonce, {
+      typ: "openid4vci-proof+jwt",
+    });
+
+    const credRes = await app(
+      new Request("https://issuer.university.edu/credential", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          format: "vc+sd-jwt",
+          proofs: {
+            jwt: [proofJwt],
+          },
+        }),
+      })
+    );
+
+    expect(credRes.status).toBe(200);
+    const credData = (await credRes.json()) as any;
+    const outerJwt = credData.credential.split("~")[0];
+    const header = jose.decodeProtectedHeader(outerJwt);
+    expect(header.typ).toBe("vc+sd-jwt");
+  });
+
+  it("signs Status List Token with issuerDid allowing verification via did.json", async () => {
+    const statusRes = await app(
+      new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "GET",
+      })
+    );
+    expect(statusRes.status).toBe(200);
+    const token = await statusRes.text();
+    const header = jose.decodeProtectedHeader(token);
+    const payload = jose.decodeJwt(token);
+
+    expect(payload.iss).toBe(mockConfig.issuerDid);
+    expect(header.kid).toBe(`${mockConfig.issuerDid}#${mockConfig.keyId}`);
+  });
 });

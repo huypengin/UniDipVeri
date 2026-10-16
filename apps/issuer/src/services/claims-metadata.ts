@@ -62,6 +62,7 @@ export interface Oid4vciIssuerMetadata {
     string,
     CredentialConfigurationSupported
   >;
+  credentials_supported?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -321,6 +322,38 @@ export function generateIssuerMetadata(
     claims,
   };
 
+  const legacySupportedCredential = {
+    id: configId,
+    format: "vc+sd-jwt",
+    scope,
+    vct,
+    cryptographic_binding_methods_supported: ["jwk"],
+    credential_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+    proof_types_supported: {
+      jwt: {
+        proof_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+      },
+    },
+    display: configuration.display,
+    claims,
+  };
+
+  const modernSupportedCredential = {
+    id: `${configId}_v2`,
+    format: "dc+sd-jwt",
+    scope,
+    vct,
+    cryptographic_binding_methods_supported: ["jwk"],
+    credential_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+    proof_types_supported: {
+      jwt: {
+        proof_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+      },
+    },
+    display: configuration.display,
+    claims,
+  };
+
   return {
     credential_issuer: config.baseUrl,
     credential_endpoint: `${config.baseUrl}/credential`,
@@ -335,6 +368,7 @@ export function generateIssuerMetadata(
         format: "vc+sd-jwt" as unknown as "dc+sd-jwt",
       },
     },
+    credentials_supported: [legacySupportedCredential, modernSupportedCredential],
   };
 }
 
