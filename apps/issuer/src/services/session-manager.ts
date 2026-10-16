@@ -20,6 +20,7 @@ export interface PreAuthorizedCodeSession {
   studentId: string;
   credentialConfigurationId: string;
   txCode?: string;
+  claims?: Record<string, unknown>;
   createdAt: number;
   expiresAt: number;
 }
@@ -31,6 +32,7 @@ export interface AccessTokenSession {
   accessToken: string;
   studentId: string;
   credentialConfigurationId: string;
+  claims?: Record<string, unknown>;
   cNonce: string;
   cNonceExpiresAt: number;
   createdAt: number;
@@ -52,6 +54,7 @@ export interface CreatePreAuthorizedCodeOptions {
   studentId: string;
   credentialConfigurationId: string;
   txCode?: string;
+  claims?: Record<string, unknown>;
   /** TTL in seconds (default: 600 - 10 minutes) */
   ttlSeconds?: number;
 }
@@ -129,6 +132,7 @@ export class SessionManager {
       studentId: options.studentId.trim(),
       credentialConfigurationId: options.credentialConfigurationId.trim(),
       txCode: options.txCode?.trim(),
+      claims: options.claims,
       createdAt: now,
       expiresAt: now + ttl * 1000,
     };
@@ -186,6 +190,7 @@ export class SessionManager {
       accessToken,
       studentId: session.studentId,
       credentialConfigurationId: session.credentialConfigurationId,
+      claims: session.claims,
       cNonce,
       cNonceExpiresAt: now + cNonceTtl * 1000,
       createdAt: now,
@@ -227,6 +232,66 @@ export class SessionManager {
     return session;
   }
 
+  private readonly standaloneNonces = new Map<string, number>();
+
+  /**
+   * Generates a fresh standalone c_nonce challenge per OpenID4VCI 1.0 Final Section 7.
+   */
+  generateStandaloneNonce(ttlSeconds: number = DEFAULT_C_NONCE_TTL_SECONDS): {
+    cNonce: string;
+    cNonceExpiresIn: number;
+  } {
+    const cNonce = generateSecureToken("cnonce_", 32);
+    this.standaloneNonces.set(cNonce, Date.now() + ttlSeconds * 1000);
+    return {
+      cNonce,
+      cNonceExpiresIn: ttlSeconds,
+    };
+  }
+
+  /**
+   * Generates and assigns a fresh c_nonce to an active access token session.
+   */
+  rotateSessionNonce(token: string): string | undefined {
+    const session = this.getAccessTokenSession(token);
+    if (!session) {
+      return undefined;
+    }
+    const newNonce = generateSecureToken("cnonce_", 32);
+    session.cNonce = newNonce;
+    session.cNonceExpiresAt = Date.now() + DEFAULT_C_NONCE_TTL_SECONDS * 1000;
+    return newNonce;
+  }
+
+  /**
+   * Checks whether a nonce challenge is valid for the given session or as an unexpired standalone nonce,
+   * without consuming or mutating it.
+   *
+   * @param session Active AccessTokenSession
+   * @param nonce Nonce string presented in holder proof
+   * @returns true if valid and unexpired, false otherwise
+   */
+  isValidNonce(session: AccessTokenSession, nonce: string): boolean {
+    if (!nonce || typeof nonce !== "string") {
+      return false;
+    }
+    const now = Date.now();
+    if (
+      session.cNonce &&
+      timingSafeCompare(session.cNonce, nonce) &&
+      now <= session.cNonceExpiresAt
+    ) {
+      return true;
+    }
+    if (this.standaloneNonces.has(nonce)) {
+      const exp = this.standaloneNonces.get(nonce)!;
+      if (now <= exp) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Validates a c_nonce against an active access token session and generates a fresh nonce.
    *
@@ -250,7 +315,20 @@ export class SessionManager {
       return { valid: false, error: "expired_nonce" };
     }
 
-    if (!timingSafeCompare(session.cNonce, nonce)) {
+    let nonceValid = false;
+
+    // Check against session cNonce
+    if (session.cNonce && timingSafeCompare(session.cNonce, nonce)) {
+      nonceValid = true;
+    } else if (this.standaloneNonces.has(nonce)) {
+      const exp = this.standaloneNonces.get(nonce)!;
+      this.standaloneNonces.delete(nonce); // single use
+      if (now <= exp) {
+        nonceValid = true;
+      }
+    }
+
+    if (!nonceValid) {
       return { valid: false, error: "mismatched_nonce" };
     }
 

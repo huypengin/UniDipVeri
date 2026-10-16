@@ -2,18 +2,32 @@ import type { CredentialTypeConfig } from "@unidipveri/core";
 import type { IssuerConfig } from "./config.js";
 import type { KeyContext } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
-import { handleMetadataRequest } from "./routes/metadata.js";
+import { StudentRecordService } from "./services/student-records.js";
+import { StatusListService } from "./services/status-list.js";
+import {
+  handleMetadataRequest,
+  handleOAuthMetadataRequest,
+} from "./routes/metadata.js";
 import { handleDidRequest } from "./routes/did.js";
 import { handleVctRequest } from "./routes/vct.js";
 import { handleOfferRequest } from "./routes/offer.js";
 import { handleTokenRequest } from "./routes/token.js";
+import { handleCredentialRequest } from "./routes/credential.js";
+import { handleNonceRequest } from "./routes/nonce.js";
+import {
+  handleStatusListRequest,
+  handleAdminRevokeRequest,
+  handleAdminStatusQuery,
+} from "./routes/status.js";
+import { handlePortalRequest } from "./routes/portal.js";
+import { handleDocsRequest } from "./routes/docs.js";
 
 /**
  * Standard CORS headers applied to all responses to support web wallets and browser verifiers.
  */
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -39,14 +53,18 @@ export function withCors(response: Response): Response {
  * @param config Validated IssuerConfig
  * @param keyContext Initialized cryptographic KeyContext
  * @param schemaConfig Validated CredentialTypeConfig
- * @param sessionManager Optional SessionManager instance (defaults to new instance)
+ * @param sessionManager SessionManager instance (defaults to new instance)
+ * @param studentRecordsService StudentRecordService repository (defaults to new instance)
+ * @param statusListService StatusListService revocation engine (defaults to new instance)
  * @returns Pure request handler function
  */
 export function createApp(
   config: IssuerConfig,
   keyContext: KeyContext,
   schemaConfig: CredentialTypeConfig,
-  sessionManager: SessionManager = new SessionManager()
+  sessionManager: SessionManager = new SessionManager(),
+  studentRecordsService: StudentRecordService = new StudentRecordService(),
+  statusListService: StatusListService = new StatusListService()
 ): (req: Request) => Promise<Response> {
   const bootTimeMs = Date.now();
 
@@ -63,11 +81,40 @@ export function createApp(
       const url = new URL(req.url);
       const pathname = url.pathname.replace(/\/+$/, "") || "/";
       const method = req.method.toUpperCase();
+      const startMs = performance.now();
+      const userAgent = req.headers.get("user-agent") || "unknown";
+
+      if (pathname !== "/health") {
+        console.log(`[UniDipVeri] --> ${method} ${pathname}${url.search ? url.search : ""} (Agent: ${userAgent})`);
+      }
+
+      const respond = async (res: Response | Promise<Response>): Promise<Response> => {
+        const response = await res;
+        if (pathname !== "/health") {
+          const durationMs = Math.round(performance.now() - startMs);
+          const symbol = response.status >= 400 ? "⚠️" : "✅";
+          console.log(`[UniDipVeri] <-- ${symbol} ${response.status} ${method} ${pathname} (${durationMs}ms)`);
+        }
+        return withCors(response);
+      };
+
+      // Route: GET / or GET /issue (Interactive Registrar Portal)
+      if ((method === "GET" || method === "HEAD") && (pathname === "/" || pathname === "/issue")) {
+        return respond(handlePortalRequest(req, config, schemaConfig));
+      }
+
+      // Route: GET /docs, GET /swagger, GET /docs/openapi.json
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/docs" || pathname === "/swagger" || pathname === "/docs/openapi.json")
+      ) {
+        return respond(handleDocsRequest(req, config, schemaConfig));
+      }
 
       // Route: GET /health
       if (method === "GET" && pathname === "/health") {
         const uptimeSeconds = (Date.now() - bootTimeMs) / 1000;
-        return withCors(
+        return respond(
           Response.json(
             {
               status: "ok",
@@ -85,12 +132,21 @@ export function createApp(
         method === "GET" &&
         pathname === "/.well-known/openid-credential-issuer"
       ) {
-        return withCors(handleMetadataRequest(config, schemaConfig));
+        return respond(handleMetadataRequest(config, schemaConfig));
+      }
+
+      // Route: GET /.well-known/oauth-authorization-server, GET /.well-known/openid-configuration
+      if (
+        method === "GET" &&
+        (pathname === "/.well-known/oauth-authorization-server" ||
+          pathname === "/.well-known/openid-configuration")
+      ) {
+        return respond(handleOAuthMetadataRequest(config));
       }
 
       // Route: GET /.well-known/did.json
       if (method === "GET" && pathname === "/.well-known/did.json") {
-        return withCors(handleDidRequest(config, keyContext));
+        return respond(handleDidRequest(config, keyContext));
       }
 
       // Route: GET /types/* or matching vctPath
@@ -100,7 +156,7 @@ export function createApp(
         method === "GET" &&
         (pathname.startsWith("/types") || pathname === vctPath)
       ) {
-        return withCors(
+        return respond(
           handleVctRequest(url.pathname, schemaConfig, config.vctBaseUrl)
         );
       }
@@ -110,48 +166,77 @@ export function createApp(
         (method === "GET" || method === "POST") &&
         pathname === "/credential-offer"
       ) {
-        return withCors(
-          await handleOfferRequest(req, config, sessionManager, schemaConfig)
+        return respond(
+          handleOfferRequest(req, config, sessionManager, schemaConfig)
         );
       }
 
       // Route: /token (POST)
       if (pathname === "/token") {
-        return withCors(await handleTokenRequest(req, sessionManager));
+        return respond(handleTokenRequest(req, sessionManager));
       }
 
-      // Stub: POST /credential
-      if (method === "POST" && pathname === "/credential") {
-        return withCors(
-          Response.json(
-            {
-              error: "not_implemented",
-              error_description:
-                "Credential issuance endpoint is not yet implemented",
-            },
-            { status: 501 }
-          )
+      // Route: /nonce (POST)
+      if (pathname === "/nonce") {
+        return respond(handleNonceRequest(req, sessionManager));
+      }
+
+      // Route: /credential (POST)
+      if (pathname === "/credential") {
+        return respond(
+          handleCredentialRequest(req, {
+            config,
+            sessionManager,
+            keyContext,
+            schemaConfig,
+            studentRecordsService,
+            statusListService,
+          })
         );
       }
 
+      // Route: GET /status/:id
+      if (pathname.startsWith("/status/")) {
+        const statusId = pathname.slice("/status/".length);
+        return respond(
+          handleStatusListRequest(req, statusId, {
+            config,
+            keyContext,
+            statusListService,
+          })
+        );
+      }
+
+      // Route: POST /admin/revoke
+      if (pathname === "/admin/revoke") {
+        return respond(handleAdminRevokeRequest(req, statusListService));
+      }
+
+      // Route: GET /admin/status/:idx
+      if (pathname.startsWith("/admin/status/")) {
+        const idxStr = pathname.slice("/admin/status/".length);
+        const idx = parseInt(idxStr, 10);
+        return respond(handleAdminStatusQuery(idx, statusListService));
+      }
+
       // 404 Route Not Found
-      return withCors(
+      return respond(
         Response.json(
           {
             error: "not_found",
-            error_description: `Route '${pathname}' with method ${method} not found`,
+            error_description: `Route ${pathname} not found on this issuer`,
           },
           { status: 404 }
         )
       );
     } catch (err) {
-      // 500 Server Error
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[UniDipVeri ❌] Unhandled server error: ${message}`);
       return withCors(
         Response.json(
           {
             error: "server_error",
-            error_description:
-              err instanceof Error ? err.message : String(err),
+            error_description: `Unhandled issuer internal error: ${message}`,
           },
           { status: 500 }
         )

@@ -13,7 +13,10 @@ import {
   type Oid4vciIssuerMetadata,
   type SdJwtVcTypeMetadata,
 } from "../src/services/claims-metadata.js";
-import { handleMetadataRequest } from "../src/routes/metadata.js";
+import {
+  handleMetadataRequest,
+  handleOAuthMetadataRequest,
+} from "../src/routes/metadata.js";
 import { handleVctRequest } from "../src/routes/vct.js";
 
 const schemaPath = join(
@@ -84,6 +87,10 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
         "https://issuer.university.edu/credential"
       );
       expect(metadata.token_endpoint).toBe("https://issuer.university.edu/token");
+      expect(metadata.authorization_servers).toEqual([
+        "https://issuer.university.edu",
+      ]);
+      expect(metadata.authorization_server).toBe("https://issuer.university.edu");
 
       const configId = "graduation_record_sd_jwt_vc";
       const config = metadata.credential_configurations_supported[configId];
@@ -176,15 +183,49 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
       expect(typeMetadata.schema).toBeDefined();
       expect(typeMetadata.claims).toBeDefined();
 
-      // Verify selective disclosure policies preserved in Type Metadata
-      expect(typeMetadata.claims.studentId.sd).toBe("always_disclosed");
-      expect(typeMetadata.claims.dateOfBirth.sd).toBe("selectively_disclosable");
-      expect(typeMetadata.claims.nationalId.sd).toBe("selectively_disclosable");
+      expect(Array.isArray(typeMetadata.claims)).toBe(true);
 
-      const diploma = typeMetadata.claims.papers.properties?.diploma;
-      expect(diploma?.sd).toBe("selectively_disclosable");
-      expect(diploma?.properties?.degreeName.sd).toBe("always_disclosed");
-      expect(diploma?.properties?.honours?.sd).toBe("selectively_disclosable");
+      const findByPath = (path: Array<string | number | null>) =>
+        typeMetadata.claims.find(
+          (c) => JSON.stringify(c.path) === JSON.stringify(path)
+        );
+
+      // Verify selective disclosure policies preserved in Type Metadata array per draft-19
+      const studentIdClaim = findByPath(["studentId"]);
+      expect(studentIdClaim).toBeDefined();
+      expect(studentIdClaim?.sd).toBe("never");
+      expect(studentIdClaim?.mandatory).toBe(true);
+
+      const dateOfBirthClaim = findByPath(["dateOfBirth"]);
+      expect(dateOfBirthClaim).toBeDefined();
+      expect(dateOfBirthClaim?.sd).toBe("always");
+      expect(dateOfBirthClaim?.mandatory).toBe(false);
+
+      const nationalIdClaim = findByPath(["nationalId"]);
+      expect(nationalIdClaim).toBeDefined();
+      expect(nationalIdClaim?.sd).toBe("always");
+
+      const diplomaClaim = findByPath(["papers", "diploma"]);
+      expect(diplomaClaim).toBeDefined();
+      expect(diplomaClaim?.sd).toBe("always");
+
+      const degreeNameClaim = findByPath(["papers", "diploma", "degreeName"]);
+      expect(degreeNameClaim).toBeDefined();
+      expect(degreeNameClaim?.sd).toBe("never");
+
+      const honoursClaim = findByPath(["papers", "diploma", "honours"]);
+      expect(honoursClaim).toBeDefined();
+      expect(honoursClaim?.sd).toBe("always");
+
+      const coursesGradeClaim = findByPath([
+        "papers",
+        "transcript",
+        "courses",
+        null,
+        "grade",
+      ]);
+      expect(coursesGradeClaim).toBeDefined();
+      expect(coursesGradeClaim?.sd).toBe("always");
     });
 
     it("handleVctRequest serves Type Metadata on exact vct path and /types prefix", async () => {
@@ -237,4 +278,25 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
       expect(body.error).toBe("not_found");
     });
   });
+
+  describe("OAuth 2.0 Authorization Server Metadata (RFC 8414)", () => {
+    it("handleOAuthMetadataRequest returns 200 OK with compliant metadata document", async () => {
+      const res = handleOAuthMetadataRequest(issuerConfig);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("application/json");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+      const body = (await res.json()) as any;
+      expect(body.issuer).toBe("https://issuer.university.edu");
+      expect(body.token_endpoint).toBe("https://issuer.university.edu/token");
+      expect(body.authorization_endpoint).toBe(
+        "https://issuer.university.edu/credential-offer"
+      );
+      expect(body.grant_types_supported).toEqual([
+        "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+      ]);
+      expect(body.token_endpoint_auth_methods_supported).toEqual(["none"]);
+    });
+  });
 });
+

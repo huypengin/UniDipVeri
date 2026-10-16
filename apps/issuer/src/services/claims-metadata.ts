@@ -55,10 +55,35 @@ export interface Oid4vciIssuerMetadata {
   credential_issuer: string;
   credential_endpoint: string;
   token_endpoint: string;
+  nonce_endpoint?: string;
+  authorization_servers?: string[];
+  authorization_server?: string;
   credential_configurations_supported: Record<
     string,
     CredentialConfigurationSupported
   >;
+  credentials_supported?: Array<Record<string, unknown>>;
+}
+
+/**
+ * Localized claim display metadata in Type Metadata per draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ */
+export interface SdJwtVcTypeClaimDisplay {
+  lang?: string;
+  locale?: string;
+  label?: string;
+  name?: string;
+  description?: string;
+}
+
+/**
+ * Claim metadata definition inside Type Metadata claims array per draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ */
+export interface SdJwtVcTypeMetadataClaim {
+  path: Array<string | number | null>;
+  display?: SdJwtVcTypeClaimDisplay[];
+  sd?: "always" | "never" | "allowed";
+  mandatory?: boolean;
 }
 
 /**
@@ -70,7 +95,13 @@ export interface SdJwtVcTypeMetadata {
   name: string;
   description: string;
   schema: Record<string, unknown>;
-  claims: Record<string, ClaimDef>;
+  display?: Array<{
+    lang?: string;
+    locale?: string;
+    name?: string;
+    description?: string;
+  }>;
+  claims: SdJwtVcTypeMetadataClaim[];
 }
 
 /**
@@ -291,14 +322,108 @@ export function generateIssuerMetadata(
     claims,
   };
 
+  const legacySupportedCredential = {
+    id: configId,
+    format: "vc+sd-jwt",
+    scope,
+    vct,
+    cryptographic_binding_methods_supported: ["jwk"],
+    credential_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+    proof_types_supported: {
+      jwt: {
+        proof_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+      },
+    },
+    display: configuration.display,
+    claims,
+  };
+
+  const modernSupportedCredential = {
+    id: `${configId}_v2`,
+    format: "dc+sd-jwt",
+    scope,
+    vct,
+    cryptographic_binding_methods_supported: ["jwk"],
+    credential_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+    proof_types_supported: {
+      jwt: {
+        proof_signing_alg_values_supported: ["ES256", "EdDSA", "ES384"],
+      },
+    },
+    display: configuration.display,
+    claims,
+  };
+
   return {
     credential_issuer: config.baseUrl,
     credential_endpoint: `${config.baseUrl}/credential`,
     token_endpoint: `${config.baseUrl}/token`,
+    nonce_endpoint: `${config.baseUrl}/nonce`,
+    authorization_servers: [config.baseUrl],
+    authorization_server: config.baseUrl,
     credential_configurations_supported: {
       [configId]: configuration,
+      [`${configId}_legacy`]: {
+        ...configuration,
+        format: "vc+sd-jwt" as unknown as "dc+sd-jwt",
+      },
     },
+    credentials_supported: [legacySupportedCredential, modernSupportedCredential],
   };
+}
+
+/**
+ * Derives the array of claim metadata entries conforming to draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * Recursively maps claims, nested object properties, and array items to claim path pointers.
+ *
+ * @param claims Record of claim definitions from schema
+ * @param parentPath Accumulated path segments
+ * @returns Array of SdJwtVcTypeMetadataClaim objects
+ */
+export function deriveTypeMetadataClaims(
+  claims: Record<string, ClaimDef>,
+  parentPath: Array<string | number | null> = []
+): SdJwtVcTypeMetadataClaim[] {
+  const result: SdJwtVcTypeMetadataClaim[] = [];
+
+  for (const [key, def] of Object.entries(claims)) {
+    const currentPath = [...parentPath, key];
+    const displayName = formatClaimDisplayName(key);
+
+    const display: SdJwtVcTypeClaimDisplay = {
+      lang: "en-US",
+      locale: "en-US",
+      label: displayName,
+      name: displayName,
+    };
+    if (def.description) {
+      display.description = def.description;
+    }
+
+    const claimEntry: SdJwtVcTypeMetadataClaim = {
+      path: currentPath,
+      display: [display],
+      sd: def.sd === "selectively_disclosable" ? "always" : "never",
+      mandatory: def.required ?? false,
+    };
+
+    result.push(claimEntry);
+
+    if (def.type === "object" && def.properties) {
+      result.push(...deriveTypeMetadataClaims(def.properties, currentPath));
+    } else if (def.type === "array" && def.items) {
+      if (def.items.type === "object" && def.items.properties) {
+        result.push(
+          ...deriveTypeMetadataClaims(def.items.properties, [
+            ...currentPath,
+            null,
+          ])
+        );
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -318,6 +443,14 @@ export function generateTypeMetadata(
     name: schemaConfig.name,
     description: schemaConfig.description,
     schema: deriveJsonSchema(schemaConfig),
-    claims: schemaConfig.claims,
+    display: [
+      {
+        lang: "en-US",
+        locale: "en-US",
+        name: schemaConfig.name,
+        description: schemaConfig.description,
+      },
+    ],
+    claims: deriveTypeMetadataClaims(schemaConfig.claims),
   };
 }

@@ -210,3 +210,25 @@ export async function resolveDidVerificationKey(
     publicKeyJwk: matched.publicKeyJwk,
   };
 }
+
+/**
+ * Resolves an issuer and keyId into a canonical verification method DID URL if the issuer is a DID.
+ * Per W3C DID Core Section 3.2 and draft-ietf-oauth-sd-jwt-vc-19 Section 3.2.2.1,
+ * verification methods referenced outside the DID document must be formatted as DID URLs.
+ *
+ * @param issuer Issuer URI or DID (e.g. "did:web:example.edu")
+ * @param keyId Key identifier or fragment (e.g. "key-1", "#key-1", or full DID URL)
+ * @returns Fully qualified DID URL if issuer is a DID, otherwise original keyId
+ */
+export function resolveIssuerKeyId(issuer: string, keyId: string): string {
+  if (issuer.startsWith("did:")) {
+    if (keyId.startsWith("did:")) {
+      return keyId;
+    }
+    if (keyId.startsWith("#")) {
+      return `${issuer}${keyId}`;
+    }
+    return `${issuer}#${keyId}`;
+  }
+  return keyId;
+}

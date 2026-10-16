@@ -146,6 +146,9 @@ export interface IssueSdJwtVcOptions {
 
   /** Optional custom salt generator producing >= 128-bit CSPRNG salts */
   saltGenerator?: () => string;
+
+  /** Optional explicit typ header override (defaults to SD_JWT_VC_TYP "dc+sd-jwt") */
+  typ?: string;
 }
 
 /**
@@ -177,6 +180,9 @@ export interface SignSdJwtVcOptions {
 
   /** Issuer signing key configuration */
   signingKey: IssuerSigningKey;
+
+  /** Optional explicit typ header override (defaults to SD_JWT_VC_TYP "dc+sd-jwt") */
+  typ?: string;
 }
 
 /**
@@ -265,7 +271,7 @@ export async function signSdJwtVc(
   const jwt = await new jose.SignJWT(payload)
     .setProtectedHeader({
       alg: validatedAlg,
-      typ: SD_JWT_VC_TYP,
+      typ: options.typ ?? SD_JWT_VC_TYP,
       ...(signingKey.keyId ? { kid: signingKey.keyId } : {}),
     })
     .sign(key);
@@ -420,6 +426,9 @@ export async function issueSdJwtVc(
 
   const assembledPayload: Record<string, unknown> = {
     ...transformResult.maskedPayload,
+    ...(transformResult.disclosures.length > 0
+      ? { _sd_alg: options.digestAlgorithm ?? "sha-256" }
+      : {}),
     iss: options.issuer,
     vct,
     iat,
@@ -444,5 +453,6 @@ export async function issueSdJwtVc(
     payload: assembledPayload,
     disclosures: transformResult.disclosures,
     signingKey: options.signingKey,
+    typ: options.typ,
   });
 }

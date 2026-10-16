@@ -196,6 +196,10 @@ export async function handleTokenRequest(
       c_nonce_expires_in: result.cNonceExpiresIn,
     };
 
+    console.log(
+      `[Token Endpoint ✅] Pre-authorized code exchanged: access_token=${result.accessToken.slice(0, 10)}..., c_nonce=${result.cNonce.slice(0, 14)}... (expires in ${result.expiresIn}s)`
+    );
+
     return Response.json(responseBody, {
       status: 200,
       headers: {
@@ -206,12 +210,15 @@ export async function handleTokenRequest(
     });
   } catch (err) {
     if (err instanceof InvalidGrantError) {
+      console.warn(`[Token Endpoint ⚠️] Code exchange rejected: ${err.message}`);
       return tokenErrorResponse(400, "invalid_grant", err.message);
     }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[Token Endpoint ❌] Unexpected server error: ${message}`);
     return tokenErrorResponse(
       500,
       "server_error",
-      err instanceof Error ? err.message : String(err)
+      message
     );
   }
 }
