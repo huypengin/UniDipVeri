@@ -4,6 +4,7 @@ import { loadSchemaFromFile } from "@unidipveri/core";
 import { join } from "node:path";
 import { loadIssuerConfig } from "../src/config.js";
 import {
+  formatClaimLabel,
   handlePortalRequest,
   renderPortalHtml,
   renderSchemaFormFields,
@@ -191,5 +192,16 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     expect(resPost.headers.get("Allow")).toBe("GET, HEAD");
     const data = (await resPost.json()) as { error: string };
     expect(data.error).toBe("invalid_request");
+  });
+
+  it("formats claim labels cleanly separating letters and numbers", () => {
+    expect(formatClaimLabel("gradeIn4.0")).toBe("Grade In 4.0");
+    expect(formatClaimLabel("gradeIn10.0")).toBe("Grade In 10.0");
+    expect(formatClaimLabel("gradeIn100.0")).toBe("Grade In 100.0");
+    expect(formatClaimLabel("course1")).toBe("Course 1");
+    expect(formatClaimLabel("level2Course")).toBe("Level 2 Course");
+    expect(formatClaimLabel("iso3166Code")).toBe("Iso 3166 Code");
+    expect(formatClaimLabel("studentId")).toBe("Student ID");
+    expect(formatClaimLabel("cumulativeGPA")).toBe("Cumulative GPA");
   });
 });
