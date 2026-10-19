@@ -11,7 +11,7 @@ import type { IssuerConfig } from "../src/config.js";
 describe("OpenAPI Specification & Swagger UI Documentation", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   const mockConfig: IssuerConfig = {

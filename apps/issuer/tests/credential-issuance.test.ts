@@ -20,7 +20,7 @@ import type { IssuerConfig } from "../src/config.js";
 describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   const mockConfig: IssuerConfig = {

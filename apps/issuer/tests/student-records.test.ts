@@ -10,7 +10,7 @@ import { loadSchemaFromFile, transformClaims } from "@unidipveri/core";
 describe("Student Academic Records Repository", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   it("retrieves preloaded honors graduate record with expected fields", () => {

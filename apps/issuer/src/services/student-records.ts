@@ -33,7 +33,7 @@ export interface TranscriptRecord {
 }
 
 /**
- * Complete student academic record matching schemas/graduation-record.yaml.
+ * Complete student academic record matching schemas/graduation-record.v1.yaml.
  */
 export interface StudentAcademicRecord {
   studentId: string;
@@ -48,7 +48,7 @@ export interface StudentAcademicRecord {
 }
 
 /**
- * Preloaded demo academic records conforming to schemas/graduation-record.yaml.
+ * Preloaded demo academic records conforming to schemas/graduation-record.v1.yaml.
  */
 export const PRELOADED_STUDENT_RECORDS: Record<string, StudentAcademicRecord> = {
   "STU-2026-FINAL": {

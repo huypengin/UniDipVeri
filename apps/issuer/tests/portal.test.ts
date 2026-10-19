@@ -12,7 +12,7 @@ import {
 
 const SCHEMA_PATH = join(
   import.meta.dir,
-  "../../../schemas/graduation-record.yaml"
+  "../../../schemas/graduation-record.v1.yaml"
 );
 const graduationSchema = await loadSchemaFromFile(SCHEMA_PATH);
 

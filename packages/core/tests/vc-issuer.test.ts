@@ -22,7 +22,7 @@ import { transformClaims } from "../src/sd-jwt/transform.js";
 describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & RFC 9901)", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   const testStudentClaims = {

@@ -7,7 +7,7 @@ import type { IssuerConfig } from "../src/config.js";
 
 const FIXTURE_SCHEMA_PATH = join(
   import.meta.dir,
-  "../../../schemas/graduation-record.yaml"
+  "../../../schemas/graduation-record.v1.yaml"
 );
 
 describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final Section 4.1)", () => {

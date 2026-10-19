@@ -16,7 +16,7 @@ import {
 describe("Issuer Configuration Loading & Validation", () => {
   const fixtureSchemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   it("loads valid configuration with full environment overrides", () => {
@@ -204,7 +204,7 @@ describe("Issuer Configuration Loading & Validation", () => {
 describe("Issuer KeyManager & Cryptographic Caching", () => {
   const fixtureSchemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
   const algorithms: SigningAlgorithm[] = ["ES256", "EdDSA", "ES384"];
 

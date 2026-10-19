@@ -9,7 +9,7 @@ import type { CredentialOfferResponse } from "../src/routes/offer.js";
 
 const schemaPath = join(
   import.meta.dir,
-  "../../../schemas/graduation-record.yaml"
+  "../../../schemas/graduation-record.v1.yaml"
 );
 const schemaConfig = await loadSchemaFromFile(schemaPath);
 const config = loadIssuerConfig({

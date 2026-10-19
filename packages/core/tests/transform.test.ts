@@ -17,7 +17,7 @@ import { computeDisclosureDigestSync } from "../src/sd-jwt/digest.js";
 describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   const sampleGraduationClaims = {
@@ -233,7 +233,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
     });
   });
 
-  describe("Thesis Primary Schema: Graduation Composite Record (graduation-record.yaml)", () => {
+  describe("Thesis Primary Schema: Graduation Composite Record (graduation-record.v1.yaml)", () => {
     let graduationSchema: CredentialTypeConfig;
 
     beforeEach(async () => {

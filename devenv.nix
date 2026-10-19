@@ -48,7 +48,7 @@
           export ISSUER_DID="did:web:''$DOMAIN"
         fi
 
-        export SCHEMA_PATH="''${SCHEMA_PATH:-$(pwd)/schemas/graduation-record.yaml}"
+        export SCHEMA_PATH="''${SCHEMA_PATH:-$(pwd)/schemas/graduation-record.v1.yaml}"
         export PORT="''${PORT:-3000}"
 
         echo "=========================================================="

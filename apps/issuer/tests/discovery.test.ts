@@ -21,7 +21,7 @@ import { handleVctRequest } from "../src/routes/vct.js";
 
 const schemaPath = join(
   import.meta.dir,
-  "../../../schemas/graduation-record.yaml"
+  "../../../schemas/graduation-record.v1.yaml"
 );
 const schemaConfig = await loadSchemaFromFile(schemaPath);
 const issuerConfig = loadIssuerConfig({
@@ -299,4 +299,3 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
     });
   });
 });
-

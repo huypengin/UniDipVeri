@@ -21,7 +21,7 @@ import { computeDisclosureDigestSync } from "../src/sd-jwt/digest.js";
 describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/core)", () => {
   const schemaPath = join(
     import.meta.dir,
-    "../../../schemas/graduation-record.yaml"
+    "../../../schemas/graduation-record.v1.yaml"
   );
 
   const testRecord = {

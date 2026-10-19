@@ -1,0 +1,159 @@
+vctPath: "/types/graduation-record/v2"
+name: "Graduation Academic Record"
+description: "Official comprehensive graduation credential containing Diploma conferral, Final Academic Transcript, and Student Civic Education."
+
+claims:
+  studentId:
+    type: string
+    required: true
+    sd: always_disclosed
+    description: "Internal university student identifier"
+
+  fullName:
+    type: string
+    required: true
+    sd: always_disclosed
+    description: "Full legal student name"
+
+  dateOfBirth:
+    type: string
+    format: date
+    required: false
+    sd: selectively_disclosable
+    description: "Date of birth (YYYY-MM-DD)"
+
+  nationalId:
+    type: string
+    required: false
+    sd: selectively_disclosable
+    description: "National ID / citizen number"
+
+  papers:
+    type: object
+    required: true
+    sd: always_disclosed
+    properties:
+      diploma:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        description: "Official university diploma record"
+        properties:
+          degreeName:
+            type: string
+            required: true
+            sd: always_disclosed
+            description: "Conferred degree title"
+          degreeType:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Degree classification"
+          programName:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Academic major/program"
+          major:
+            type: string
+            required: true
+            sd: selectively_disclosable
+            description: "Primary academic major"
+          minor:
+            type: string
+            required: false
+            sd: selectively_disclosable
+            description: "Secondary academic minor"
+          graduationDate:
+            type: string
+            format: date
+            required: true
+            sd: always_disclosed
+            description: "Official graduation conferral date"
+          honours:
+            type: string
+            required: false
+            sd: selectively_disclosable
+            description: "Honours classification"
+
+      transcript:
+        type: object
+        required: true
+        sd: selectively_disclosable
+        description: "Complete academic transcript record"
+        properties:
+          transcriptId:
+            type: string
+            required: true
+            sd: always_disclosed
+            description: "Official transcript serial number"
+          cumulativeGPA:
+            type: number
+            required: false
+            sd: selectively_disclosable
+            description: "Final cumulative GPA"
+          totalCredits:
+            type: number
+            required: false
+            sd: selectively_disclosable
+            description: "Total completed academic credits"
+          courses:
+            type: array
+            required: true
+            sd: selectively_disclosable
+            description: "Complete course-level results"
+            items:
+              type: object
+              properties:
+                code:
+                  type: string
+                  required: true
+                  sd: always_disclosed
+                  description: "Course code"
+                title:
+                  type: string
+                  required: true
+                  sd: always_disclosed
+                  description: "Course name"
+                credits:
+                  type: number
+                  required: true
+                  sd: always_disclosed
+                  description: "Course credits"
+                gradeIn4.0:
+                  type: number
+                  required: true
+                  sd: selectively_disclosable
+                  description: "Numerical course grade in 4.0 scale"
+                gradeIn10.0:
+                  type: number
+                  required: true
+                  sd: selectively_disclosable
+                  description: "Numerical course grade in 10.0 scale"
+                gradeIn100.0:
+                  type: number
+                  required: true
+                  sd: selectively_disclosable
+                  description: "Numerical course grade in 100.0 scale"
+                letterGrade:
+                  type: string
+                  required: false
+                  sd: selectively_disclosable
+                  description: "Letter grade"
+
+      studentCivicEducation:
+        type: object
+        required: false
+        sd: selectively_disclosable
+        description: "Student civic education information"
+        properties:
+          completionStatus:
+            type: boolean
+            required: true
+            sd: always_disclosed
+            description: "Indicates whether the student has completed the civic education program"
+          assessmentResult:
+            type: number
+            required: true
+            sd: selectively_disclosable
+            description: "The student's civic education assessment score (e.g., 85 out of 100)"
