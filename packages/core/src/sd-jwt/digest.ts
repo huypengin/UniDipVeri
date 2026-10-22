@@ -69,6 +69,54 @@ export function normalizeDigestAlgorithm(
 }
 
 /**
+ * Computes the base64url-encoded digest of any US-ASCII string using Web Crypto API.
+ * Conforms to RFC 9901 Section 4.2.3 and Section 4.3.
+ *
+ * @param input Non-empty US-ASCII string
+ * @param algorithm Hash algorithm matching _sd_alg (defaults to sha-256)
+ * @returns Unpadded base64url-encoded digest string
+ */
+export async function computeAsciiDigest(
+  input: string,
+  algorithm: SupportedDigestAlgorithm = DEFAULT_DIGEST_ALGORITHM
+): Promise<string> {
+  if (typeof input !== "string" || input.length === 0) {
+    throw new Error("Input must be a non-empty string");
+  }
+
+  const validatedAlg = normalizeDigestAlgorithm(algorithm);
+  const { webCrypto } = HASH_NAME_MAP[validatedAlg];
+
+  const asciiBytes = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest(webCrypto, asciiBytes);
+
+  return base64url.encode(new Uint8Array(hashBuffer));
+}
+
+/**
+ * Computes the base64url-encoded digest of any US-ASCII string using Node / Bun crypto.
+ * Conforms to RFC 9901 Section 4.2.3 and Section 4.3.
+ *
+ * @param input Non-empty US-ASCII string
+ * @param algorithm Hash algorithm matching _sd_alg (defaults to sha-256)
+ * @returns Unpadded base64url-encoded digest string
+ */
+export function computeAsciiDigestSync(
+  input: string,
+  algorithm: SupportedDigestAlgorithm = DEFAULT_DIGEST_ALGORITHM
+): string {
+  if (typeof input !== "string" || input.length === 0) {
+    throw new Error("Input must be a non-empty string");
+  }
+
+  const validatedAlg = normalizeDigestAlgorithm(algorithm);
+  const { nodeCrypto } = HASH_NAME_MAP[validatedAlg];
+
+  const hash = createHash(nodeCrypto).update(input, "ascii").digest();
+  return base64url.encode(hash);
+}
+
+/**
  * Computes the base64url-encoded digest of a base64url disclosure string using Web Crypto API.
  *
  * Requirements per RFC 9901 Section 4.2.3:
@@ -94,14 +142,7 @@ export async function computeDisclosureDigest(
     );
   }
 
-  const validatedAlg = normalizeDigestAlgorithm(algorithm);
-  const { webCrypto } = HASH_NAME_MAP[validatedAlg];
-
-  // Encode as US-ASCII bytes per RFC 9901 Section 4.2.3
-  const asciiBytes = new TextEncoder().encode(disclosureString);
-  const hashBuffer = await crypto.subtle.digest(webCrypto, asciiBytes);
-
-  return base64url.encode(new Uint8Array(hashBuffer));
+  return computeAsciiDigest(disclosureString, algorithm);
 }
 
 /**
@@ -126,11 +167,7 @@ export function computeDisclosureDigestSync(
     );
   }
 
-  const validatedAlg = normalizeDigestAlgorithm(algorithm);
-  const { nodeCrypto } = HASH_NAME_MAP[validatedAlg];
-
-  const hash = createHash(nodeCrypto).update(disclosureString, "ascii").digest();
-  return base64url.encode(hash);
+  return computeAsciiDigestSync(disclosureString, algorithm);
 }
 
 /**
