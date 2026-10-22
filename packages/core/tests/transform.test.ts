@@ -469,8 +469,13 @@ describe("Claim Masking Transformer (RFC 9901)", () => {
       const graduationSchema = await loadSchemaFromFile(schemaPath);
       const result = transformClaims(sampleGraduationClaims, graduationSchema);
 
+      const oracleHasher = (val: string | ArrayBuffer) =>
+        createHash("sha256")
+          .update(typeof val === "string" ? val : new Uint8Array(val))
+          .digest();
+
       const inst = new SDJwtInstance({
-        hasher: (val) => createHash("sha256").update(val).digest(),
+        hasher: oracleHasher,
       });
 
       // Construct a mock SD-JWT with our masked payload and all generated disclosures
@@ -489,9 +494,7 @@ describe("Claim Masking Transformer (RFC 9901)", () => {
       expect(decoded.disclosures!.length).toBe(result.disclosures.length);
 
       // Reconstruct claims via @sd-jwt/core's oracle getClaims()
-      const oracleClaims = await decoded.getClaims(async (data) =>
-        createHash("sha256").update(data).digest()
-      );
+      const oracleClaims = await decoded.getClaims(oracleHasher);
 
       expect(oracleClaims).toEqual(sampleGraduationClaims);
     });

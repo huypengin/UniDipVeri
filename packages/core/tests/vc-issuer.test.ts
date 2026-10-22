@@ -122,15 +122,20 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         expect(verifyResult.payload._sd).toBeArray();
 
         // 6. Oracle compatibility: verify with @sd-jwt/core
+        const oracleHasher = (val: string | ArrayBuffer) =>
+          createHash("sha256")
+            .update(typeof val === "string" ? val : new Uint8Array(val))
+            .digest();
+
         const oracle = new SDJwtInstance({
-          hasher: (val) => createHash("sha256").update(val).digest(),
+          hasher: oracleHasher,
         });
         const decoded = await oracle.decode(result.compact);
         expect(decoded.jwt).toBeDefined();
         expect(decoded.disclosures?.length).toBe(result.disclosures.length);
 
-        const reconstructed = (await decoded.getClaims(async (data) =>
-          createHash("sha256").update(data).digest()
+        const reconstructed = (await decoded.getClaims(
+          oracleHasher
         )) as Record<string, unknown>;
         expect(reconstructed.studentId).toBe("STU-2026-8899");
         expect(reconstructed.dateOfBirth).toBe("2002-05-15");

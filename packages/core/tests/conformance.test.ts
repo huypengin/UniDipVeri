@@ -24,6 +24,11 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     "../../../schemas/graduation-record.v1.yaml"
   );
 
+  const oracleHasher = (val: string | ArrayBuffer) =>
+    createHash("sha256")
+      .update(typeof val === "string" ? val : new Uint8Array(val))
+      .digest();
+
   const testRecord = {
     studentId: "STU-2026-0042",
     fullName: "Tran Van B",
@@ -74,7 +79,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
 
     // Feed combined wire format to @sd-jwt/core oracle
     const oracle = new SDJwtInstance({
-      hasher: (val) => createHash("sha256").update(val).digest(),
+      hasher: oracleHasher,
     });
 
     const decoded = await oracle.decode(combinedWireFormat);
@@ -82,9 +87,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     expect(decoded.disclosures?.length).toBe(disclosures.length);
 
     // Oracle getClaims() reconstructs original claims structure
-    const reconstructed = await decoded.getClaims(async (data) =>
-      createHash("sha256").update(data).digest()
-    );
+    const reconstructed = await decoded.getClaims(oracleHasher);
 
     expect(reconstructed).toEqual(testRecord);
   });
@@ -95,7 +98,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     const digest = computeDisclosureDigestSync(ourDisclosure);
 
     const oracle = new SDJwtInstance({
-      hasher: (val) => createHash("sha256").update(val).digest(),
+      hasher: oracleHasher,
     });
 
     const header = base64url.encode(
@@ -110,9 +113,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     expect(decoded.disclosures?.[0]?.key).toBe("faculty");
     expect(decoded.disclosures?.[0]?.value).toBe("Engineering");
 
-    const claims = await decoded.getClaims(async (data) =>
-      createHash("sha256").update(data).digest()
-    );
+    const claims = await decoded.getClaims(oracleHasher);
     expect(claims).toEqual({ faculty: "Engineering" });
   });
 
@@ -123,7 +124,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     const digest = computeDisclosureDigestSync(ourDisclosure);
 
     const oracle = new SDJwtInstance({
-      hasher: (val) => createHash("sha256").update(val).digest(),
+      hasher: oracleHasher,
     });
 
     const header = base64url.encode(
@@ -138,9 +139,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     expect(decoded.disclosures?.[0]?.key).toBeUndefined();
     expect(decoded.disclosures?.[0]?.value).toEqual(courseObj);
 
-    const claims = await decoded.getClaims(async (data) =>
-      createHash("sha256").update(data).digest()
-    );
+    const claims = await decoded.getClaims(oracleHasher);
     expect(claims).toEqual({ courses: [courseObj] });
   });
 });
