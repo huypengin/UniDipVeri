@@ -69,7 +69,7 @@ export function generateOpenApiSpec(
           tags: ["Discovery & Metadata"],
           summary: "OID4VCI Issuer Metadata Discovery",
           description:
-            "Returns OpenID4VCI 1.0 Final Section 11.2.2 issuer metadata, including credential configurations and endpoints.",
+            "Returns OpenID4VCI 1.0 Final Credential Issuer Metadata, including credential configurations and endpoints.",
           responses: {
             "200": {
               description: "Compliant OID4VCI 1.0 Final Credential Issuer Metadata",
@@ -125,7 +125,7 @@ export function generateOpenApiSpec(
         get: {
           tags: ["Discovery & Metadata"],
           summary: "SD-JWT VC Type Metadata Document",
-          description: "Draft-19 Section 5 Type Metadata document specifying claim names and selective disclosure policies.",
+          description: "Draft-19 Type Metadata document specifying claim names and selective disclosure policies.",
           responses: {
             "200": {
               description: "SD-JWT VC Type Metadata",
@@ -284,7 +284,7 @@ export function generateOpenApiSpec(
           tags: ["Issuance Flow"],
           summary: "OID4VCI Nonce Endpoint",
           description:
-            "Issues a fresh cryptographic c_nonce challenge per OpenID4VCI 1.0 Final Section 7 for wallets prior to proof signing.",
+            "Issues a fresh cryptographic c_nonce challenge per OpenID4VCI 1.0 Final for wallets prior to proof signing.",
           responses: {
             "200": {
               description: "Fresh c_nonce challenge returned successfully",

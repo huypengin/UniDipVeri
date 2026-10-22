@@ -4,7 +4,7 @@ import { resolveIssuerKeyId } from "@unidipveri/core";
 import type { KeyContext } from "./key-manager.js";
 
 /**
- * Standard Status List Token typ header per draft-ietf-oauth-status-list-21 Section 5.1.
+ * Standard Status List Token typ header per draft-ietf-oauth-status-list-21.
  */
 export const STATUS_LIST_TOKEN_TYP = "statuslist+jwt";
 
@@ -155,7 +155,7 @@ export class StatusListService {
   }
 
   /**
-   * Generates and signs a Status List Token JWT per draft-ietf-oauth-status-list-21 Section 5.1.
+   * Generates and signs a Status List Token JWT per draft-ietf-oauth-status-list-21.
    *
    * @param options Configuration including issuer URI, status list sub URI, and key context
    * @returns Signed Status List Token JWS string

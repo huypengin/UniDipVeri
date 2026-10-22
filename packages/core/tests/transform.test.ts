@@ -14,7 +14,7 @@ import {
 import { decodeDisclosure } from "../src/sd-jwt/disclosure.js";
 import { computeDisclosureDigestSync } from "../src/sd-jwt/digest.js";
 
-describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () => {
+describe("Claim Masking Transformer (RFC 9901)", () => {
   const schemaPath = join(
     import.meta.dir,
     "../../../schemas/graduation-record.v1.yaml"
@@ -95,7 +95,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
       expect(Array.isArray(sd)).toBe(true);
       expect(sd.length).toBe(2);
 
-      // _sd array is sorted lexicographically in Unicode code point order per RFC 9901 Section 4.2.4.1
+      // _sd array is sorted lexicographically in Unicode code point order per RFC 9901
       const sortedCopy = [...sd].sort();
       expect(sd).toEqual(sortedCopy);
 
@@ -152,7 +152,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
     });
   });
 
-  describe("Array Element Selective Disclosure (RFC 9901 Section 4.2.4.2)", () => {
+  describe("Array Element Selective Disclosure (RFC 9901)", () => {
     const arraySchema: CredentialTypeConfig = {
       vctPath: "/types/array/v1",
       name: "Array Credential",
@@ -598,7 +598,7 @@ describe("Claim Masking Transformer (RFC 9901 Section 4.2.4 and Section 6)", () 
       ).toThrow(/claimsData must be a non-null object/);
     });
 
-    it("throws error in reconstructClaims when plaintext collision occurs (RFC 9901 Section 7.1.3.c.ii.3)", () => {
+    it("throws error in reconstructClaims when plaintext collision occurs (RFC 9901 plaintext collision prohibition)", () => {
       // Create a tampered payload that has "email" both as plain claim and in _sd
       const disclosure = decodeDisclosure(
         "WyJ4OHZlM2s5cDFxXzJtUnRWd1phNGJRIiwiZW1haWwiLCJhbGljZUBleGFtcGxlLmNvbSJd"

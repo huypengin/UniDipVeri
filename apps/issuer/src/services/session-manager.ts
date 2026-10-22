@@ -235,7 +235,7 @@ export class SessionManager {
   private readonly standaloneNonces = new Map<string, number>();
 
   /**
-   * Generates a fresh standalone c_nonce challenge per OpenID4VCI 1.0 Final Section 7.
+   * Generates a fresh standalone c_nonce challenge per OpenID4VCI 1.0 Final.
    */
   generateStandaloneNonce(ttlSeconds: number = DEFAULT_C_NONCE_TTL_SECONDS): {
     cNonce: string;
@@ -295,7 +295,7 @@ export class SessionManager {
   /**
    * Validates a c_nonce against an active access token session and generates a fresh nonce.
    *
-   * Conforms to OID4VCI Section 7.2 requirement for nonce rotation during credential requests.
+   * Conforms to OID4VCI requirement for nonce rotation during credential requests.
    *
    * @param token Bearer access token string
    * @param nonce Nonce string presented in holder proof

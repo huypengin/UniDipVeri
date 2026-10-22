@@ -67,7 +67,7 @@ describe("Oracle Compatibility & Wire-Format Conformance (RFC 9901 & @sd-jwt/cor
     );
     const dummySignature = base64url.encode(new Uint8Array(64));
 
-    // SD-JWT combined format per RFC 9901 Section 5
+    // SD-JWT combined format per RFC 9901
     const combinedWireFormat = `${header}.${payload}.${dummySignature}~${disclosures.join("~")}~`;
 
     expect(combinedWireFormat.endsWith("~")).toBe(true);

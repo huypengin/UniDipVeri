@@ -17,14 +17,14 @@ import type { ClaimDef, CredentialTypeConfig } from "../schema/types.js";
  */
 export interface TransformOptions {
   /**
-   * Hash algorithm matching _sd_alg in RFC 9901 Section 4.1.1.
+   * Hash algorithm matching _sd_alg in RFC 9901.
    * Defaults to "sha-256".
    */
   algorithm?: SupportedDigestAlgorithm;
 
   /**
    * Whether to explicitly include the "_sd_alg" property in the root masked payload.
-   * Per RFC 9901 Section 4.1.1:
+   * Per RFC 9901 algorithm indicator rules:
    * - If algorithm is not "sha-256", _sd_alg MUST be present (enforced automatically).
    * - If algorithm is "sha-256", _sd_alg is optional and only added if this is true.
    * Default: false.
@@ -67,7 +67,7 @@ export interface TransformedClaimsResult {
  */
 export interface ReconstructOptions {
   /**
-   * Hash algorithm matching _sd_alg in RFC 9901 Section 4.1.1.
+   * Hash algorithm matching _sd_alg in RFC 9901.
    * Defaults to payload's _sd_alg if present, otherwise "sha-256".
    */
   algorithm?: SupportedDigestAlgorithm;
@@ -77,12 +77,12 @@ export interface ReconstructOptions {
  * Pure transformation function that recursively processes claims data against a credential schema.
  *
  * Requirements per RFC 9901:
- * - Selectively disclosable object claims are replaced with digests in an "_sd" array (Section 4.2.4.1).
- * - Elements of "_sd" arrays are sorted lexicographically in Unicode code point order (Section 4.2.4.1).
- * - Empty "_sd" arrays are omitted if no claims are disclosable (Section 4.2.4.1).
- * - Selectively disclosable array elements are replaced with "..." digest markers (Section 4.2.4.2).
- * - Disclosures are generated using >= 128-bit CSPRNG salts (Section 4.2.1, Section 9.3).
- * - Nested objects and array elements with selective disclosure are handled recursively (Section 6).
+ * - Selectively disclosable object claims are replaced with digests in an "_sd" array.
+ * - Elements of "_sd" arrays are sorted lexicographically in Unicode code point order.
+ * - Empty "_sd" arrays are omitted if no claims are disclosable.
+ * - Selectively disclosable array elements are replaced with "..." digest markers.
+ * - Disclosures are generated using >= 128-bit CSPRNG salts to satisfy entropy requirements.
+ * - Nested objects and array elements with selective disclosure are handled recursively.
  *
  * @param claimsData Raw claims object to transform
  * @param schema Credential schema configuration or claims definition record
@@ -91,7 +91,7 @@ export interface ReconstructOptions {
  */
 /**
  * Reserved SD-JWT claim/marker names prohibited anywhere in caller input claims.
- * Enforced per RFC 9901 Section 4.2.1 and Section 4.2.4 to prevent injection
+ * Enforced per RFC 9901 to prevent injection
  * of counterfeit digests or array element markers in mapped or unmapped structures.
  */
 export const RESERVED_SD_TRANSFORM_KEYS = ["_sd", "_sd_alg", "..."] as const;
@@ -345,7 +345,7 @@ export function transformClaims(
 
 /**
  * Reconstructs a full or partially disclosed claims object from a masked payload
- * and a set of presented disclosure strings per RFC 9901 Section 7.1.
+ * and a set of presented disclosure strings per RFC 9901 claim reconstruction rules.
  *
  * @param maskedPayload The masked payload containing _sd arrays and/or ... markers
  * @param disclosures Array of base64url disclosure strings presented by the holder
@@ -435,7 +435,7 @@ export function reconstructClaims(
           if (matched && matched.type === "object") {
             if (matched.key in unmaskedObj) {
               throw new Error(
-                `Collision detected: claim "${matched.key}" already exists as a plain property (RFC 9901 Section 7.1.3.c.ii.3)`
+                `Collision detected: claim "${matched.key}" already exists as a plain property (RFC 9901 plaintext collision prohibition)`
               );
             }
             unmaskedObj[matched.key] = unmaskValue(matched.value);

@@ -1,7 +1,7 @@
 /**
  * Canonical VCT (Verifiable Credential Type) URI resolution.
  *
- * Implements draft-ietf-oauth-sd-jwt-vc-19 Section 3.2.2.1 and Section 5.
+ * Implements draft-ietf-oauth-sd-jwt-vc-19 credential type (vct) and Type Metadata URI resolution.
  * Provides the single canonical function for joining schema vctPath and base URL.
  */
 

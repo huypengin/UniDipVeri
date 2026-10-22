@@ -4,7 +4,7 @@ import { z } from "zod";
 
 /**
  * Supported hash algorithms registered in the IANA Named Information Hash Algorithm Registry
- * for use with _sd_alg in RFC 9901 Section 4.1.1.
+ * for use with _sd_alg in RFC 9901.
  */
 export const SupportedDigestAlgorithmSchema = z.enum([
   "sha-256",
@@ -17,7 +17,7 @@ export type SupportedDigestAlgorithm = z.infer<
 >;
 
 /**
- * Default hash algorithm per RFC 9901 Section 4.1.1:
+ * Default hash algorithm per RFC 9901 default hash algorithm rule:
  * "The default hash algorithm is sha-256. If _sd_alg is not present, sha-256 MUST be used."
  */
 export const DEFAULT_DIGEST_ALGORITHM: SupportedDigestAlgorithm = "sha-256";
@@ -45,7 +45,7 @@ export function isValidDigestAlgorithm(
 
 /**
  * Normalizes an algorithm identifier matching _sd_alg.
- * Returns "sha-256" if undefined or omitted, adhering to RFC 9901 Section 4.1.1.
+ * Returns "sha-256" if undefined or omitted, adhering to RFC 9901 default algorithm requirements.
  *
  * @param alg The candidate algorithm identifier.
  * @returns SupportedDigestAlgorithm
@@ -61,7 +61,7 @@ export function normalizeDigestAlgorithm(
   const result = SupportedDigestAlgorithmSchema.safeParse(alg);
   if (!result.success) {
     throw new Error(
-      `Unsupported _sd_alg hash algorithm: "${alg}". Supported algorithms are: ${SupportedDigestAlgorithmSchema.options.join(", ")} per RFC 9901 Section 4.1.1`
+      `Unsupported _sd_alg hash algorithm: "${alg}". Supported algorithms are: ${SupportedDigestAlgorithmSchema.options.join(", ")} per RFC 9901`
     );
   }
 
@@ -71,7 +71,7 @@ export function normalizeDigestAlgorithm(
 /**
  * Computes the base64url-encoded digest of a base64url disclosure string using Web Crypto API.
  *
- * Requirements per RFC 9901 Section 4.2.3:
+ * Requirements per RFC 9901 disclosure digest computation:
  * 1. The digest MUST be computed over the US-ASCII bytes of the base64url-encoded Disclosure string.
  * 2. The input to the hash function MUST be the base64url-encoded string itself, not the decoded bytes.
  * 3. The bytes of the output of the hash function MUST be base64url encoded directly (no hex conversion).
@@ -97,7 +97,7 @@ export async function computeDisclosureDigest(
   const validatedAlg = normalizeDigestAlgorithm(algorithm);
   const { webCrypto } = HASH_NAME_MAP[validatedAlg];
 
-  // Encode as US-ASCII bytes per RFC 9901 Section 4.2.3
+  // Encode as US-ASCII bytes per RFC 9901 digest calculation rules
   const asciiBytes = new TextEncoder().encode(disclosureString);
   const hashBuffer = await crypto.subtle.digest(webCrypto, asciiBytes);
 
@@ -106,7 +106,7 @@ export async function computeDisclosureDigest(
 
 /**
  * Synchronous variant of computeDisclosureDigest using Node / Bun crypto.
- * Conforms identically to RFC 9901 Section 4.2.3.
+ * Conforms identically to RFC 9901 disclosure digest computation rules.
  *
  * @param disclosureString Unpadded base64url disclosure string
  * @param algorithm Hash algorithm matching _sd_alg (defaults to sha-256)
