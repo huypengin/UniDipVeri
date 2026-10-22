@@ -20,3 +20,5 @@ export * from "./sd-jwt/transform.js";
 // DID Resolution module (W3C did:web)
 export * from "./did/did-resolver.js";
 
+// Pluggable verification engine module
+export * from "./verification/index.js";
