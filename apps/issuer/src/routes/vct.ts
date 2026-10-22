@@ -3,7 +3,7 @@ import { generateTypeMetadata } from "../services/claims-metadata.js";
 
 /**
  * Handles GET requests to SD-JWT VC Type Metadata endpoints (/types/*)
- * conforming to draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * conforming to draft-ietf-oauth-sd-jwt-vc-19 Type Metadata specification.
  *
  * Verifiers dereference the credential's 'vct' URI to fetch this document.
  *

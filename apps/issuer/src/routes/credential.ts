@@ -27,7 +27,7 @@ export interface HandleCredentialRequestOptions {
 
 /**
  * Response structure returned on successful credential issuance
- * per OpenID4VCI 1.0 Final Section 7.3.
+ * per OpenID4VCI 1.0 Final credential response specification.
  */
 export interface Oid4vciCredentialResponse {
   credential: string;

@@ -14,7 +14,7 @@ export const PRE_AUTHORIZED_CODE_GRANT_TYPE =
 export const MAX_TOKEN_REQUEST_SIZE_BYTES = 4096;
 
 /**
- * OpenID4VCI 1.0 Final Token Response payload per Section 6.2.
+ * OpenID4VCI 1.0 Final Token Response payload.
  */
 export interface TokenResponse {
   access_token: string;
@@ -25,7 +25,7 @@ export interface TokenResponse {
 }
 
 /**
- * RFC 6749 Section 5.2 Error Response payload.
+ * RFC 6749 Error Response payload.
  */
 export interface TokenErrorResponse {
   error: string;
@@ -61,12 +61,12 @@ function tokenErrorResponse(
 /**
  * Handles POST requests to the OAuth 2.0 Token endpoint (/token).
  *
- * Implements OpenID for Verifiable Credential Issuance 1.0 Final Section 6.2 & RFC 6749 Section 4.1.3.
+ * Implements OpenID for Verifiable Credential Issuance 1.0 Final Token Response & RFC 6749 token exchange.
  *
  * Security & Protocol Controls:
  * 1. Strict Content-Type enforcement: Requires application/x-www-form-urlencoded (allowing charset suffix).
  * 2. Body size limit: Rejects payloads exceeding MAX_TOKEN_REQUEST_SIZE_BYTES (4 KB).
- * 3. Parameter uniqueness: Prohibits duplicate parameters per RFC 6749 Section 3.2.
+ * 3. Parameter uniqueness: Prohibits duplicate parameters per RFC 6749.
  * 4. Body-only parameter extraction: Ignores query string to prevent credential exposure in access logs.
  * 5. Exact grant type matching: Rejects mismatches with unsupported_grant_type.
  *
@@ -139,7 +139,7 @@ export async function handleTokenRequest(
   // Parse form-urlencoded parameters
   const params = new URLSearchParams(rawText);
 
-  // 3. Reject duplicate parameters per RFC 6749 Section 3.2
+  // 3. Reject duplicate parameters per RFC 6749 parameter uniqueness requirement
   for (const key of new Set(params.keys())) {
     if (params.getAll(key).length > 1) {
       return tokenErrorResponse(

@@ -8,7 +8,7 @@ import {
   type TokenErrorResponse,
 } from "../src/routes/token.js";
 
-describe("OAuth 2.0 Token Endpoint Hardening (OpenID4VCI 1.0 Final Section 6.2 & RFC 6749)", () => {
+describe("OAuth 2.0 Token Endpoint Hardening (OpenID4VCI 1.0 Final & RFC 6749)", () => {
   let sessionManager: SessionManager;
 
   beforeEach(() => {
@@ -174,7 +174,7 @@ describe("OAuth 2.0 Token Endpoint Hardening (OpenID4VCI 1.0 Final Section 6.2 &
     });
   });
 
-  describe("Duplicate Parameter Prohibition (RFC 6749 Section 3.2)", () => {
+  describe("Duplicate Parameter Prohibition (RFC 6749)", () => {
     it("rejects request with duplicate grant_type parameter", async () => {
       const body = `grant_type=${encodeURIComponent(
         PRE_AUTHORIZED_CODE_GRANT_TYPE
@@ -237,7 +237,7 @@ describe("OAuth 2.0 Token Endpoint Hardening (OpenID4VCI 1.0 Final Section 6.2 &
     });
   });
 
-  describe("Grant Type & Code Validation (RFC 6749 Section 5.2)", () => {
+  describe("Grant Type & Code Validation (RFC 6749)", () => {
     it("rejects wrong grant_type with 400 unsupported_grant_type", async () => {
       const params = new URLSearchParams();
       params.set("grant_type", "authorization_code");

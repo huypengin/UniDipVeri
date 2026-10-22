@@ -26,7 +26,7 @@ export const SD_JWT_VC_TYP = "dc+sd-jwt";
 
 /**
  * Reserved top-level claim names prohibited in caller raw claims.
- * Enforced per draft-ietf-oauth-sd-jwt-vc-19 Section 3 and RFC 9901 Section 4.2.1.
+ * Enforced per draft-ietf-oauth-sd-jwt-vc-19 and RFC 9901 reserved claim rules.
  */
 export const RESERVED_TOP_LEVEL_CLAIMS = RESERVED_ROOT_CLAIM_NAMES;
 
@@ -47,8 +47,8 @@ export const JWK_PRIVATE_KEY_PROPERTIES = [
 ] as const;
 
 /**
- * Zod schema for Holder Confirmation (cnf) claim per RFC 9901 Section 4.3
- * and draft-ietf-oauth-sd-jwt-vc-19 Section 3.2.1.
+ * Zod schema for Holder Confirmation (cnf) claim per RFC 9901
+ * and draft-ietf-oauth-sd-jwt-vc-19 holder binding rules.
  */
 export const CnfClaimSchema = z
   .object({
@@ -80,7 +80,7 @@ export type CnfClaim = z.infer<typeof CnfClaimSchema>;
 
 /**
  * Zod schema for Token Status List (status) revocation claim per
- * draft-ietf-oauth-status-list-21 and draft-ietf-oauth-sd-jwt-vc-19 Section 3.2.2.
+ * draft-ietf-oauth-status-list-21 and draft-ietf-oauth-sd-jwt-vc-19 status claim specification.
  */
 export const TokenStatusListClaimSchema = z.object({
   status_list: z.object({
@@ -222,7 +222,7 @@ async function resolvePrivateKey(
  * - JWT payload must contain mandatory 'iss' and 'vct' claims.
  * - Validates 'cnf' and 'status' claims if present against schema constraints.
  * - Enforces timestamp ordering if both 'nbf' and 'exp' are numeric.
- * - Output serialized as <signed-jwt>~<disc1>~...~<discN>~ per RFC 9901 Section 5.
+ * - Output serialized as <signed-jwt>~<disc1>~...~<discN>~ per RFC 9901 combined format.
  *
  * @param options Low-level signing options
  * @returns IssuedSdJwtVcResult containing compact string and breakdown

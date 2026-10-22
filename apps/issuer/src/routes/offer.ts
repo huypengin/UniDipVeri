@@ -3,7 +3,7 @@ import type { IssuerConfig } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 
 /**
- * OpenID4VCI 1.0 Final Credential Offer parameters per Section 4.1.1.
+ * OpenID4VCI 1.0 Final Credential Offer parameters.
  */
 export interface Oid4vciCredentialOffer {
   credential_issuer: string;
@@ -38,7 +38,7 @@ export const DEFAULT_CREDENTIAL_CONFIG_ID = "graduation_record_sd_jwt_vc";
 /**
  * Handles GET and POST requests for /credential-offer.
  *
- * Implements OpenID for Verifiable Credential Issuance 1.0 Final Section 4.1.
+ * Implements OpenID for Verifiable Credential Issuance 1.0 Final Credential Offer endpoint.
  *
  * @param req Incoming HTTP Request
  * @param config Validated IssuerConfig (source of truth for base URLs)
@@ -172,7 +172,7 @@ export async function handleOfferRequest(
     claims,
   });
 
-  // Construct OpenID4VCI 1.0 Final Section 4.1.1 Credential Offer structure
+  // Construct OpenID4VCI 1.0 Final Credential Offer structure
   const credentialOffer: Oid4vciCredentialOffer = {
     // Strictly isolate from incoming Host header (using config.baseUrl)
     credential_issuer: config.baseUrl,

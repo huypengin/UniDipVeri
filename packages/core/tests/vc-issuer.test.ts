@@ -90,7 +90,7 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         expect(result.disclosures.length).toBeGreaterThan(0);
         expect(result.payload).toBeDefined();
 
-        // 2. Wire format ends with delimiter "~" per RFC 9901 Section 5
+        // 2. Wire format ends with delimiter "~" per RFC 9901 combined format
         expect(result.compact.endsWith("~")).toBe(true);
         expect(result.compact).toBe(
           `${result.jwt}~${result.disclosures.join("~")}~`
@@ -122,15 +122,20 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         expect(verifyResult.payload._sd).toBeArray();
 
         // 6. Oracle compatibility: verify with @sd-jwt/core
+        const oracleHasher = (val: string | ArrayBuffer) =>
+          createHash("sha256")
+            .update(typeof val === "string" ? val : new Uint8Array(val))
+            .digest();
+
         const oracle = new SDJwtInstance({
-          hasher: (val) => createHash("sha256").update(val).digest(),
+          hasher: oracleHasher,
         });
         const decoded = await oracle.decode(result.compact);
         expect(decoded.jwt).toBeDefined();
         expect(decoded.disclosures?.length).toBe(result.disclosures.length);
 
-        const reconstructed = (await decoded.getClaims(async (data) =>
-          createHash("sha256").update(data).digest()
+        const reconstructed = (await decoded.getClaims(
+          oracleHasher
         )) as Record<string, unknown>;
         expect(reconstructed.studentId).toBe("STU-2026-8899");
         expect(reconstructed.dateOfBirth).toBe("2002-05-15");
@@ -139,7 +144,7 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
   }
 
   describe("Holder Key Confirmation (cnf) Binding", () => {
-    it("injects cnf.jwk into outer signed payload per draft-19 Section 3.2.1", async () => {
+    it("injects cnf.jwk into outer signed payload per draft-19 holder binding rules", async () => {
       const schema = await loadSchemaFromFile(schemaPath);
       const issuerKeys = await generateKeyPair("ES256");
       const holderKeys = await generateKeyPair("ES256");
@@ -501,7 +506,7 @@ describe("Outer JWS SD-JWT VC Issuance Engine (draft-ietf-oauth-sd-jwt-vc-19 & R
         },
       });
 
-      // Per RFC 9901 Section 5, 0 disclosures results in <jwt>~
+      // Per RFC 9901 combined format, 0 disclosures results in <jwt>~
       expect(result.compact).toBe(`${result.jwt}~`);
       expect(result.disclosures).toEqual([]);
     });

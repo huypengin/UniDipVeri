@@ -4,7 +4,7 @@ import { generateIssuerMetadata } from "../services/claims-metadata.js";
 
 /**
  * Handles GET requests to /.well-known/openid-credential-issuer
- * conforming to OID4VCI 1.0 Final Section 11.2.2.
+ * conforming to OID4VCI 1.0 Final Credential Issuer Metadata specification.
  *
  * @param config Validated IssuerConfig
  * @param schemaConfig Validated CredentialTypeConfig

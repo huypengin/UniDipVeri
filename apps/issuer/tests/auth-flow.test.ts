@@ -322,7 +322,7 @@ describe("End-to-End Authorization & Security Flow", () => {
       expect(body.error).toBe("invalid_request");
     });
 
-    it("rejects duplicate form parameters (RFC 6749 Section 3.2)", async () => {
+    it("rejects duplicate form parameters per RFC 6749 parameter uniqueness requirement", async () => {
       const res = await app(
         new Request("https://issuer.university.edu/token", {
           method: "POST",

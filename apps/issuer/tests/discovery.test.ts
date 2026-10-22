@@ -57,7 +57,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
     });
   });
 
-  describe("OID4VCI Claims Metadata (OID4VCI 1.0 Final Section 11.2.3)", () => {
+  describe("OID4VCI Claims Metadata (OID4VCI 1.0 Final)", () => {
     it("derives mandatory and optional claims accurately from schema definition", () => {
       const oid4vciClaims = deriveOid4vciClaims(schemaConfig.claims);
 
@@ -133,7 +133,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
     });
   });
 
-  describe("SD-JWT VC Type Metadata (draft-ietf-oauth-sd-jwt-vc-19 Section 5)", () => {
+  describe("SD-JWT VC Type Metadata (draft-ietf-oauth-sd-jwt-vc-19)", () => {
     it("derives valid Draft 2020-12 JSON Schema matching schema hierarchy", () => {
       const jsonSchema = deriveJsonSchema(schemaConfig);
 
@@ -169,7 +169,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
       expect(jsonSchema.required).not.toContain("dateOfBirth");
     });
 
-    it("generates Draft-19 Section 5 Type Metadata document with selective disclosure policies", () => {
+    it("generates Draft-19 Type Metadata document with selective disclosure policies", () => {
       const typeMetadata = generateTypeMetadata(
         schemaConfig,
         issuerConfig.vctBaseUrl

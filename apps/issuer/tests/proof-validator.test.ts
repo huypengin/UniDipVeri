@@ -7,7 +7,7 @@ import {
   type HolderProofParameter,
 } from "../src/services/proof-validator.js";
 
-describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final Section 7.2.1)", () => {
+describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
   const issuerBaseUrl = "https://issuer.university.edu";
   const issuerDid = "did:web:issuer.university.edu";
   const cNonce = "cnonce_test_challenge_1234567890abcdef";

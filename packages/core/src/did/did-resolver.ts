@@ -213,7 +213,7 @@ export async function resolveDidVerificationKey(
 
 /**
  * Resolves an issuer and keyId into a canonical verification method DID URL if the issuer is a DID.
- * Per W3C DID Core Section 3.2 and draft-ietf-oauth-sd-jwt-vc-19 Section 3.2.2.1,
+ * Per W3C DID Core and draft-ietf-oauth-sd-jwt-vc-19 verification method formatting requirements,
  * verification methods referenced outside the DID document must be formatted as DID URLs.
  *
  * @param issuer Issuer URI or DID (e.g. "did:web:example.edu")

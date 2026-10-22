@@ -2,24 +2,24 @@ import { base64url } from "jose";
 
 /**
  * Default byte length for salt generation (16 bytes = 128 bits).
- * Conforms to RFC 9901 Section 4.2.1 and Section 9.3 entropy recommendations.
+ * Conforms to RFC 9901 salt format and minimum 128-bit entropy recommendations.
  */
 export const DEFAULT_SALT_BYTE_LENGTH = 16;
 
 /**
  * Minimum recommended byte length for issuer-generated salts (16 bytes = 128 bits).
- * RFC 9901 Section 9.3 recommends a minimum random length of 128 bits.
+ * RFC 9901 recommends a minimum random salt length of 128 bits.
  */
 export const MIN_SALT_BYTE_LENGTH = 16;
 
 /**
  * Generates a cryptographically secure random salt formatted as an unpadded base64url string.
  *
- * Per RFC 9901 Section 4.2.1:
+ * Per RFC 9901 salt generation guidelines:
  * "To achieve the recommended entropy of the salt, the Issuer can base64url-encode 128 bits
  * of cryptographically secure random data, producing a string."
  *
- * Per RFC 9901 Section 9.3:
+ * Per RFC 9901 entropy recommendations:
  * "The RECOMMENDED minimum length of the randomly generated portion of the salt is 128 bits."
  *
  * @param byteLength Number of random bytes to generate (defaults to 16 bytes = 128 bits entropy).
@@ -30,7 +30,7 @@ export const MIN_SALT_BYTE_LENGTH = 16;
 export function generateSalt(byteLength: number = DEFAULT_SALT_BYTE_LENGTH): string {
   if (!Number.isInteger(byteLength) || byteLength < MIN_SALT_BYTE_LENGTH) {
     throw new Error(
-      `Salt byte length must be an integer >= ${MIN_SALT_BYTE_LENGTH} (128 bits of entropy) per RFC 9901 Section 9.3, received ${byteLength}`
+      `Salt byte length must be an integer >= ${MIN_SALT_BYTE_LENGTH} (128 bits of entropy) per RFC 9901 minimum entropy recommendation, received ${byteLength}`
     );
   }
 
@@ -40,8 +40,8 @@ export function generateSalt(byteLength: number = DEFAULT_SALT_BYTE_LENGTH): str
 }
 
 /**
- * Validates whether a given salt conforms to RFC 9901 Section 4.2.1 requirements.
- * Per RFC 9901 Section 4.2.1: "A salt value. MUST be a string."
+ * Validates whether a given salt conforms to RFC 9901 salt requirements.
+ * Per RFC 9901: "A salt value. MUST be a string."
  * Verifiers treat the salt as an opaque string and do not enforce internal encoding formats.
  *
  * @param salt The salt candidate to validate.
@@ -52,14 +52,14 @@ export function isValidSalt(salt: unknown): boolean {
 }
 
 /**
- * Asserts that a salt conforms to RFC 9901 Section 4.2.1 (non-empty string).
+ * Asserts that a salt conforms to RFC 9901 (non-empty string).
  *
  * @param salt The salt candidate to assert.
  * @throws Error if the salt is not a non-empty string.
  */
 export function assertValidSalt(salt: unknown): asserts salt is string {
   if (typeof salt !== "string" || salt.length === 0) {
-    throw new Error("Salt must be a non-empty string per RFC 9901 Section 4.2.1");
+    throw new Error("Salt must be a non-empty string per RFC 9901");
   }
 }
 
@@ -68,7 +68,7 @@ export function assertValidSalt(salt: unknown): asserts salt is string {
  * to at least the specified byte length (default 16 bytes = 128 bits).
  *
  * Note: This function verifies decoded byte length, not statistical randomness/entropy.
- * Per RFC 9901 Section 7.1.3, this check is an Issuer generation validation helper
+ * Per RFC 9901 verification rules, this check is an Issuer generation validation helper
  * and MUST NOT be used to reject third-party credentials where the salt may use alternative
  * string formats (e.g. UUIDs, hex strings).
  *
@@ -97,7 +97,7 @@ export function assertMinSaltByteLength(
 
   if (bytes.length < minByteLength) {
     throw new Error(
-      `Salt decoded byte length too short: decoded to ${bytes.length} bytes, minimum recommended is ${minByteLength} bytes per RFC 9901 Section 9.3`
+      `Salt decoded byte length too short: decoded to ${bytes.length} bytes, minimum recommended is ${minByteLength} bytes per RFC 9901 entropy recommendations`
     );
   }
 }

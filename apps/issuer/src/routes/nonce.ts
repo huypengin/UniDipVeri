@@ -2,7 +2,7 @@ import type { SessionManager } from "../services/session-manager.js";
 
 /**
  * Handles incoming requests to the OpenID4VCI 1.0 Final Nonce Endpoint (POST /nonce)
- * conforming to Section 7.
+ * conforming to OpenID4VCI 1.0 Final nonce endpoint requirements.
  *
  * Provides a fresh c_nonce challenge to digital wallets prior to proof construction.
  *

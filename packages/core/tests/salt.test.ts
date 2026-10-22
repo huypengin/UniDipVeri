@@ -9,7 +9,7 @@ import {
   isValidSalt,
 } from "../src/sd-jwt/salt.js";
 
-describe("CSPRNG Salt Generator (RFC 9901 Section 4.2.1 and Section 9.3)", () => {
+describe("CSPRNG Salt Generator (RFC 9901)", () => {
   describe("generateSalt()", () => {
     it("generates a 22-character unpadded base64url string with default 16 bytes (128 bits)", () => {
       const salt = generateSalt();
@@ -40,7 +40,7 @@ describe("CSPRNG Salt Generator (RFC 9901 Section 4.2.1 and Section 9.3)", () =>
       expect(base64url.decode(salt32).length).toBe(32);
     });
 
-    it("enforces minimum 128-bit (16-byte) entropy requirement per RFC 9901 Section 9.3", () => {
+    it("enforces minimum 128-bit (16-byte) entropy requirement per RFC 9901", () => {
       expect(() => generateSalt(15)).toThrow(
         `Salt byte length must be an integer >= ${MIN_SALT_BYTE_LENGTH}`
       );
@@ -103,7 +103,7 @@ describe("CSPRNG Salt Generator (RFC 9901 Section 4.2.1 and Section 9.3)", () =>
     });
   });
 
-  describe("isValidSalt() (RFC 9901 Section 4.2.1)", () => {
+  describe("isValidSalt() (RFC 9901)", () => {
     it("returns true for freshly generated base64url salts", () => {
       expect(isValidSalt(generateSalt())).toBe(true);
       expect(isValidSalt(generateSalt(32))).toBe(true);
@@ -128,7 +128,7 @@ describe("CSPRNG Salt Generator (RFC 9901 Section 4.2.1 and Section 9.3)", () =>
     });
   });
 
-  describe("assertValidSalt() (RFC 9901 Section 4.2.1)", () => {
+  describe("assertValidSalt() (RFC 9901)", () => {
     it("does not throw for valid string salts", () => {
       expect(() => assertValidSalt(generateSalt())).not.toThrow();
       expect(() => assertValidSalt("custom-salt-123")).not.toThrow();
@@ -159,7 +159,7 @@ describe("CSPRNG Salt Generator (RFC 9901 Section 4.2.1 and Section 9.3)", () =>
     it("rejects base64url salts with insufficient decoded byte length (< 16 decoded bytes)", () => {
       const shortSalt = base64url.encode(new Uint8Array(8));
       expect(() => assertMinSaltByteLength(shortSalt)).toThrow(
-        "Salt decoded byte length too short: decoded to 8 bytes, minimum recommended is 16 bytes per RFC 9901 Section 9.3"
+        "Salt decoded byte length too short: decoded to 8 bytes, minimum recommended is 16 bytes per RFC 9901 entropy recommendations"
       );
     });
   });

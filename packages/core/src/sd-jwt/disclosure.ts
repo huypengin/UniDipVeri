@@ -3,13 +3,13 @@ import { assertValidSalt } from "./salt.js";
 
 /**
  * An object property disclosure tuple: [salt, claim_name, claim_value]
- * Conforms to RFC 9901 Section 4.2.1.
+ * Conforms to RFC 9901 object disclosure tuple format.
  */
 export type ObjectDisclosureTuple = [salt: string, key: string, value: unknown];
 
 /**
  * An array element disclosure tuple: [salt, claim_value]
- * Conforms to RFC 9901 Section 4.2.2.
+ * Conforms to RFC 9901 array element disclosure tuple format.
  */
 export type ArrayDisclosureTuple = [salt: string, value: unknown];
 
@@ -32,7 +32,7 @@ export interface DecodedObjectDisclosure {
 
 /**
  * Decoded representation of an anonymous array element disclosure
- * (for selectively disclosable array elements marked by "..." in RFC 9901 Section 4.2.4.2).
+ * (for selectively disclosable array elements marked by "..." in RFC 9901).
  */
 export interface DecodedArrayDisclosure {
   type: "array";
@@ -57,7 +57,7 @@ export interface DisclosureOptions {
 }
 
 /**
- * Reserved claim names that MUST NOT be used as disclosure keys per RFC 9901 Section 4.2.1.
+ * Reserved claim names that MUST NOT be used as disclosure keys per RFC 9901.
  */
 const RESERVED_CLAIM_NAMES = new Set(["_sd", "..."]);
 
@@ -99,7 +99,7 @@ export function canonicalJsonStringify(value: unknown): string {
 /**
  * Encodes a disclosure tuple into an unpadded base64url disclosure string.
  *
- * Serialization steps per RFC 9901 Section 4.2:
+ * Serialization steps per RFC 9901 disclosure serialization rules:
  * 1. JSON serialization of array tuple: JSON.stringify(canonicalize(tuple))
  * 2. UTF-8 byte conversion: new TextEncoder().encode(json)
  * 3. Base64url encoding (unpadded): base64url.encode(bytes)
@@ -180,7 +180,7 @@ export function encodeArrayDisclosure(
 
 /**
  * Decodes and validates a base64url-encoded disclosure string.
- * Conforms to RFC 9901 Section 4.2 and Section 7.1.3.
+ * Conforms to RFC 9901 disclosure decoding and validation rules.
  *
  * @param disclosureString Unpadded base64url disclosure string
  * @param options Decoding and validation options

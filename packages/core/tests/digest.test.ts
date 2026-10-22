@@ -9,13 +9,13 @@ import {
   verifyDisclosureDigestSync,
 } from "../src/sd-jwt/digest.js";
 
-describe("Disclosure Digest Computer (RFC 9901 Section 4.1.1 and Section 4.2.3)", () => {
-  // Official test vector from RFC 9901 Section 4.2.3
+describe("Disclosure Digest Computer (RFC 9901)", () => {
+  // Official test vector from RFC 9901
   const rfcVectorDisclosure =
     "WyJfMjZiYzRMVC1hYzZxMktJNmNCVzVlcyIsICJmYW1pbHlfbmFtZSIsICJNw7ZiaXVzIl0";
   const rfcVectorExpectedSha256 = "X9yH0Ajrdm1Oij4tWso9UzzKJvPoDxwmuEcO3XAdRC0";
 
-  // Official test vectors from RFC 9901 Section 6.1 and Section 6.2
+  // Official test vectors from RFC 9901 hierarchical examples
   const rfcAddressDisclosure =
     "WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIlNjaHVsc3RyLiAxMiIsICJsb2NhbGl0eSI6ICJTY2h1bHBmb3J0YSIsICJyZWdpb24iOiAiU2FjaHNlbi1BbmhhbHQiLCAiY291bnRyeSI6ICJERSJ9XQ";
   const rfcAddressExpectedSha256 = "fOBUSQvo46yQO-wRwXBcGqvnbKIueISEL961_Sjd4do";
@@ -33,7 +33,7 @@ describe("Disclosure Digest Computer (RFC 9901 Section 4.1.1 and Section 4.2.3)"
   const rfcCountryExpectedSha256 = "WN9r9dCBJ8HTCsS2jKASxTjEyW5m5x65_Z_2ro2jfXM";
 
   describe("Official RFC 9901 Test Vectors", () => {
-    it("computes exact SHA-256 digest matching RFC 9901 Section 4.2.3 example (family_name)", async () => {
+    it("computes exact SHA-256 digest matching RFC 9901 example (family_name)", async () => {
       const asyncDigest = await computeDisclosureDigest(rfcVectorDisclosure);
       expect(asyncDigest).toBe(rfcVectorExpectedSha256);
 
@@ -41,7 +41,7 @@ describe("Disclosure Digest Computer (RFC 9901 Section 4.1.1 and Section 4.2.3)"
       expect(syncDigest).toBe(rfcVectorExpectedSha256);
     });
 
-    it("computes exact SHA-256 digest matching RFC 9901 Section 6.1 example (address block)", async () => {
+    it("computes exact SHA-256 digest matching RFC 9901 example (address block)", async () => {
       const asyncDigest = await computeDisclosureDigest(rfcAddressDisclosure);
       expect(asyncDigest).toBe(rfcAddressExpectedSha256);
 
@@ -49,7 +49,7 @@ describe("Disclosure Digest Computer (RFC 9901 Section 4.1.1 and Section 4.2.3)"
       expect(syncDigest).toBe(rfcAddressExpectedSha256);
     });
 
-    it("computes exact SHA-256 digests matching RFC 9901 Section 6.2 examples (street_address, region, country)", async () => {
+    it("computes exact SHA-256 digests matching RFC 9901 examples (street_address, region, country)", async () => {
       expect(await computeDisclosureDigest(rfcStreetDisclosure)).toBe(
         rfcStreetExpectedSha256
       );
@@ -115,7 +115,7 @@ describe("Disclosure Digest Computer (RFC 9901 Section 4.1.1 and Section 4.2.3)"
   });
 
   describe("Validation & Normalization", () => {
-    it("normalizes undefined and null algorithm to sha-256 per RFC 9901 Section 4.1.1", () => {
+    it("normalizes undefined and null algorithm to sha-256 per RFC 9901 default hash algorithm rule", () => {
       expect(normalizeDigestAlgorithm(undefined)).toBe("sha-256");
       expect(normalizeDigestAlgorithm(null)).toBe("sha-256");
       expect(normalizeDigestAlgorithm("")).toBe("sha-256");

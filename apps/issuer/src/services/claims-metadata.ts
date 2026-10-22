@@ -7,7 +7,7 @@ import {
 import type { IssuerConfig } from "../config.js";
 
 /**
- * Claim display metadata conforming to OID4VCI 1.0 Final Section 11.2.3.
+ * Claim display metadata conforming to OID4VCI 1.0 Final.
  */
 export interface Oid4vciClaimDisplay {
   name: string;
@@ -15,7 +15,7 @@ export interface Oid4vciClaimDisplay {
 }
 
 /**
- * Claim metadata definition conforming to OID4VCI 1.0 Final Section 11.2.3.
+ * Claim metadata definition conforming to OID4VCI 1.0 Final.
  */
 export interface Oid4vciClaimMetadata {
   mandatory: boolean;
@@ -24,7 +24,7 @@ export interface Oid4vciClaimMetadata {
 }
 
 /**
- * Supported credential configuration conforming to OID4VCI 1.0 Final Section 11.2.3
+ * Supported credential configuration conforming to OID4VCI 1.0 Final
  * and draft-ietf-oauth-sd-jwt-vc-19.
  */
 export interface CredentialConfigurationSupported {
@@ -49,7 +49,7 @@ export interface CredentialConfigurationSupported {
 
 /**
  * Full OID4VCI Credential Issuer Metadata document conforming to
- * OID4VCI 1.0 Final Section 11.2.2.
+ * OID4VCI 1.0 Final.
  */
 export interface Oid4vciIssuerMetadata {
   credential_issuer: string;
@@ -66,7 +66,7 @@ export interface Oid4vciIssuerMetadata {
 }
 
 /**
- * Localized claim display metadata in Type Metadata per draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * Localized claim display metadata in Type Metadata per draft-ietf-oauth-sd-jwt-vc-19.
  */
 export interface SdJwtVcTypeClaimDisplay {
   lang?: string;
@@ -77,7 +77,7 @@ export interface SdJwtVcTypeClaimDisplay {
 }
 
 /**
- * Claim metadata definition inside Type Metadata claims array per draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * Claim metadata definition inside Type Metadata claims array per draft-ietf-oauth-sd-jwt-vc-19.
  */
 export interface SdJwtVcTypeMetadataClaim {
   path: Array<string | number | null>;
@@ -88,7 +88,7 @@ export interface SdJwtVcTypeMetadataClaim {
 
 /**
  * SD-JWT VC Type Metadata document conforming to
- * draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * draft-ietf-oauth-sd-jwt-vc-19.
  */
 export interface SdJwtVcTypeMetadata {
   vct: string;
@@ -106,7 +106,7 @@ export interface SdJwtVcTypeMetadata {
 
 /**
  * Formats a camelCase or snake_case claim property identifier into a clean,
- * human-readable title suitable for wallet display per OID4VCI 1.0 Final Section 11.2.3.
+ * human-readable title suitable for wallet display per OID4VCI 1.0 Final.
  *
  * Examples:
  *   studentId -> "Student ID"
@@ -184,7 +184,7 @@ export function deriveScope(name: string): string {
 
 /**
  * Derives the OID4VCI claims dictionary from schema ClaimDef mappings
- * conforming to OID4VCI 1.0 Final Section 11.2.3.
+ * conforming to OID4VCI 1.0 Final.
  *
  * @param claims Top-level schema claims map
  * @returns OID4VCI claim metadata dictionary
@@ -212,7 +212,7 @@ export function deriveOid4vciClaims(
 
 /**
  * Derives a standard JSON Schema (Draft 2020-12) representation from CredentialTypeConfig
- * for inclusion in SD-JWT VC Type Metadata per draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * for inclusion in SD-JWT VC Type Metadata per draft-ietf-oauth-sd-jwt-vc-19.
  *
  * @param schemaConfig Fully validated CredentialTypeConfig
  * @returns Draft 2020-12 JSON Schema object
@@ -282,7 +282,7 @@ export function deriveJsonSchema(
 
 /**
  * Generates the full OID4VCI Credential Issuer Metadata document
- * conforming to OID4VCI 1.0 Final Section 11.2.2 and Section 11.2.3.
+ * conforming to OID4VCI 1.0 Final.
  *
  * @param config Validated IssuerConfig
  * @param schemaConfig Loaded CredentialTypeConfig
@@ -373,7 +373,7 @@ export function generateIssuerMetadata(
 }
 
 /**
- * Derives the array of claim metadata entries conforming to draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * Derives the array of claim metadata entries conforming to draft-ietf-oauth-sd-jwt-vc-19.
  * Recursively maps claims, nested object properties, and array items to claim path pointers.
  *
  * @param claims Record of claim definitions from schema
@@ -428,7 +428,7 @@ export function deriveTypeMetadataClaims(
 
 /**
  * Generates the SD-JWT VC Type Metadata document conforming to
- * draft-ietf-oauth-sd-jwt-vc-19 Section 5.
+ * draft-ietf-oauth-sd-jwt-vc-19.
  *
  * @param schemaConfig Loaded CredentialTypeConfig
  * @param vctBaseUrl Canonical base URL for resolving vctPath

@@ -3,7 +3,7 @@ import { JWK_PRIVATE_KEY_PROPERTIES } from "@unidipveri/core";
 
 /**
  * Standard error thrown when a holder proof-of-possession fails validation.
- * Yields OAuth 2.0 error code "invalid_or_missing_proof" per OpenID4VCI 1.0 Final Section 7.5.
+ * Yields OAuth 2.0 error code "invalid_or_missing_proof" per OpenID4VCI 1.0 Final proof error specification.
  */
 export class InvalidProofError extends Error {
   readonly code = "invalid_or_missing_proof";
@@ -59,7 +59,7 @@ export function sanitizePublicJwk(jwk: jose.JWK): jose.JWK {
  * Robustly extracts the holder proof JWT string from an incoming OID4VCI Credential Request body
  * or proof parameter.
  *
- * Supports both modern OpenID4VCI 1.0 Final Section 8.2 structures (proofs.jwt array or string)
+ * Supports both modern OpenID4VCI 1.0 Final structures (proofs.jwt array or string)
  * and legacy Draft 11/13 structures (proof object or direct string).
  *
  * @param input Parsed Credential Request JSON body or raw proof object/string
@@ -84,7 +84,7 @@ export function extractProofJwt(input: unknown): string | null {
 
   const record = input as Record<string, unknown>;
 
-  // 2. Check input.proofs (OpenID4VCI 1.0 Final Section 8.2)
+  // 2. Check input.proofs (OpenID4VCI 1.0 Final)
   if (record.proofs !== undefined && record.proofs !== null) {
     // Case 2a: proofs: { jwt: ["..."] } or proofs: { jwt: "..." }
     if (typeof record.proofs === "object" && !Array.isArray(record.proofs)) {
@@ -151,7 +151,7 @@ export function extractProofJwt(input: unknown): string | null {
 }
 
 /**
- * Verifies an incoming holder proof-of-possession JWT per OpenID4VCI 1.0 Final Section 7.2.1 / Section 8.2.
+ * Verifies an incoming holder proof-of-possession JWT per OpenID4VCI 1.0 Final proof verification rules.
  *
  * Validates:
  * 1. Proof extraction (supports proofs.jwt, proof.jwt, compact JWT strings, and proof objects).
