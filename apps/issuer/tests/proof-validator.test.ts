@@ -72,12 +72,28 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
     }
   });
 
-  it("accepts both openid-credential-proof+jwt and jwt typ header values", async () => {
-    for (const typ of ["openid-credential-proof+jwt", "jwt"]) {
+  it("accepts standard proof typ headers and gates legacy typ behind allowLegacyProofTyp", async () => {
+    // Standard types accepted by default
+    for (const typ of ["openid-credential-proof+jwt", "openid4vci-proof+jwt"]) {
       const { proof } = await createValidProof({ typ });
       const result = await verifyHolderProof(proof, issuerBaseUrl, cNonce);
       expect(result.header.typ).toBe(typ);
     }
+
+    // Legacy "jwt" rejected by default
+    const { proof: legacyProof } = await createValidProof({ typ: "jwt" });
+    expect(
+      verifyHolderProof(legacyProof, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("rejected by default policy");
+
+    // Legacy "jwt" accepted when allowLegacyProofTyp is explicitly true
+    const resultLegacy = await verifyHolderProof(
+      legacyProof,
+      issuerBaseUrl,
+      cNonce,
+      { allowLegacyProofTyp: true }
+    );
+    expect(resultLegacy.header.typ).toBe("jwt");
   });
 
   it("verifies proof against array of allowed audiences matching either baseUrl or DID", async () => {
@@ -121,7 +137,7 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
   it("rejects unsupported signature algorithm in protected header", async () => {
     const key = new TextEncoder().encode("secret-key-too-short");
     const badJwt = await new jose.SignJWT({ aud: issuerBaseUrl, nonce: cNonce, iat: Math.floor(Date.now() / 1000) })
-      .setProtectedHeader({ alg: "HS256", typ: "jwt", jwk: { kty: "oct", k: "secret" } as any })
+      .setProtectedHeader({ alg: "HS256", typ: "openid4vci-proof+jwt", jwk: { kty: "oct", k: "secret" } as any })
       .sign(key);
 
     expect(
@@ -222,10 +238,10 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
     expect(result.header.typ).toBe("openid4vci-proof+jwt");
   });
 
-  it("verifies proof from single proofs.jwt string and direct compact JWT string", async () => {
-    const { proof } = await createValidProof({ typ: "jwt" });
+  it("verifies proof from single proofs.jwt string and gates direct compact JWT string behind allowLegacyShapes", async () => {
+    const { proof } = await createValidProof({ typ: "openid4vci-proof+jwt" });
 
-    // proofs: { jwt: "..." }
+    // proofs: { jwt: "..." } (single string wire shape)
     const resultFromObj = await verifyHolderProof(
       { proofs: { jwt: proof.jwt } },
       issuerBaseUrl,
@@ -233,13 +249,36 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
     );
     expect(resultFromObj.payload.nonce).toBe(cNonce);
 
-    // Direct JWT string
+    // Direct JWT string rejected by default
+    expect(
+      verifyHolderProof(proof.jwt, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("Missing or malformed proof object");
+
+    // Direct JWT string succeeds with allowLegacyShapes
     const resultFromStr = await verifyHolderProof(
       proof.jwt,
       issuerBaseUrl,
-      cNonce
+      cNonce,
+      { allowLegacyShapes: true }
     );
     expect(resultFromStr.payload.nonce).toBe(cNonce);
+  });
+
+  it("strictly rejects request containing both proof and proofs parameters", async () => {
+    const { proof: proof1 } = await createValidProof({ typ: "openid4vci-proof+jwt" });
+    const { proof: proof2 } = await createValidProof({ typ: "openid-credential-proof+jwt" });
+
+    const conflictedRequest = {
+      credential_configuration_id: "graduation_record_sd_jwt_vc",
+      proof: proof2,
+      proofs: {
+        jwt: [proof1.jwt],
+      },
+    };
+
+    expect(
+      verifyHolderProof(conflictedRequest, issuerBaseUrl, cNonce)
+    ).rejects.toThrow("Request must not contain both 'proof' and 'proofs' parameters");
   });
 
   it("verifies proof when audience points to /credential endpoint with trailing slashes", async () => {

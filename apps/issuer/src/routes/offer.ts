@@ -149,12 +149,13 @@ export async function handleOfferRequest(
   }
 
   // Determine credential configuration identifier
+  const legacyConfigId = `${DEFAULT_CREDENTIAL_CONFIG_ID}_legacy`;
   const targetConfigId =
     credentialConfigurationId && credentialConfigurationId.trim().length > 0
       ? credentialConfigurationId.trim()
       : DEFAULT_CREDENTIAL_CONFIG_ID;
 
-  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID) {
+  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID && targetConfigId !== legacyConfigId) {
     return Response.json(
       {
         error: "invalid_request",

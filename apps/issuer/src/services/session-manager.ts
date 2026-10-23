@@ -209,6 +209,19 @@ export class SessionManager {
   }
 
   /**
+   * Consumes and removes an access token session upon successful credential issuance (one-shot issuance).
+   *
+   * @param token Bearer access token string
+   * @returns true if session was found and removed, false otherwise
+   */
+  consumeAccessToken(token: string): boolean {
+    if (!token || typeof token !== "string") {
+      return false;
+    }
+    return this.accessTokens.delete(token);
+  }
+
+  /**
    * Retrieves an active AccessTokenSession by token string, validating expiration.
    *
    * @param token Bearer access token string

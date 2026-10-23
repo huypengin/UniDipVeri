@@ -1,6 +1,7 @@
 import {
   issueSdJwtVc,
   resolveIssuerKeyId,
+  resolveVct,
   type CredentialTypeConfig,
 } from "@unidipveri/core";
 import {
@@ -173,6 +174,20 @@ export async function handleCredentialRequest(
     );
   }
 
+  // Reject requests containing both 'proof' and 'proofs'
+  if (body.proof !== undefined && body.proofs !== undefined) {
+    return Response.json(
+      {
+        error: "invalid_request",
+        error_description: "Request must not contain both 'proof' and 'proofs' parameters",
+      },
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }
+    );
+  }
+
   // 4. Credential Configuration ID Validation
   let requestedConfigId: string | undefined = undefined;
   if (typeof body.credential_configuration_id === "string") {
@@ -180,13 +195,43 @@ export async function handleCredentialRequest(
   } else if (typeof body.credential_identifier === "string") {
     requestedConfigId = body.credential_identifier.trim();
   } else if (
-    body.format === "dc+sd-jwt" ||
-    body.format === "vc+sd-jwt" ||
+    body.format !== undefined ||
     body.vct !== undefined ||
     body.credential_definition !== undefined ||
     body.types !== undefined
   ) {
-    // Graceful fallback for Draft 11/13 wallets that identify credentials via format/types/vct
+    // If no credential_configuration_id is given and vct/format are present, require them to match the session's configuration
+    const isLegacySession = session.credentialConfigurationId.endsWith("_legacy");
+    const expectedFormat = isLegacySession ? "vc+sd-jwt" : "dc+sd-jwt";
+    if (typeof body.format === "string" && body.format !== expectedFormat) {
+      return Response.json(
+        {
+          error: "unsupported_credential_format",
+          error_description: `Requested format '${body.format}' does not match authorized configuration format '${expectedFormat}'`,
+        },
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        }
+      );
+    }
+
+    if (typeof body.vct === "string") {
+      const canonicalVct = resolveVct(schemaConfig.vctPath, config.vctBaseUrl);
+      if (body.vct !== canonicalVct && body.vct !== schemaConfig.vctPath) {
+        return Response.json(
+          {
+            error: "unsupported_credential_configuration_id",
+            error_description: `Requested vct '${body.vct}' does not match authorized schema configuration vct '${canonicalVct}'`,
+          },
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          }
+        );
+      }
+    }
+
     requestedConfigId = session.credentialConfigurationId;
   }
 
@@ -220,14 +265,19 @@ export async function handleCredentialRequest(
   }
 
   // 5. Holder Proof-of-Possession Verification
+  const effectiveIssuer = getEffectiveIssuer(config);
+  const debugLogBody = process.env.DEBUG_LOG_CREDENTIAL_REQUEST_BODY === "true";
+
   let verifiedProof;
   try {
     const validAudiences = [
-      config.baseUrl,
+      effectiveIssuer,
       config.baseUrl.replace(/\/+$/, ""),
       `${config.baseUrl.replace(/\/+$/, "")}/credential`,
-      config.issuerDid,
     ];
+    if (config.issuerDid && !validAudiences.includes(config.issuerDid)) {
+      validAudiences.push(config.issuerDid);
+    }
 
     verifiedProof = await verifyHolderProof(
       body,
@@ -242,7 +292,9 @@ export async function handleCredentialRequest(
     const freshNonce = sessionManager.rotateSessionNonce(accessToken);
     if (err instanceof InvalidProofError) {
       console.warn(`[Credential Endpoint ⚠️] Proof validation rejected: ${err.message}`);
-      console.warn(`[Credential Endpoint ⚠️] Request body was:`, JSON.stringify(body, null, 2));
+      if (debugLogBody) {
+        console.warn(`[Credential Endpoint ⚠️] Request body:`, JSON.stringify(body, null, 2));
+      }
       return Response.json(
         {
           error: err.code,
@@ -257,7 +309,9 @@ export async function handleCredentialRequest(
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[Credential Endpoint ❌] Unexpected proof error: ${message}`);
-    console.error(`[Credential Endpoint ❌] Request body was:`, JSON.stringify(body, null, 2));
+    if (debugLogBody) {
+      console.error(`[Credential Endpoint ❌] Request body:`, JSON.stringify(body, null, 2));
+    }
     return Response.json(
       {
         error: "invalid_proof",
@@ -280,7 +334,7 @@ export async function handleCredentialRequest(
         error: "invalid_nonce",
         error_description: "The c_nonce challenge is invalid or has expired",
         c_nonce: rotation.newNonce,
-        c_nonce_expires_in: 86400,
+        c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS,
       },
       {
         status: 400,
@@ -321,7 +375,10 @@ export async function handleCredentialRequest(
   try {
     const effectiveIssuer = getEffectiveIssuer(config);
     const effectiveKeyId = resolveIssuerKeyId(effectiveIssuer, keyContext.keyId);
-    const requestedTyp = body.format === "vc+sd-jwt" ? "vc+sd-jwt" : "dc+sd-jwt";
+    const isLegacyConfig =
+      session.credentialConfigurationId.endsWith("_legacy") ||
+      (requestedConfigId !== undefined && requestedConfigId.endsWith("_legacy"));
+    const requestedTyp = isLegacyConfig ? "vc+sd-jwt" : "dc+sd-jwt";
 
     const issued = await issueSdJwtVc(rawClaims, schemaConfig, {
       issuer: effectiveIssuer,
@@ -343,6 +400,9 @@ export async function handleCredentialRequest(
       validitySeconds: 31536000, // 1 year
       typ: requestedTyp,
     });
+
+    // ATOMIC CONSUMPTION: Enforce one-shot issuance per access token session
+    sessionManager.consumeAccessToken(accessToken);
 
     const responseBody: Oid4vciCredentialResponse = {
       credential: issued.compact,
