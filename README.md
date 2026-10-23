@@ -119,7 +119,7 @@ unidipveri/
 │   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Portal, Docs
 │   │   │   ├── app.ts         # HTTP request dispatcher and CORS
 │   │   │   └── server.ts      # Bun.serve entrypoint
-│   │   └── tests/             # 172 tests
+│   │   └── tests/             # 179 tests
 │   └── playground/    # Placeholder (package.json only)
 ├── packages/
 │   └── core/          # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
@@ -148,7 +148,7 @@ The cryptographic and data-model engine. It keeps no global state and takes sche
 
 ### `@unidipveri/issuer`
 The issuance service:
-- **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`.
+- **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`, `/.well-known/jwt-vc-issuer`.
 - **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, and key binding into `cnf.jwk`.
 - **Revocation**: Token Status List endpoint plus **unauthenticated** admin endpoints to revoke.
 - **Registrar portal**: Schema-driven form and disclosure-policy badges.
@@ -174,7 +174,9 @@ bun install --frozen-lockfile
 
 ### Running Tests
 
-The suite contains 328 automated tests (156 core + 172 issuer) covering the implemented behavior. It is not an official conformance suite.
+The suite contains 335 automated tests (156 core + 179 issuer) covering the implemented behavior. It is not an official conformance suite.
+
+> **Note on Off-the-Shelf Library Smoke Test:** The issuer test suite includes a smoke check against `@sd-jwt/sd-jwt-vc` (pinned in `devDependencies`). This test is strictly a development regression check to detect wire serialization breakage; it is **not** counted as independent third-party interoperability evidence since it executes with in-process key callbacks. Independent interop is evaluated via external verifier services documented in `docs/interop/matrix.md`.
 
 ```bash
 bun run test        # all workspaces
@@ -224,7 +226,8 @@ Environment variables, validated with Zod at startup:
 | :--- | :--- | :--- | :--- |
 | `SCHEMA_PATH` | Path to the credential schema YAML | none | **Yes** |
 | `SIGNING_ALGORITHM` | `ES256`, `EdDSA`, or `ES384` | `ES256` | No |
-| `KEY_ID` | Key identifier in the DID document | `key-1` | No |
+| `KEY_ID` | Key identifier in the DID document and JWKS | `key-1` | No |
+| `ISSUER_IDENTIFIER_MODE` | Issuer identifier format: `did` (Variant A, `did:web`) or `https` (Variant B, HTTPS URL with `/.well-known/jwt-vc-issuer`) | `did` | No |
 | `ISSUER_DID` | Issuer DID (must start with `did:`) | `did:web:localhost%3A3000` | No |
 | `ISSUER_BASE_URL` | Public base URL of the issuer (use HTTPS outside local development) | `http://localhost:3000` | No |
 | `VCT_BASE_URL` | Base URL used to resolve a relative `vctPath` | `ISSUER_BASE_URL` | No |

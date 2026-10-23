@@ -3,7 +3,10 @@ import {
   resolveIssuerKeyId,
   type CredentialTypeConfig,
 } from "@unidipveri/core";
-import type { IssuerConfig } from "../config.js";
+import {
+  type IssuerConfig,
+  getEffectiveIssuer,
+} from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { KeyContext } from "../services/key-manager.js";
 import type { StudentRecordService } from "../services/student-records.js";
@@ -312,11 +315,12 @@ export async function handleCredentialRequest(
 
   // 9. Issue SD-JWT VC via Core Engine
   try {
-    const effectiveKeyId = resolveIssuerKeyId(config.issuerDid, keyContext.keyId);
+    const effectiveIssuer = getEffectiveIssuer(config);
+    const effectiveKeyId = resolveIssuerKeyId(effectiveIssuer, keyContext.keyId);
     const requestedTyp = body.format === "vc+sd-jwt" ? "vc+sd-jwt" : "dc+sd-jwt";
 
     const issued = await issueSdJwtVc(rawClaims, schemaConfig, {
-      issuer: config.issuerDid,
+      issuer: effectiveIssuer,
       signingKey: {
         privateKey: keyContext.privateKey,
         alg: keyContext.alg,

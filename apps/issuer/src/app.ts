@@ -4,11 +4,9 @@ import type { KeyContext } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { StudentRecordService } from "./services/student-records.js";
 import { StatusListService } from "./services/status-list.js";
-import {
-  handleMetadataRequest,
-  handleOAuthMetadataRequest,
-} from "./routes/metadata.js";
+import { handleMetadataRequest, handleOAuthMetadataRequest } from "./routes/metadata.js";
 import { handleDidRequest } from "./routes/did.js";
+import { handleJwtVcIssuerRequest } from "./routes/jwt-vc-issuer.js";
 import { handleVctRequest } from "./routes/vct.js";
 import { handleOfferRequest } from "./routes/offer.js";
 import { handleTokenRequest } from "./routes/token.js";
@@ -147,6 +145,14 @@ export function createApp(
       // Route: GET /.well-known/did.json
       if (method === "GET" && pathname === "/.well-known/did.json") {
         return respond(handleDidRequest(config, keyContext));
+      }
+
+      // Route: GET /.well-known/jwt-vc-issuer
+      if (
+        (method === "GET" || method === "HEAD") &&
+        pathname === "/.well-known/jwt-vc-issuer"
+      ) {
+        return respond(handleJwtVcIssuerRequest(config, keyContext));
       }
 
       // Route: GET /types/* or matching vctPath

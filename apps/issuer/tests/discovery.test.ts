@@ -18,6 +18,12 @@ import {
   handleOAuthMetadataRequest,
 } from "../src/routes/metadata.js";
 import { handleVctRequest } from "../src/routes/vct.js";
+import {
+  generateJwtVcIssuerMetadata,
+  handleJwtVcIssuerRequest,
+} from "../src/routes/jwt-vc-issuer.js";
+import { generateDidDocument } from "../src/routes/did.js";
+import { initializeKeyManager } from "../src/services/key-manager.js";
 
 const schemaPath = join(
   import.meta.dir,
@@ -296,6 +302,47 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
         "urn:ietf:params:oauth:grant-type:pre-authorized_code",
       ]);
       expect(body.token_endpoint_auth_methods_supported).toEqual(["none"]);
+    });
+  });
+
+  describe("SD-JWT VC Issuer Metadata Document (/.well-known/jwt-vc-issuer)", () => {
+    it("generates compliant metadata with issuer matching baseUrl and identical key to DID doc", async () => {
+      const keyContext = await initializeKeyManager(issuerConfig);
+      const metadata = generateJwtVcIssuerMetadata(issuerConfig, keyContext);
+      const didDoc = generateDidDocument(issuerConfig, keyContext);
+
+      // Issuer must match baseUrl verbatim
+      expect(metadata.issuer).toBe(issuerConfig.baseUrl);
+
+      // Must include inline jwks and NOT jwks_uri
+      expect(metadata.jwks).toBeDefined();
+      expect(Array.isArray(metadata.jwks.keys)).toBe(true);
+      expect(metadata.jwks.keys.length).toBe(1);
+      expect((metadata as any).jwks_uri).toBeUndefined();
+
+      // Key must carry kid matching keyContext.keyId and match key in DID document
+      const key = metadata.jwks.keys[0];
+      expect(key.kid).toBe(issuerConfig.keyId);
+      expect(key.use).toBe("sig");
+      expect(key.alg).toBe(issuerConfig.signingAlgorithm);
+
+      const didKey = didDoc.verificationMethod[0]?.publicKeyJwk;
+      expect(key.x).toBe(didKey.x);
+      expect(key.y).toBe(didKey.y);
+      expect(key.crv).toBe(didKey.crv);
+    });
+
+    it("serves GET /.well-known/jwt-vc-issuer with application/json and CORS headers", async () => {
+      const keyContext = await initializeKeyManager(issuerConfig);
+      const res = handleJwtVcIssuerRequest(issuerConfig, keyContext);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("application/json");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+      const body = (await res.json()) as any;
+      expect(body.issuer).toBe(issuerConfig.baseUrl);
+      expect(body.jwks.keys[0].kid).toBe(issuerConfig.keyId);
     });
   });
 });

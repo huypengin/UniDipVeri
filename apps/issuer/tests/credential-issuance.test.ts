@@ -30,6 +30,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     issuerDid: "did:web:issuer.university.edu",
     baseUrl: "https://issuer.university.edu",
     vctBaseUrl: "https://issuer.university.edu",
+    issuerIdentifierMode: "did",
     port: 3000,
   };
 
@@ -727,5 +728,149 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
 
     expect(payload.iss).toBe(mockConfig.issuerDid);
     expect(header.kid).toBe(`${mockConfig.issuerDid}#${mockConfig.keyId}`);
+  });
+
+  describe("Variant B: HTTPS Issuer Identifier & /.well-known/jwt-vc-issuer", () => {
+    it("issues SD-JWT VC with HTTPS iss, kid matching jwt-vc-issuer, and explicit _sd_alg", async () => {
+      const httpsConfig: IssuerConfig = {
+        ...mockConfig,
+        issuerIdentifierMode: "https",
+      };
+
+      const httpsApp = createApp(
+        httpsConfig,
+        keyContext,
+        await loadSchemaFromFile(schemaPath),
+        new SessionManager(),
+        new StudentRecordService(),
+        new StatusListService()
+      );
+
+      // 1. Get offer
+      const offerRes = await httpsApp(
+        new Request("https://issuer.university.edu/credential-offer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId: "STU-2026-FINAL",
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+          }),
+        })
+      );
+      const offerData = (await offerRes.json()) as any;
+      const preAuthCode =
+        offerData.credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      // 2. Token exchange
+      const tokenRes = await httpsApp(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            preAuthCode
+          )}`,
+        })
+      );
+      const tokenData = (await tokenRes.json()) as any;
+
+      // 3. Proof
+      const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+      const proofJwt = await createHolderProof(holderKeyPair, tokenData.c_nonce);
+
+      // 4. Request credential
+      const credRes = await httpsApp(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proof: {
+              proof_type: "jwt",
+              jwt: proofJwt,
+            },
+          }),
+        })
+      );
+      expect(credRes.status).toBe(200);
+      const credData = (await credRes.json()) as any;
+
+      const compactToken = credData.credential as string;
+      const jwtString = compactToken.split("~")[0];
+      const header = jose.decodeProtectedHeader(jwtString);
+      const payload = jose.decodeJwt(jwtString);
+
+      // Emits HTTPS iss and simple kid
+      expect(payload.iss).toBe(httpsConfig.baseUrl);
+      expect(header.kid).toBe(httpsConfig.keyId);
+      expect(payload._sd_alg).toBe("sha-256");
+
+      // Dereference key from /.well-known/jwt-vc-issuer
+      const metadataRes = await httpsApp(
+        new Request("https://issuer.university.edu/.well-known/jwt-vc-issuer", {
+          method: "GET",
+        })
+      );
+      expect(metadataRes.status).toBe(200);
+      const metadata = (await metadataRes.json()) as any;
+      expect(metadata.issuer).toBe(httpsConfig.baseUrl);
+
+      const matchedKeyJwk = metadata.jwks.keys.find((k: any) => k.kid === header.kid);
+      expect(matchedKeyJwk).toBeDefined();
+
+      const importedKey = await jose.importJWK(matchedKeyJwk, "ES256");
+      const verified = await jose.jwtVerify(jwtString, importedKey);
+      expect(verified.payload.iss).toBe(httpsConfig.baseUrl);
+    });
+
+    it("signs Status List Token with HTTPS iss and kid matching jwt-vc-issuer", async () => {
+      const httpsConfig: IssuerConfig = {
+        ...mockConfig,
+        issuerIdentifierMode: "https",
+      };
+
+      const httpsApp = createApp(
+        httpsConfig,
+        keyContext,
+        await loadSchemaFromFile(schemaPath),
+        sessionManager,
+        studentRecordsService,
+        statusListService
+      );
+
+      const statusRes = await httpsApp(
+        new Request("https://issuer.university.edu/status/status-list-1", {
+          method: "GET",
+        })
+      );
+      expect(statusRes.status).toBe(200);
+      const token = await statusRes.text();
+      const header = jose.decodeProtectedHeader(token);
+      const payload = jose.decodeJwt(token);
+
+      expect(payload.iss).toBe(httpsConfig.baseUrl);
+      expect(payload.sub).toBe(`${httpsConfig.baseUrl}/status/status-list-1`);
+      expect(header.kid).toBe(httpsConfig.keyId);
+      expect(typeof payload.iat).toBe("number");
+      expect(typeof payload.exp).toBe("number");
+      expect(payload.exp).toBeGreaterThan(payload.iat as number);
+
+      // Verifies against jwt-vc-issuer JWKS
+      const metadataRes = await httpsApp(
+        new Request("https://issuer.university.edu/.well-known/jwt-vc-issuer", {
+          method: "GET",
+        })
+      );
+      const metadata = (await metadataRes.json()) as any;
+      const matchedKeyJwk = metadata.jwks.keys.find((k: any) => k.kid === header.kid);
+      const importedKey = await jose.importJWK(matchedKeyJwk, "ES256");
+
+      const verified = await jose.jwtVerify(token, importedKey);
+      expect(verified.payload.iss).toBe(httpsConfig.baseUrl);
+    });
   });
 });

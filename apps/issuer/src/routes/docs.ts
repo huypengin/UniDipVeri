@@ -121,6 +121,37 @@ export function generateOpenApiSpec(
           },
         },
       },
+      "/.well-known/jwt-vc-issuer": {
+        get: {
+          tags: ["Discovery & Metadata"],
+          summary: "SD-JWT VC Issuer Metadata Document",
+          description:
+            "Publishes Issuer metadata and JWKS per draft-ietf-oauth-sd-jwt-vc for HTTPS issuer identifiers.",
+          responses: {
+            "200": {
+              description: "SD-JWT VC Issuer Metadata Document with inline JWKS",
+              content: {
+                "application/json": {
+                  example: {
+                    issuer: config.baseUrl,
+                    jwks: {
+                      keys: [
+                        {
+                          kty: "EC",
+                          crv: "P-256",
+                          kid: config.keyId,
+                          use: "sig",
+                          alg: config.signingAlgorithm,
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       [vctPath]: {
         get: {
           tags: ["Discovery & Metadata"],

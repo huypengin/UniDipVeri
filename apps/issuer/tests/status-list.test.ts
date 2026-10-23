@@ -16,6 +16,7 @@ describe("Token Status List Revocation Engine (draft-ietf-oauth-status-list-21)"
     issuerDid: "did:web:issuer.university.edu",
     baseUrl: "https://issuer.university.edu",
     vctBaseUrl: "https://issuer.university.edu",
+    issuerIdentifierMode: "did",
     port: 3000,
   };
 

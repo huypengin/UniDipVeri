@@ -46,7 +46,8 @@ sequenceDiagram
 | `GET` | `/.well-known/openid-credential-issuer` | `application/json` | Issuer metadata (`credential_configurations_supported`, endpoints, display). |
 | `GET` | `/.well-known/oauth-authorization-server` | `application/json` | Authorization server metadata (token endpoint, grant types). |
 | `GET` | `/.well-known/openid-configuration` | `application/json` | Alias for the authorization server metadata. |
-| `GET` | `/.well-known/did.json` | `application/did+ld+json` | DID document with the issuer's active verification key. |
+| `GET` | `/.well-known/did.json` | `application/did+ld+json` | DID document with the issuer's active verification key (Variant A). |
+| `GET` | `/.well-known/jwt-vc-issuer` | `application/json` | SD-JWT VC Issuer Metadata Document with inline JWKS (Variant B). |
 | `GET` | `/types/*` | `application/json` | SD-JWT VC type metadata (JSON Schema and claim display definitions). |
 
 ### Issuance (OpenID4VCI, Pre-Authorized Code flow)
@@ -92,6 +93,7 @@ Environment variables, validated with Zod:
 | :--- | :--- | :--- |
 | `SCHEMA_PATH` | Path to the credential YAML schema | *(required)* |
 | `ISSUER_BASE_URL` | Public base URL of the service (HTTPS outside local development) | `http://localhost:3000` |
+| `ISSUER_IDENTIFIER_MODE` | Issuer identifier format: `did` (Variant A, `did:web`) or `https` (Variant B, HTTPS URL) | `did` |
 | `VCT_BASE_URL` | Base URL used to construct canonical VCT URIs | `ISSUER_BASE_URL` |
 | `ISSUER_DID` | Issuer DID (`did:web:...`) | `did:web:localhost%3A3000` |
 | `SIGNING_ALGORITHM` | `ES256`, `EdDSA` or `ES384` | `ES256` |
@@ -110,11 +112,11 @@ Environment variables, validated with Zod:
 # Watch mode
 bun run dev
 
-# 172 automated tests covering the offer, token, nonce, credential, revocation, and off-the-shelf library smoke checks
+# 179 automated tests covering the offer, token, nonce, credential, revocation, discovery, and smoke checks
 bun test
 ```
 
-The tests exercise the implemented behavior. They are not an official OpenID conformance suite.
+The tests exercise the implemented behavior. They are not an official OpenID conformance suite. The test suite includes an off-the-shelf library smoke check (`@sd-jwt/sd-jwt-vc` pinned in `devDependencies`) which serves strictly as a development regression test to verify wire output; it is **not** counted as independent third-party interoperability evidence. Independent verification is tracked in `docs/interop/matrix.md`.
 
 ---
 

@@ -11,7 +11,15 @@ import { StatusListService } from "../src/services/status-list.js";
 import { initializeKeyManager } from "../src/services/key-manager.js";
 import type { IssuerConfig } from "../src/config.js";
 
-describe("Off-The-Shelf SD-JWT VC Library Acceptance Smoke Test", () => {
+/**
+ * Development-Only Regression Smoke Test.
+ *
+ * NOTE: This test serves strictly as an internal development regression check to
+ * ensure our issuer emits wire serialization accepted by an off-the-shelf library.
+ * Because it executes in-process and injects local verification callbacks, it is
+ * NOT counted as independent third-party interoperability evidence.
+ */
+describe("Off-The-Shelf SD-JWT VC Library Acceptance Smoke Test (Regression Check Only)", () => {
   const schemaPath = join(
     import.meta.dir,
     "../../../schemas/graduation-record.v1.yaml"
@@ -24,6 +32,7 @@ describe("Off-The-Shelf SD-JWT VC Library Acceptance Smoke Test", () => {
     issuerDid: "did:web:issuer.university.edu",
     baseUrl: "https://issuer.university.edu",
     vctBaseUrl: "https://issuer.university.edu",
+    issuerIdentifierMode: "did",
     port: 3000,
   };
 
