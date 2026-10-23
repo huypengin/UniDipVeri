@@ -60,7 +60,7 @@ sequenceDiagram
 ### Revocation (Token Status List)
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/status/:id` | None | Signed Token Status List JWT (`application/statuslist+jwt`) containing a Gzip-compressed bitstring. |
+| `GET` | `/status/:id` | None | Signed Token Status List JWT (`application/statuslist+jwt`) containing an RFC 1950 ZLIB-compressed bitstring. |
 | `POST` | `/admin/revoke` | **None** | Marks a credential index as revoked. |
 | `GET` | `/admin/status/:idx` | **None** | Returns the revocation state for an index. |
 
@@ -110,7 +110,7 @@ Environment variables, validated with Zod:
 # Watch mode
 bun run dev
 
-# 171 automated tests covering the offer, token, nonce, credential and revocation endpoints
+# 172 automated tests covering the offer, token, nonce, credential, revocation, and off-the-shelf library smoke checks
 bun test
 ```
 

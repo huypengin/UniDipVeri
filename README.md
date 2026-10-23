@@ -23,10 +23,11 @@
 - **SD-JWT VC profile (draft-19)**: Credentials use media type `application/dc+sd-jwt` and header `typ: "dc+sd-jwt"`, with holder binding via `cnf.jwk` and a `vct` resolved from the schema.
 - **Schema-agnostic core**: No credential schema is hardcoded. Credential types are declared in YAML and validated with Zod.
 - **OpenID4VCI 1.0 Final, Pre-Authorized Code flow only**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
-- **Revocation via Token Status List**: A Gzip-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
+- **Revocation via Token Status List**: An RFC 1950 ZLIB-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
 - **Registrar portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
+- **Third-Party Verifier Interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
 
 ---
 
@@ -40,7 +41,7 @@ Issuance was tested by scanning a credential offer and confirming that the walle
 | Sphereon Wallet | 0.8.0 | Yes |
 | Lissi ID-Wallet | 3.3.0 | Yes |
 
-Presentation, verification, and revocation were **not** tested with these wallets. Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
+Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
 
 ---
 
@@ -49,9 +50,8 @@ Presentation, verification, and revocation were **not** tested with these wallet
 - **All state is in memory.** Sessions, nonces and the **revocation status list** are lost on restart, so previously revoked credentials will appear valid again after a restart.
 - **The default signing key is ephemeral.** If `ISSUER_PRIVATE_KEY_JWK` is not set, a new key is generated on every boot. The DID document changes, and credentials issued before the restart will no longer verify against it.
 - **No authentication on sensitive endpoints.** The registrar portal, `/credential-offer`, and `/admin/*` (including revocation) are open. Anyone who can reach the service can create offers with arbitrary claims or revoke credentials.
-- **Not HAIP-conformant.** HAIP 1.0 requires mechanisms this project does not implement (for example Authorization Code flow with PAR/PKCE, DPoP and wallet attestation). Only the signing-algorithm choices overlap.
+- **Pre-Authorized Code flow only.** The Authorization Code flow is not implemented. Wallets requiring Authorization Code flow or HAIP profile features (for example PAR/PKCE, DPoP and wallet attestation) are not supported.
 - **Limited privacy.** SD-JWT hides undisclosed claims but does not provide unlinkability: the issuer signature, `cnf.jwk`, and the digests are the same in every presentation of a credential, so verifiers can correlate them. It also offers no predicate proofs (for example "over 18" without the birth date).
-- **The playground is a placeholder.** `apps/playground` currently contains only a `package.json`; there is no verifier demo yet.
 - **Standards are moving.** The draft references (SD-JWT VC draft-19, Token Status List draft-21) are the revisions implemented here and may have been superseded.
 
 ---
@@ -64,9 +64,12 @@ flowchart TD
         W[Mobile / Web Wallet]
     end
 
+    subgraph Verifier ["Independent Third-Party Verifier"]
+        V[Off-the-shelf Verifier / Relying Party<br/>e.g. @sd-jwt/sd-jwt-vc, walt.id]
+    end
+
     subgraph Apps ["Applications"]
         IssuerApp["@unidipveri/issuer<br/>(OID4VCI issuer, status list, registrar portal)"]
-        PlaygroundApp["@unidipveri/playground<br/>(placeholder, not implemented)"]
     end
 
     subgraph CoreEngine ["@unidipveri/core"]
@@ -82,8 +85,9 @@ flowchart TD
 
     W <-->|OID4VCI Pre-Authorized Code flow| IssuerApp
     IssuerApp --> CoreEngine
-    PlaygroundApp -.-> CoreEngine
     CoreEngine --> Schemas
+    W -.->|Presents SD-JWT VC| V
+    V -.->|Resolves DID / Status List| IssuerApp
 ```
 
 ---
@@ -115,7 +119,7 @@ unidipveri/
 │   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Portal, Docs
 │   │   │   ├── app.ts         # HTTP request dispatcher and CORS
 │   │   │   └── server.ts      # Bun.serve entrypoint
-│   │   └── tests/             # 171 tests
+│   │   └── tests/             # 172 tests
 │   └── playground/    # Placeholder (package.json only)
 ├── packages/
 │   └── core/          # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
@@ -170,7 +174,7 @@ bun install --frozen-lockfile
 
 ### Running Tests
 
-The suite contains 327 automated tests (156 core + 171 issuer) covering the implemented behavior. It is not an official conformance suite.
+The suite contains 328 automated tests (156 core + 172 issuer) covering the implemented behavior. It is not an official conformance suite.
 
 ```bash
 bun run test        # all workspaces
