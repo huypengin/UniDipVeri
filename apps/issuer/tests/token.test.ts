@@ -43,7 +43,7 @@ describe("OAuth 2.0 Token Endpoint Hardening (OpenID4VCI 1.0 Final & RFC 6749)",
       expect(body.access_token).toStartWith("iat_");
       expect(body.expires_in).toBe(600);
       expect(body.c_nonce).toStartWith("cnonce_");
-      expect(body.c_nonce_expires_in).toBe(86400);
+      expect(body.c_nonce_expires_in).toBe(600);
 
       // Verify access token session is retrievable
       const accessSession = sessionManager.getAccessTokenSession(body.access_token);

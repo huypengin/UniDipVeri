@@ -3,14 +3,18 @@ import { JWK_PRIVATE_KEY_PROPERTIES } from "@unidipveri/core";
 
 /**
  * Standard error thrown when a holder proof-of-possession fails validation.
- * Yields OAuth 2.0 error code "invalid_or_missing_proof" per OpenID4VCI 1.0 Final proof error specification.
+ * Yields OAuth 2.0 error codes "invalid_proof" or "invalid_nonce" per OpenID4VCI 1.0 Final.
  */
 export class InvalidProofError extends Error {
-  readonly code = "invalid_or_missing_proof";
+  readonly code: "invalid_proof" | "invalid_nonce" | "invalid_or_missing_proof";
 
-  constructor(message: string) {
+  constructor(
+    message: string,
+    code: "invalid_proof" | "invalid_nonce" | "invalid_or_missing_proof" = "invalid_proof"
+  ) {
     super(message);
     this.name = "InvalidProofError";
+    this.code = code;
   }
 }
 
@@ -89,10 +93,18 @@ export function extractProofJwt(input: unknown): string | null {
     // Case 2a: proofs: { jwt: ["..."] } or proofs: { jwt: "..." }
     if (typeof record.proofs === "object" && !Array.isArray(record.proofs)) {
       const proofsObj = record.proofs as Record<string, unknown>;
-      if (Array.isArray(proofsObj.jwt) && proofsObj.jwt.length > 0) {
-        const candidate = proofsObj.jwt[0];
-        if (typeof candidate === "string" && candidate.trim().length > 0) {
-          return candidate.trim();
+      if (Array.isArray(proofsObj.jwt)) {
+        if (proofsObj.jwt.length > 1) {
+          throw new InvalidProofError(
+            "Multiple proofs in proofs.jwt are unsupported in single credential request; expected exactly 1 proof",
+            "invalid_proof"
+          );
+        }
+        if (proofsObj.jwt.length === 1) {
+          const candidate = proofsObj.jwt[0];
+          if (typeof candidate === "string" && candidate.trim().length > 0) {
+            return candidate.trim();
+          }
         }
       }
       if (typeof proofsObj.jwt === "string" && proofsObj.jwt.trim().length > 0) {
@@ -100,15 +112,23 @@ export function extractProofJwt(input: unknown): string | null {
       }
     }
     // Case 2b: proofs: [ { jwt: "..." } ] or proofs: [ "..." ]
-    if (Array.isArray(record.proofs) && record.proofs.length > 0) {
-      const first = record.proofs[0];
-      if (typeof first === "string" && first.trim().length > 0) {
-        return first.trim();
+    if (Array.isArray(record.proofs)) {
+      if (record.proofs.length > 1) {
+        throw new InvalidProofError(
+          "Multiple proofs in proofs array are unsupported in single credential request; expected exactly 1 proof",
+          "invalid_proof"
+        );
       }
-      if (first && typeof first === "object" && !Array.isArray(first)) {
-        const item = first as Record<string, unknown>;
-        if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
-          return item.jwt.trim();
+      if (record.proofs.length === 1) {
+        const first = record.proofs[0];
+        if (typeof first === "string" && first.trim().length > 0) {
+          return first.trim();
+        }
+        if (first && typeof first === "object" && !Array.isArray(first)) {
+          const item = first as Record<string, unknown>;
+          if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
+            return item.jwt.trim();
+          }
         }
       }
     }
@@ -313,7 +333,8 @@ export async function verifyHolderProof(
 
   if (!nonceValid) {
     throw new InvalidProofError(
-      `Proof nonce does not match session c_nonce challenge`
+      `Proof nonce does not match session c_nonce challenge`,
+      "invalid_nonce"
     );
   }
 

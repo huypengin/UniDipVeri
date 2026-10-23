@@ -4,7 +4,7 @@ import {
   type CredentialTypeConfig,
 } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
-import type { SessionManager } from "../services/session-manager.js";
+import { SessionManager, DEFAULT_C_NONCE_TTL_SECONDS } from "../services/session-manager.js";
 import type { KeyContext } from "../services/key-manager.js";
 import type { StudentRecordService } from "../services/student-records.js";
 import type { StatusListService } from "../services/status-list.js";
@@ -31,6 +31,7 @@ export interface HandleCredentialRequestOptions {
  */
 export interface Oid4vciCredentialResponse {
   credential: string;
+  credentials: Array<{ credential: string }>;
   c_nonce: string;
   c_nonce_expires_in: number;
 }
@@ -240,7 +241,7 @@ export async function handleCredentialRequest(
         {
           error: err.code,
           error_description: err.message,
-          ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: 86400 } : {}),
+          ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS } : {}),
         },
         {
           status: 400,
@@ -253,9 +254,9 @@ export async function handleCredentialRequest(
     console.error(`[Credential Endpoint ❌] Request body was:`, JSON.stringify(body, null, 2));
     return Response.json(
       {
-        error: "invalid_or_missing_proof",
+        error: "invalid_proof",
         error_description: `Holder proof verification failed: ${message}`,
-        ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: 86400 } : {}),
+        ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS } : {}),
       },
       {
         status: 400,
@@ -338,8 +339,13 @@ export async function handleCredentialRequest(
 
     const responseBody: Oid4vciCredentialResponse = {
       credential: issued.compact,
+      credentials: [
+        {
+          credential: issued.compact,
+        },
+      ],
       c_nonce: rotation.newNonce,
-      c_nonce_expires_in: 86400,
+      c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS,
     };
 
     console.log(

@@ -421,7 +421,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     );
     expect(credRes.status).toBe(400);
     const errBody = (await credRes.json()) as any;
-    expect(errBody.error).toBe("invalid_or_missing_proof");
+    expect(errBody.error).toBe("invalid_proof");
   });
 
   it("rejects replaying old c_nonce after rotation with HTTP 400", async () => {
@@ -482,7 +482,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     );
     expect(credRes2.status).toBe(400);
     const errBody = (await credRes2.json()) as any;
-    expect(errBody.error).toBe("invalid_or_missing_proof");
+    expect(errBody.error).toBe("invalid_nonce");
   });
 
   it("issues credential when wallet submits modern OpenID4VCI 1.0 Final proofs.jwt array", async () => {
@@ -554,7 +554,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     expect(nonceRes.status).toBe(200);
     const nonceBody = (await nonceRes.json()) as any;
     expect(nonceBody.c_nonce).toStartWith("cnonce_");
-    expect(nonceBody.c_nonce_expires_in).toBe(86400);
+    expect(nonceBody.c_nonce_expires_in).toBe(600);
 
     const badMethodRes = await app(
       new Request("https://issuer.university.edu/nonce", {
@@ -727,5 +727,238 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
 
     expect(payload.iss).toBe(mockConfig.issuerDid);
     expect(header.kid).toBe(`${mockConfig.issuerDid}#${mockConfig.keyId}`);
+  });
+
+  describe("OpenID4VCI 1.0 Final Wire Compatibility & Dual-Format Validation", () => {
+    it("completes issuance for OpenID4VCI 1.0 Final shaped request with nonce from /nonce and dual credential response", async () => {
+      // 1. Offer
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+          method: "GET",
+        })
+      );
+      const offerData = (await offerRes.json()) as any;
+      const preAuthCode =
+        offerData.credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      // 2. Token exchange
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            preAuthCode
+          )}`,
+        })
+      );
+      expect(tokenRes.status).toBe(200);
+      const { access_token } = (await tokenRes.json()) as any;
+
+      // 3. Obtain fresh nonce from POST /nonce
+      const nonceRes = await app(
+        new Request("https://issuer.university.edu/nonce", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${access_token}` },
+        })
+      );
+      expect(nonceRes.status).toBe(200);
+      const { c_nonce: freshNonce, c_nonce_expires_in: nonceTtl } = (await nonceRes.json()) as any;
+      expect(freshNonce).toStartWith("cnonce_");
+      expect(nonceTtl).toBe(600);
+
+      // 4. Generate holder proof with openid4vci-proof+jwt and nonce from /nonce
+      const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+      const proofJwt = await createHolderProof(holderKeyPair, freshNonce, {
+        typ: "openid4vci-proof+jwt",
+        aud: "https://issuer.university.edu",
+      });
+
+      // 5. Submit 1.0 Final credential request: proofs.jwt array
+      const credRes = await app(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proofs: {
+              jwt: [proofJwt],
+            },
+          }),
+        })
+      );
+
+      expect(credRes.status).toBe(200);
+      const credBody = (await credRes.json()) as any;
+
+      // Verify dual-wire compatibility: both top-level credential and credentials array
+      expect(typeof credBody.credential).toBe("string");
+      expect(Array.isArray(credBody.credentials)).toBe(true);
+      expect(credBody.credentials.length).toBe(1);
+      expect(credBody.credentials[0].credential).toBe(credBody.credential);
+      expect(credBody.c_nonce).toStartWith("cnonce_");
+      expect(credBody.c_nonce_expires_in).toBe(600);
+    });
+
+    it("completes issuance for legacy Draft 11-13 shaped request with proof object and token nonce", async () => {
+      // 1. Offer
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+          method: "GET",
+        })
+      );
+      const offerData = (await offerRes.json()) as any;
+      const preAuthCode =
+        offerData.credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      // 2. Token exchange returns initial c_nonce
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            preAuthCode
+          )}`,
+        })
+      );
+      const { access_token, c_nonce: tokenNonce } = (await tokenRes.json()) as any;
+
+      // 3. Generate holder proof with openid-credential-proof+jwt and token nonce
+      const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+      const proofJwt = await createHolderProof(holderKeyPair, tokenNonce, {
+        typ: "openid-credential-proof+jwt",
+        aud: "https://issuer.university.edu",
+      });
+
+      // 4. Submit Draft 11-13 credential request: proof: { proof_type: "jwt", jwt: "..." }
+      const credRes = await app(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proof: {
+              proof_type: "jwt",
+              jwt: proofJwt,
+            },
+          }),
+        })
+      );
+
+      expect(credRes.status).toBe(200);
+      const credBody = (await credRes.json()) as any;
+      expect(typeof credBody.credential).toBe("string");
+      expect(credBody.credentials[0].credential).toBe(credBody.credential);
+    });
+
+    it("rejects credential request with multiple proofs in proofs.jwt with invalid_proof", async () => {
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+          method: "GET",
+        })
+      );
+      const { credential_offer } = (await offerRes.json()) as any;
+      const code =
+        credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            code
+          )}`,
+        })
+      );
+      const { access_token, c_nonce } = (await tokenRes.json()) as any;
+
+      const kp1 = await jose.generateKeyPair("ES256", { extractable: true });
+      const kp2 = await jose.generateKeyPair("ES256", { extractable: true });
+      const proof1 = await createHolderProof(kp1, c_nonce);
+      const proof2 = await createHolderProof(kp2, c_nonce);
+
+      // Submit request with 2 proofs in proofs.jwt
+      const credRes = await app(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proofs: {
+              jwt: [proof1, proof2],
+            },
+          }),
+        })
+      );
+
+      expect(credRes.status).toBe(400);
+      const errBody = (await credRes.json()) as any;
+      expect(errBody.error).toBe("invalid_proof");
+      expect(errBody.error_description).toContain("Multiple proofs in proofs.jwt are unsupported");
+    });
+
+    it("rejects invalid nonce with invalid_nonce and returns fresh c_nonce challenge", async () => {
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-2026-FINAL", {
+          method: "GET",
+        })
+      );
+      const { credential_offer } = (await offerRes.json()) as any;
+      const code =
+        credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            code
+          )}`,
+        })
+      );
+      const { access_token } = (await tokenRes.json()) as any;
+
+      // Create proof with stale/wrong nonce
+      const kp = await jose.generateKeyPair("ES256", { extractable: true });
+      const proofWithWrongNonce = await createHolderProof(kp, "cnonce_wrong_stale_123");
+
+      const credRes = await app(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proofs: {
+              jwt: [proofWithWrongNonce],
+            },
+          }),
+        })
+      );
+
+      expect(credRes.status).toBe(400);
+      const errBody = (await credRes.json()) as any;
+      expect(errBody.error).toBe("invalid_nonce");
+      expect(errBody.c_nonce).toStartWith("cnonce_");
+      expect(errBody.c_nonce_expires_in).toBe(600);
+    });
   });
 });
