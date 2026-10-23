@@ -1,10 +1,10 @@
 # @unidipveri/issuer
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-purple)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+[![OpenID4VCI: Pre-Auth (1.0 Final audit)](https://img.shields.io/badge/OpenID4VCI-Pre--Auth%20(1.0%20Final%20audit)-yellow)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 [![Revocation: Token Status List](https://img.shields.io/badge/Revocation-draft--status--list--21-blue)](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/)
 
-`@unidipveri/issuer` is a reference **credential issuer** that implements the **Pre-Authorized Code flow of OpenID4VCI 1.0 Final**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
+`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
 
 > **Prototype, not production software.** All state is held in memory, the default signing key is ephemeral, and the portal, `/credential-offer` and `/admin/*` endpoints have **no authentication**. See [Known Limitations](#known-limitations).
 
