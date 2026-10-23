@@ -1,4 +1,4 @@
-import type { SessionManager } from "../services/session-manager.js";
+import { SessionManager, DEFAULT_C_NONCE_TTL_SECONDS } from "../services/session-manager.js";
 
 /**
  * Handles incoming requests to the OpenID4VCI 1.0 Final Nonce Endpoint (POST /nonce)
@@ -37,7 +37,7 @@ export function handleNonceRequest(
   }
 
   let cNonce: string;
-  let cNonceExpiresIn = 86400;
+  let cNonceExpiresIn = DEFAULT_C_NONCE_TTL_SECONDS;
 
   if (bearerToken) {
     const rotated = sessionManager.rotateSessionNonce(bearerToken);

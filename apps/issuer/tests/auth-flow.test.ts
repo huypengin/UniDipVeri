@@ -103,7 +103,7 @@ describe("End-to-End Authorization & Security Flow", () => {
       expect(tokenBody.expires_in).toBe(600);
       expect(tokenBody.c_nonce).toBeDefined();
       expect(tokenBody.c_nonce.length).toBeGreaterThanOrEqual(32);
-      expect(tokenBody.c_nonce_expires_in).toBe(86400);
+      expect(tokenBody.c_nonce_expires_in).toBe(600);
 
       // Step 3: Validate session manager state for downstream credential issuance
       const session = sessionManager.getAccessTokenSession(tokenBody.access_token);

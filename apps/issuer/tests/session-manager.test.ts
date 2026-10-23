@@ -91,7 +91,7 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
       expect(result.accessToken).toStartWith("iat_");
       expect(result.cNonce).toStartWith("cnonce_");
       expect(result.expiresIn).toBe(600);
-      expect(result.cNonceExpiresIn).toBe(86400);
+      expect(result.cNonceExpiresIn).toBe(600);
 
       // Verify code was burned from pre-auth map
       expect(sessionManager.preAuthCodeCount).toBe(0);

@@ -73,7 +73,7 @@ export interface ExchangePreAuthorizedCodeOptions {
  */
 export const DEFAULT_PRE_AUTH_CODE_TTL_SECONDS = 600; // 10 minutes
 export const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 600; // 10 minutes
-export const DEFAULT_C_NONCE_TTL_SECONDS = 86400; // 24 hours
+export const DEFAULT_C_NONCE_TTL_SECONDS = 600; // 10 minutes (short challenge lifetime)
 
 /**
  * Timing-safe string comparison to mitigate PIN/tx_code side-channel attacks.
