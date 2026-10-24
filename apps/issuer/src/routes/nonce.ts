@@ -1,4 +1,5 @@
 import { SessionManager, DEFAULT_C_NONCE_TTL_SECONDS } from "../services/session-manager.js";
+import { writeIssuerLog } from "../services/logger.js";
 
 /**
  * Handles incoming requests to the OpenID4VCI 1.0 Final Nonce Endpoint (POST /nonce)
@@ -53,6 +54,10 @@ export function handleNonceRequest(
     cNonce = standalone.cNonce;
     cNonceExpiresIn = standalone.cNonceExpiresIn;
   }
+
+  writeIssuerLog(
+    `[Nonce Endpoint ✅] Issued fresh c_nonce: c_nonce=${cNonce.slice(0, 14)}... (expires in ${cNonceExpiresIn}s, bearer=${Boolean(bearerToken)})`
+  );
 
   return Response.json(
     {

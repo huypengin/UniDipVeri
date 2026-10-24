@@ -1,4 +1,5 @@
-import { InvalidGrantError, type SessionManager } from "../services/session-manager.js";
+import { InvalidGrantError, InvalidRequestError, type SessionManager } from "../services/session-manager.js";
+import { writeIssuerLog } from "../services/logger.js";
 
 /**
  * Standard grant type identifier for OpenID4VCI Pre-Authorized Code Flow.
@@ -14,14 +15,14 @@ export const PRE_AUTHORIZED_CODE_GRANT_TYPE =
 export const MAX_TOKEN_REQUEST_SIZE_BYTES = 4096;
 
 /**
- * OpenID4VCI 1.0 Final Token Response payload.
+ * OAuth 2.0 Token Response payload with optional c_nonce challenge.
  */
 export interface TokenResponse {
   access_token: string;
   token_type: "Bearer";
   expires_in: number;
-  c_nonce: string;
-  c_nonce_expires_in: number;
+  c_nonce?: string;
+  c_nonce_expires_in?: number;
 }
 
 /**
@@ -56,6 +57,68 @@ function tokenErrorResponse(
       },
     }
   );
+}
+
+/**
+ * Safely reads the request entity-body up to maxBytes, even when Content-Length is missing
+ * or chunked transfer encoding is used, preventing unbounded memory allocation.
+ */
+async function readLimitedRequestBody(
+  req: Request,
+  maxBytes: number
+): Promise<{ text?: string; error?: string }> {
+  // If Content-Length header is provided and exceeds limit, reject immediately
+  const contentLengthHeader = req.headers.get("content-length");
+  if (contentLengthHeader !== null) {
+    const declaredLength = parseInt(contentLengthHeader, 10);
+    if (isNaN(declaredLength) || declaredLength > maxBytes) {
+      return {
+        error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+      };
+    }
+  }
+
+  // Stream-limit reading via ReadableStream if available
+  if (req.body && typeof req.body.getReader === "function") {
+    const reader = req.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          totalBytes += value.byteLength;
+          if (totalBytes > maxBytes) {
+            await reader.cancel("Request body size limit exceeded");
+            return {
+              error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+            };
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const concatenated = Buffer.concat(chunks);
+    return { text: concatenated.toString("utf-8") };
+  }
+
+  // Fallback to text()
+  try {
+    const rawText = await req.text();
+    if (Buffer.byteLength(rawText, "utf-8") > maxBytes) {
+      return {
+        error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+      };
+    }
+    return { text: rawText };
+  } catch {
+    return { error: "Request body could not be read" };
+  }
 }
 
 /**
@@ -101,40 +164,17 @@ export async function handleTokenRequest(
     );
   }
 
-  // 2. Body size check: Verify Content-Length header if present
-  const contentLengthHeader = req.headers.get("content-length");
-  if (contentLengthHeader !== null) {
-    const declaredLength = parseInt(contentLengthHeader, 10);
-    if (isNaN(declaredLength) || declaredLength > MAX_TOKEN_REQUEST_SIZE_BYTES) {
-      return tokenErrorResponse(
-        400,
-        "invalid_request",
-        `Request body exceeds maximum allowed size of ${MAX_TOKEN_REQUEST_SIZE_BYTES} bytes`
-      );
-    }
-  }
-
-  // Read raw entity body
-  let rawText: string;
-  try {
-    rawText = await req.text();
-  } catch {
+  // 2. Stream-limit request body reading to MAX_TOKEN_REQUEST_SIZE_BYTES
+  // Protects against unbounded memory allocation even when Content-Length is missing
+  const bodyResult = await readLimitedRequestBody(req, MAX_TOKEN_REQUEST_SIZE_BYTES);
+  if (bodyResult.error || bodyResult.text === undefined) {
     return tokenErrorResponse(
       400,
       "invalid_request",
-      "Request body could not be read"
+      bodyResult.error || "Request body could not be read"
     );
   }
-
-  // 2b. Body size check: Verify actual string byte length
-  const actualByteLength = Buffer.byteLength(rawText, "utf-8");
-  if (actualByteLength > MAX_TOKEN_REQUEST_SIZE_BYTES) {
-    return tokenErrorResponse(
-      400,
-      "invalid_request",
-      `Request body exceeds maximum allowed size of ${MAX_TOKEN_REQUEST_SIZE_BYTES} bytes`
-    );
-  }
+  const rawText = bodyResult.text;
 
   // Parse form-urlencoded parameters
   const params = new URLSearchParams(rawText);
@@ -196,7 +236,7 @@ export async function handleTokenRequest(
       c_nonce_expires_in: result.cNonceExpiresIn,
     };
 
-    console.log(
+    writeIssuerLog(
       `[Token Endpoint ✅] Pre-authorized code exchanged: access_token=${result.accessToken.slice(0, 10)}..., c_nonce=${result.cNonce.slice(0, 14)}... (expires in ${result.expiresIn}s)`
     );
 
@@ -209,8 +249,12 @@ export async function handleTokenRequest(
       },
     });
   } catch (err) {
+    if (err instanceof InvalidRequestError) {
+      writeIssuerLog(`[Token Endpoint ⚠️] Invalid token request parameter: ${err.message}`);
+      return tokenErrorResponse(400, "invalid_request", err.message);
+    }
     if (err instanceof InvalidGrantError) {
-      console.warn(`[Token Endpoint ⚠️] Code exchange rejected: ${err.message}`);
+      writeIssuerLog(`[Token Endpoint ⚠️] Code exchange rejected: ${err.message}`);
       return tokenErrorResponse(400, "invalid_grant", err.message);
     }
     const message = err instanceof Error ? err.message : String(err);

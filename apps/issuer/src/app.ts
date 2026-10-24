@@ -4,6 +4,7 @@ import type { KeyContext } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { StudentRecordService } from "./services/student-records.js";
 import { StatusListService } from "./services/status-list.js";
+import { writeIssuerLog } from "./services/logger.js";
 import { handleMetadataRequest, handleOAuthMetadataRequest } from "./routes/metadata.js";
 import { handleDidRequest } from "./routes/did.js";
 import { handleJwtVcIssuerRequest } from "./routes/jwt-vc-issuer.js";
@@ -83,7 +84,7 @@ export function createApp(
       const userAgent = req.headers.get("user-agent") || "unknown";
 
       if (pathname !== "/health") {
-        console.log(`[UniDipVeri] --> ${method} ${pathname}${url.search ? url.search : ""} (Agent: ${userAgent})`);
+        writeIssuerLog(`[UniDipVeri] --> ${method} ${pathname}${url.search ? url.search : ""} (Agent: ${userAgent})`);
       }
 
       const respond = async (res: Response | Promise<Response>): Promise<Response> => {
@@ -91,7 +92,7 @@ export function createApp(
         if (pathname !== "/health") {
           const durationMs = Math.round(performance.now() - startMs);
           const symbol = response.status >= 400 ? "⚠️" : "✅";
-          console.log(`[UniDipVeri] <-- ${symbol} ${response.status} ${method} ${pathname} (${durationMs}ms)`);
+          writeIssuerLog(`[UniDipVeri] <-- ${symbol} ${response.status} ${method} ${pathname} (${durationMs}ms)`);
         }
         return withCors(response);
       };

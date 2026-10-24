@@ -19,6 +19,7 @@ import {
   verifyHolderProof,
   InvalidProofError,
 } from "../services/proof-validator.js";
+import { writeIssuerLog } from "../services/logger.js";
 
 /**
  * Context options passed into handleCredentialRequest.
@@ -285,15 +286,15 @@ export async function handleCredentialRequest(
       (nonce) => sessionManager.isValidNonce(session, nonce ?? "")
     );
 
-    console.log(
+    writeIssuerLog(
       `[Credential Endpoint ✅] Proof verified: holder alg=${verifiedProof.header.alg}, jwk=${verifiedProof.holderJwk.kty}/${verifiedProof.holderJwk.crv ?? "rsa"}, aud="${String(verifiedProof.payload.aud)}"`
     );
   } catch (err) {
     const freshNonce = sessionManager.rotateSessionNonce(accessToken);
     if (err instanceof InvalidProofError) {
-      console.warn(`[Credential Endpoint ⚠️] Proof validation rejected: ${err.message}`);
+      writeIssuerLog(`[Credential Endpoint ⚠️] Proof validation rejected: ${err.message}`);
       if (debugLogBody) {
-        console.warn(`[Credential Endpoint ⚠️] Request body:`, JSON.stringify(body, null, 2));
+        writeIssuerLog(`[Credential Endpoint ⚠️] Request body: ${JSON.stringify(body, null, 2)}`);
       }
       return Response.json(
         {
@@ -325,10 +326,25 @@ export async function handleCredentialRequest(
     );
   }
 
-  // 6. Nonce Rotation
+  // 6. Nonce Validation, Atomic One-Shot Token Consumption & Nonce Rotation
   const proofNonce = verifiedProof.payload.nonce as string;
   const rotation = sessionManager.validateAndRotateNonce(accessToken, proofNonce);
   if (!rotation.valid || !rotation.newNonce) {
+    if (rotation.error === "invalid_token") {
+      return Response.json(
+        {
+          error: "invalid_token",
+          error_description: "The access token is expired, invalid, or has already been used",
+        },
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "WWW-Authenticate": 'Bearer error="invalid_token", error_description="Token already used or expired"',
+          },
+        }
+      );
+    }
     return Response.json(
       {
         error: "invalid_nonce",
@@ -343,12 +359,14 @@ export async function handleCredentialRequest(
     );
   }
 
+  const activeSession = rotation.session ?? session;
+
   // 7. Resolve Academic Claims
   let rawClaims: Record<string, unknown>;
-  if (session.claims && Object.keys(session.claims).length > 0) {
-    rawClaims = session.claims;
+  if (activeSession.claims && Object.keys(activeSession.claims).length > 0) {
+    rawClaims = activeSession.claims;
   } else {
-    rawClaims = studentRecordsService.getStudentRecord(session.studentId);
+    rawClaims = studentRecordsService.getStudentRecord(activeSession.studentId);
   }
 
   // 8. Allocate Status List Revocation Index
@@ -415,8 +433,8 @@ export async function handleCredentialRequest(
       c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS,
     };
 
-    console.log(
-      `[Credential Endpoint 🎓] SD-JWT VC issued successfully: studentId="${session.studentId}", statusIndex=${revocationIndex}, disclosures=${issued.disclosures.length}`
+    writeIssuerLog(
+      `[Credential Endpoint 🎓] SD-JWT VC issued successfully: studentId="${activeSession.studentId}", statusIndex=${revocationIndex}, disclosures=${issued.disclosures.length}`
     );
 
     return Response.json(responseBody, {

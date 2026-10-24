@@ -1299,5 +1299,157 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
       );
       expect(validFallbackRes.status).toBe(200);
     });
+
+    it("allows issuance when using fresh standalone nonce from no-bearer POST /nonce after session nonce expired", async () => {
+      // 1. Offer + Token
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-INDEP-NONCE", {
+          method: "GET",
+        })
+      );
+      const offerData = (await offerRes.json()) as any;
+      const preAuthCode =
+        offerData.credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            preAuthCode
+          )}`,
+        })
+      );
+      expect(tokenRes.status).toBe(200);
+      const { access_token } = (await tokenRes.json()) as any;
+
+      // Manually expire the session's internal cNonce
+      const session = sessionManager.getAccessTokenSession(access_token)!;
+      session.cNonceExpiresAt = Date.now() - 1000;
+
+      // 2. Fetch fresh standalone nonce from unauthenticated (no-bearer) POST /nonce
+      const nonceRes = await app(
+        new Request("https://issuer.university.edu/nonce", {
+          method: "POST",
+        })
+      );
+      expect(nonceRes.status).toBe(200);
+      const { c_nonce: standaloneNonce } = (await nonceRes.json()) as any;
+
+      // 3. Holder builds proof using the fresh standalone nonce
+      const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+      const proof = await createHolderProof(holderKeyPair, standaloneNonce, {
+        typ: "openid4vci-proof+jwt",
+        aud: "https://issuer.university.edu",
+      });
+
+      // 4. Credential request succeeds because standalone nonce is validated independently of session nonce expiry
+      const credRes = await app(
+        new Request("https://issuer.university.edu/credential", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential_configuration_id: "graduation_record_sd_jwt_vc",
+            proofs: { jwt: [proof] },
+          }),
+        })
+      );
+
+      expect(credRes.status).toBe(200);
+      const credData = (await credRes.json()) as any;
+      expect(credData.credential).toBeDefined();
+    });
+
+    it("handles two concurrent POST /credential requests by issuing exactly one credential and allocating one status index", async () => {
+      // 1. Offer + Token
+      const offerRes = await app(
+        new Request("https://issuer.university.edu/credential-offer?studentId=STU-RACE-TEST", {
+          method: "GET",
+        })
+      );
+      const offerData = (await offerRes.json()) as any;
+      const preAuthCode =
+        offerData.credential_offer.grants[
+          "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+        ]["pre-authorized_code"];
+
+      const tokenRes = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=${encodeURIComponent(
+            preAuthCode
+          )}`,
+        })
+      );
+      const { access_token } = (await tokenRes.json()) as any;
+
+      // 2. Fetch two valid standalone nonces
+      const nonceRes1 = await app(
+        new Request("https://issuer.university.edu/nonce", {
+          method: "POST",
+        })
+      );
+      const { c_nonce: nonce1 } = (await nonceRes1.json()) as any;
+
+      const nonceRes2 = await app(
+        new Request("https://issuer.university.edu/nonce", {
+          method: "POST",
+        })
+      );
+      const { c_nonce: nonce2 } = (await nonceRes2.json()) as any;
+
+      // 3. Create two proofs with the two valid nonces
+      const holderKeyPair = await jose.generateKeyPair("ES256", { extractable: true });
+      const proof1 = await createHolderProof(holderKeyPair, nonce1, {
+        typ: "openid4vci-proof+jwt",
+        aud: "https://issuer.university.edu",
+      });
+      const proof2 = await createHolderProof(holderKeyPair, nonce2, {
+        typ: "openid4vci-proof+jwt",
+        aud: "https://issuer.university.edu",
+      });
+
+      const initialStatusIndex = statusListService.allocatedCount;
+
+      // 4. Fire two concurrent POST /credential requests simultaneously
+      const req1 = new Request("https://issuer.university.edu/credential", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credential_configuration_id: "graduation_record_sd_jwt_vc",
+          proofs: { jwt: [proof1] },
+        }),
+      });
+
+      const req2 = new Request("https://issuer.university.edu/credential", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          credential_configuration_id: "graduation_record_sd_jwt_vc",
+          proofs: { jwt: [proof2] },
+        }),
+      });
+
+      const [res1, res2] = await Promise.all([app(req1), app(req2)]);
+
+      const statuses = [res1.status, res2.status].sort();
+      // Exactly one succeeds (200), and one fails with 401 Unauthorized (invalid_token)
+      expect(statuses).toEqual([200, 401]);
+
+      // Exactly one status index was allocated
+      expect(statusListService.allocatedCount).toBe(initialStatusIndex + 1);
+    });
   });
 });
