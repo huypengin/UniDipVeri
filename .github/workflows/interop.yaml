@@ -1,0 +1,62 @@
+name: Interop
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  waltid-interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+      - name: Install devenv.sh
+        run: nix profile add nixpkgs#devenv
+
+      - name: Test devenv
+        run: devenv test
+
+      - name: Install dependencies
+        run: devenv shell bun install --frozen-lockfile
+
+      - name: Start Walt.id Verifier Container
+        run: |
+          docker run -d --name test-waltid-verifier --net=host \
+            docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76ee7fee4bb5ee68369e2ea1864733039e9a
+          echo "Waiting for Walt.id Verifier readiness on port 7004..."
+          for i in {1..40}; do
+            if curl -sf http://127.0.0.1:7004/livez >/dev/null 2>&1; then
+              echo "✓ Walt.id Verifier container is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Error: Walt.id Verifier did not become ready in 40s"
+          docker logs test-waltid-verifier
+          exit 1
+
+      - name: Run Walt.id Interoperability Suite
+        run: devenv shell bun run test:interop
+
+      - name: Collect verifier logs on failure
+        if: failure()
+        run: docker logs test-waltid-verifier || true
+
+      - name: Clean up verifier
+        if: always()
+        run: docker rm -f test-waltid-verifier || true

@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "typecheck": "bun --filter \"*\" typecheck",
-    "test": "bun --filter \"*\" test"
+    "test": "bun --filter \"*\" test",
+    "test:interop": "bun run scripts/issuer-verifier.interop.test.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
