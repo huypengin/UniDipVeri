@@ -23,6 +23,7 @@ export function generateDidDocument(
       "https://w3id.org/security/suites/jws-2020/v1",
     ],
     id: issuerDid,
+    controller: issuerDid,
     verificationMethod: [
       {
         id: keyUri,

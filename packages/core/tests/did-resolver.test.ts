@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   didWebToUrl,
+  normalizeDidDocument,
   resolveDidVerificationKey,
   resolveDidWeb,
   resolveIssuerKeyId,
@@ -245,6 +246,94 @@ describe("W3C did:web Resolver (packages/core)", () => {
       expect(
             resolveDidVerificationKey("did:web:university.edu", "raw-key", fetchNoJwk)
         ).rejects.toThrow(/does not contain a 'publicKeyJwk'/);
+    });
+  });
+
+  describe("normalizeDidDocument", () => {
+    it("defaults missing @context, controller, and assertionMethod based on W3C DID Core defaults", () => {
+      const minimalDoc: DidDocument = {
+        id: "did:web:example.edu",
+        verificationMethod: [
+          {
+            id: "did:web:example.edu#key-1",
+            type: "JsonWebKey2020",
+            publicKeyJwk: {
+              kty: "EC",
+              crv: "P-256",
+              x: "test-x",
+              y: "test-y",
+            },
+          },
+        ],
+      };
+
+      const normalized = normalizeDidDocument(minimalDoc);
+      expect(normalized["@context"]).toEqual(["https://www.w3.org/ns/did/v1"]);
+      expect(normalized.controller).toBe("did:web:example.edu");
+      expect(normalized.verificationMethod?.[0].controller).toBe("did:web:example.edu");
+      expect(normalized.assertionMethod).toEqual(["did:web:example.edu#key-1"]);
+    });
+
+    it("preserves explicitly defined @context, controller, and assertionMethod", () => {
+      const explicitDoc: DidDocument = {
+        "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1"],
+        id: "did:web:example.edu",
+        controller: "did:web:parent.edu",
+        verificationMethod: [
+          {
+            id: "did:web:example.edu#key-custom",
+            type: "JsonWebKey2020",
+            controller: "did:web:parent.edu",
+            publicKeyJwk: {
+              kty: "EC",
+              crv: "P-256",
+              x: "test-x",
+              y: "test-y",
+            },
+          },
+        ],
+        assertionMethod: ["did:web:example.edu#key-custom"],
+      };
+
+      const normalized = normalizeDidDocument(explicitDoc);
+      expect(normalized["@context"]).toEqual([
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/suites/jws-2020/v1",
+      ]);
+      expect(normalized.controller).toBe("did:web:parent.edu");
+      expect(normalized.verificationMethod?.[0].controller).toBe("did:web:parent.edu");
+      expect(normalized.assertionMethod).toEqual(["did:web:example.edu#key-custom"]);
+    });
+
+    it("normalizes incomplete documents during resolveDidWeb resolution", async () => {
+      const minimalDoc = {
+        id: "did:web:example.edu",
+        verificationMethod: [
+          {
+            id: "did:web:example.edu#key-1",
+            type: "JsonWebKey2020",
+            publicKeyJwk: {
+              kty: "EC",
+              crv: "P-256",
+              x: "test-x",
+              y: "test-y",
+            },
+          },
+        ],
+      };
+
+      const mockFetch: FetchLike = async () => {
+        return new Response(JSON.stringify(minimalDoc), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      const resolved = await resolveDidWeb("did:web:example.edu", mockFetch);
+      expect(resolved["@context"]).toEqual(["https://www.w3.org/ns/did/v1"]);
+      expect(resolved.controller).toBe("did:web:example.edu");
+      expect(resolved.verificationMethod?.[0].controller).toBe("did:web:example.edu");
+      expect(resolved.assertionMethod).toEqual(["did:web:example.edu#key-1"]);
     });
   });
 

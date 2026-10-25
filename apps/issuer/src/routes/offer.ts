@@ -156,7 +156,10 @@ export async function handleOfferRequest(
       ? credentialConfigurationId.trim()
       : DEFAULT_CREDENTIAL_CONFIG_ID;
 
-  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID && targetConfigId !== legacyConfigId) {
+  if (
+    targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID &&
+    (targetConfigId !== legacyConfigId || !config.enableLegacyVcFormat)
+  ) {
     return Response.json(
       {
         error: "invalid_request",

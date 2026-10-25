@@ -23,6 +23,7 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
     keyId: "key-1",
     signingAlgorithm: "ES256",
     schemaPath: FIXTURE_SCHEMA_PATH,
+    enableLegacyVcFormat: false,
   };
 
   beforeEach(async () => {
@@ -103,6 +104,36 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
+    });
+
+    it("rejects legacy credential_configuration_id by default when ENABLE_LEGACY_VC_FORMAT is false", async () => {
+      const req = new Request(
+        "http://localhost:3000/credential-offer?studentId=STU-1&credential_configuration_id=graduation_record_sd_jwt_vc_legacy"
+      );
+      const res = await handleOfferRequest(req, mockConfig, sessionManager, schemaConfig);
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; error_description: string };
+      expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("Unsupported credential_configuration_id");
+    });
+
+    it("accepts legacy credential_configuration_id when ENABLE_LEGACY_VC_FORMAT is true", async () => {
+      const legacyEnabledConfig = {
+        ...mockConfig,
+        enableLegacyVcFormat: true,
+      };
+
+      const req = new Request(
+        "http://localhost:3000/credential-offer?studentId=STU-1&credential_configuration_id=graduation_record_sd_jwt_vc_legacy"
+      );
+      const res = await handleOfferRequest(req, legacyEnabledConfig, sessionManager, schemaConfig);
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as CredentialOfferResponse;
+      expect(body.credential_offer.credential_configuration_ids).toEqual([
+        "graduation_record_sd_jwt_vc_legacy",
+      ]);
     });
   });
 

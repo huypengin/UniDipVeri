@@ -488,4 +488,29 @@ describe("Issuer KeyManager & Cryptographic Caching", () => {
         );
     });
   });
+
+  describe("ENABLE_LEGACY_VC_FORMAT Flag Configuration", () => {
+    it("defaults enableLegacyVcFormat to false when omitted from environment", () => {
+      const config = loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+      });
+      expect(config.enableLegacyVcFormat).toBe(false);
+    });
+
+    it("enables enableLegacyVcFormat when ENABLE_LEGACY_VC_FORMAT=true", () => {
+      const config = loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        ENABLE_LEGACY_VC_FORMAT: "true",
+      });
+      expect(config.enableLegacyVcFormat).toBe(true);
+    });
+
+    it("disables enableLegacyVcFormat when ENABLE_LEGACY_VC_FORMAT is false or arbitrary string", () => {
+      const config = loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        ENABLE_LEGACY_VC_FORMAT: "false",
+      });
+      expect(config.enableLegacyVcFormat).toBe(false);
+    });
+  });
 });
