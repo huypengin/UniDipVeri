@@ -107,6 +107,9 @@ export const IssuerConfigSchema = z.object({
 
   /** Optional raw private JWK string. If omitted, an ephemeral key is generated for development/testing */
   privateKeyJwkJson: z.string().optional(),
+
+  /** Optional file path for persisting Token Status List state across server restarts */
+  statusListPath: z.string().optional(),
 });
 
 export type IssuerConfig = z.infer<typeof IssuerConfigSchema>;
@@ -156,6 +159,7 @@ export function loadIssuerConfig(
     signingAlgorithm: env.SIGNING_ALGORITHM ?? "ES256",
     schemaPath: env.SCHEMA_PATH,
     privateKeyJwkJson: env.ISSUER_PRIVATE_KEY_JWK,
+    statusListPath: env.STATUS_LIST_PATH,
   };
 
   const parseResult = IssuerConfigSchema.safeParse(rawConfig);
@@ -169,6 +173,17 @@ export function loadIssuerConfig(
   const isProduction = env.NODE_ENV === "production";
   validateSecurityUrl(parseResult.data.baseUrl, "ISSUER_BASE_URL", isProduction);
   validateSecurityUrl(parseResult.data.vctBaseUrl, "VCT_BASE_URL", isProduction);
+
+  if (isProduction) {
+    if (
+      !parseResult.data.privateKeyJwkJson ||
+      parseResult.data.privateKeyJwkJson.trim().length === 0
+    ) {
+      throw new Error(
+        "Production configuration error: ISSUER_PRIVATE_KEY_JWK must be provided in production mode"
+      );
+    }
+  }
 
   return parseResult.data;
 }

@@ -9,6 +9,7 @@ import {
 } from "@unidipveri/core";
 import { loadIssuerConfig } from "../src/config.js";
 import { initializeKeyManager } from "../src/services/key-manager.js";
+import { StatusListService } from "../src/services/status-list.js";
 import { createApp } from "../src/app.js";
 import { handleDidRequest } from "../src/routes/did.js";
 import { startServer } from "../src/server.js";
@@ -29,7 +30,15 @@ const config = loadIssuerConfig({
   SCHEMA_PATH: schemaPath,
 });
 const keyContext = await initializeKeyManager(config);
-const app = createApp(config, keyContext, schemaConfig);
+const statusListService = new StatusListService();
+const app = createApp(
+  config,
+  keyContext,
+  schemaConfig,
+  undefined,
+  undefined,
+  statusListService
+);
 
 describe("Issuer Application Dispatcher, Routing & Server", () => {
   describe("DID Document Route (/.well-known/did.json)", () => {
@@ -323,6 +332,9 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       );
       const token = await resStatus.text();
       expect(token.split(".").length).toBe(3);
+
+      const allocatedIdx = statusListService.allocateIndex();
+      expect(allocatedIdx).toBe(0);
 
       const resRevoke = await app(
         new Request("https://issuer.university.edu/admin/revoke", {

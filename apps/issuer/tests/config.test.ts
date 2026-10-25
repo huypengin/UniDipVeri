@@ -175,16 +175,54 @@ describe("Issuer Configuration Loading & Validation", () => {
       ).toThrow(/Production configuration error: ISSUER_BASE_URL must use https:\/\/ in production/);
     });
 
-    it("succeeds startup in production (NODE_ENV=production) when both use https://", () => {
+    it("refuses to start in production (NODE_ENV=production) when ISSUER_PRIVATE_KEY_JWK is omitted", () => {
+      expect(() =>
+        loadIssuerConfig({
+          NODE_ENV: "production",
+          SCHEMA_PATH: fixtureSchemaPath,
+          ISSUER_BASE_URL: "https://issuer.university.edu",
+          VCT_BASE_URL: "https://credentials.university.edu",
+        })
+      ).toThrow(
+        /Production configuration error: ISSUER_PRIVATE_KEY_JWK must be provided in production mode/
+      );
+    });
+
+    it("refuses to start in production (NODE_ENV=production) when ISSUER_PRIVATE_KEY_JWK is empty whitespace", () => {
+      expect(() =>
+        loadIssuerConfig({
+          NODE_ENV: "production",
+          SCHEMA_PATH: fixtureSchemaPath,
+          ISSUER_BASE_URL: "https://issuer.university.edu",
+          VCT_BASE_URL: "https://credentials.university.edu",
+          ISSUER_PRIVATE_KEY_JWK: "   ",
+        })
+      ).toThrow(
+        /Production configuration error: ISSUER_PRIVATE_KEY_JWK must be provided in production mode/
+      );
+    });
+
+    it("succeeds startup in production (NODE_ENV=production) when both use https:// and key is provided", async () => {
+      const generated = await generateKeyPair("ES256");
       const config = loadIssuerConfig({
         NODE_ENV: "production",
         SCHEMA_PATH: fixtureSchemaPath,
         ISSUER_BASE_URL: "https://issuer.university.edu",
         VCT_BASE_URL: "https://credentials.university.edu",
+        ISSUER_PRIVATE_KEY_JWK: JSON.stringify(generated.privateKeyJwk),
       });
 
       expect(config.baseUrl).toBe("https://issuer.university.edu");
       expect(config.vctBaseUrl).toBe("https://credentials.university.edu");
+      expect(config.privateKeyJwkJson).toBeDefined();
+    });
+
+    it("loads optional STATUS_LIST_PATH into config", () => {
+      const config = loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        STATUS_LIST_PATH: "/var/data/status-list.json",
+      });
+      expect(config.statusListPath).toBe("/var/data/status-list.json");
     });
 
     it("allows loopback http:// (localhost and 127.0.0.1) in development/test", () => {
