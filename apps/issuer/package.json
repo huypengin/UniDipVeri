@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "dev": "bun run src/server.ts"
+    "test": "bun test tests/",
+    "dev": "bun run --watch src/server.ts"
   },
   "dependencies": {
     "@unidipveri/core": "workspace:*",
