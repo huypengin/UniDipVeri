@@ -359,7 +359,7 @@ describe("Issuer KeyManager & Cryptographic Caching", () => {
       expect(sanitized.y).toBe(generated.publicKeyJwk.y);
     });
 
-    it("rejects invalid JSON string in ISSUER_PRIVATE_KEY_JWK", async () => {
+    it("rejects invalid JSON string in ISSUER_PRIVATE_KEY_JWK", () => {
       const config = loadIssuerConfig({
         SCHEMA_PATH: fixtureSchemaPath,
         ISSUER_PRIVATE_KEY_JWK: "not-json-content",
@@ -370,7 +370,7 @@ describe("Issuer KeyManager & Cryptographic Caching", () => {
       );
     });
 
-    it("rejects JSON that does not contain a valid JWK object", async () => {
+    it("rejects JSON that does not contain a valid JWK object", () => {
       const config = loadIssuerConfig({
         SCHEMA_PATH: fixtureSchemaPath,
         ISSUER_PRIVATE_KEY_JWK: JSON.stringify({ someKey: "not-a-jwk" }),

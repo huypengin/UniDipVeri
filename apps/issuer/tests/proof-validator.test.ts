@@ -106,7 +106,7 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
     expect(result.payload.aud).toBe(issuerDid);
   });
 
-  it("rejects missing or non-object proof parameter with invalid_or_missing_proof error", async () => {
+  it("rejects missing or non-object proof parameter with invalid_or_missing_proof error", () => {
     for (const invalid of [null, undefined, "not-an-object", 12345]) {
       expect(
         verifyHolderProof(invalid, issuerBaseUrl, cNonce)
@@ -123,7 +123,7 @@ describe("Holder Proof-of-Possession Validator (OpenID4VCI 1.0 Final)", () => {
     ).rejects.toThrow("Unsupported proof_type");
   });
 
-  it("rejects malformed JWT string", async () => {
+  it("rejects malformed JWT string", () => {
     const badProof: HolderProofParameter = {
       proof_type: "jwt",
       jwt: "this.is.not.a.valid.jwt",

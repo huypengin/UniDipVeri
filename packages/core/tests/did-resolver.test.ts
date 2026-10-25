@@ -85,7 +85,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
       expect(doc.verificationMethod?.[0].id).toBe("did:web:example.edu#key-1");
     });
 
-    it("rejects when network fetch fails", async () => {
+    it("rejects when network fetch fails", () => {
       const failingFetch: FetchLike = async () => {
         throw new Error("DNS resolution failed");
       };
@@ -95,7 +95,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/Network failure resolving DID/);
     });
 
-    it("rejects when HTTP status is not ok", async () => {
+    it("rejects when HTTP status is not ok", () => {
       const notFoundFetch: FetchLike = async () => {
         return new Response("Not Found", { status: 404, statusText: "Not Found" });
       };
@@ -105,7 +105,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/HTTP status 404 Not Found/);
     });
 
-    it("rejects when response body is not valid JSON", async () => {
+    it("rejects when response body is not valid JSON", () => {
       const invalidJsonFetch: FetchLike = async () => {
         return new Response("<html>Not JSON</html>", {
           status: 200,
@@ -118,7 +118,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/Invalid JSON in DID document/);
     });
 
-    it("rejects when DID document schema is invalid", async () => {
+    it("rejects when DID document schema is invalid", () => {
       const invalidSchemaFetch: FetchLike = async () => {
         return new Response(JSON.stringify({ notAValidDidDoc: true }), {
           status: 200,
@@ -131,7 +131,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/Invalid DID document schema/);
     });
 
-    it("rejects when document id does not match requested DID", async () => {
+    it("rejects when document id does not match requested DID", () => {
       const mismatchedDoc = { ...validDoc, id: "did:web:other-domain.edu" };
       const mismatchedFetch: FetchLike = async () => {
         return new Response(JSON.stringify(mismatchedDoc), {
@@ -212,7 +212,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
       expect(result.publicKeyJwk.crv).toBe("P-256");
     });
 
-    it("rejects when requested keyId does not exist", async () => {
+    it("rejects when requested keyId does not exist", () => {
       expect(
             resolveDidVerificationKey(
                 "did:web:university.edu",
@@ -222,7 +222,7 @@ describe("W3C did:web Resolver (packages/core)", () => {
         ).rejects.toThrow(/Verification method 'non-existent-key' not found/);
     });
 
-    it("rejects when matched verificationMethod lacks publicKeyJwk", async () => {
+    it("rejects when matched verificationMethod lacks publicKeyJwk", () => {
       const docNoJwk: DidDocument = {
         "@context": "https://www.w3.org/ns/did/v1",
         id: "did:web:university.edu",

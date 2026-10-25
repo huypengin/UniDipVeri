@@ -148,7 +148,7 @@ describe("Disclosure Digest Computer (RFC 9901)", () => {
       expect(isValidDigestAlgorithm(null)).toBe(false);
     });
 
-    it("rejects empty or non-string disclosure inputs", async () => {
+    it("rejects empty or non-string disclosure inputs", () => {
       expect(computeDisclosureDigest("")).rejects.toThrow(
         "Disclosure string must be a non-empty string"
       );
@@ -160,7 +160,7 @@ describe("Disclosure Digest Computer (RFC 9901)", () => {
       );
     });
 
-    it("rejects disclosure strings with invalid base64url characters or padding", async () => {
+    it("rejects disclosure strings with invalid base64url characters or padding", () => {
       expect(computeDisclosureDigest("invalid+chars/==")).rejects.toThrow(
         "must be a valid unpadded base64url string"
       );
