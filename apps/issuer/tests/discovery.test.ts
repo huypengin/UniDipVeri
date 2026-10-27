@@ -33,6 +33,7 @@ const schemaConfig = await loadSchemaFromFile(schemaPath);
 const issuerConfig = loadIssuerConfig({
   ISSUER_BASE_URL: "https://issuer.university.edu",
   SCHEMA_PATH: schemaPath,
+  ENABLE_LEGACY_VC_FORMAT: "false",
 });
 
 describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
@@ -128,6 +129,7 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
         metadata.credential_configurations_supported[`${configId}_legacy`]
       ).toBeUndefined();
       expect(metadata.credentials_supported?.length).toBe(1);
+      expect(metadata.credentials_supported?.[0].id).toBe(configId);
       expect(metadata.credentials_supported?.[0].format).toBe("dc+sd-jwt");
     });
 
@@ -150,7 +152,9 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
       expect(legacyConfig.format as string).toBe("vc+sd-jwt");
 
       expect(metadata.credentials_supported?.length).toBe(2);
+      expect(metadata.credentials_supported?.[0].id).toBe(`${configId}_legacy`);
       expect(metadata.credentials_supported?.[0].format).toBe("vc+sd-jwt");
+      expect(metadata.credentials_supported?.[1].id).toBe(configId);
       expect(metadata.credentials_supported?.[1].format).toBe("dc+sd-jwt");
     });
 

@@ -323,7 +323,7 @@ export function generateIssuerMetadata(
   };
 
   const legacySupportedCredential = {
-    id: configId,
+    id: `${configId}_legacy`,
     format: "vc+sd-jwt",
     scope,
     vct,
@@ -339,7 +339,7 @@ export function generateIssuerMetadata(
   };
 
   const modernSupportedCredential = {
-    id: `${configId}_v2`,
+    id: configId,
     format: "dc+sd-jwt",
     scope,
     vct,

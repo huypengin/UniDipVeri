@@ -491,10 +491,20 @@ describe("Issuer KeyManager & Cryptographic Caching", () => {
 
   describe("ENABLE_LEGACY_VC_FORMAT Flag Configuration", () => {
     it("defaults enableLegacyVcFormat to false when omitted from environment", () => {
-      const config = loadIssuerConfig({
-        SCHEMA_PATH: fixtureSchemaPath,
-      });
-      expect(config.enableLegacyVcFormat).toBe(false);
+      const originalEnv = process.env.ENABLE_LEGACY_VC_FORMAT;
+      try {
+        delete process.env.ENABLE_LEGACY_VC_FORMAT;
+        const config = loadIssuerConfig({
+          SCHEMA_PATH: fixtureSchemaPath,
+        });
+        expect(config.enableLegacyVcFormat).toBe(false);
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.ENABLE_LEGACY_VC_FORMAT = originalEnv;
+        } else {
+          delete process.env.ENABLE_LEGACY_VC_FORMAT;
+        }
+      }
     });
 
     it("enables enableLegacyVcFormat when ENABLE_LEGACY_VC_FORMAT=true", () => {
@@ -505,12 +515,18 @@ describe("Issuer KeyManager & Cryptographic Caching", () => {
       expect(config.enableLegacyVcFormat).toBe(true);
     });
 
-    it("disables enableLegacyVcFormat when ENABLE_LEGACY_VC_FORMAT is false or arbitrary string", () => {
-      const config = loadIssuerConfig({
+    it("disables enableLegacyVcFormat when ENABLE_LEGACY_VC_FORMAT is false, 1, or arbitrary string", () => {
+      const configFalse = loadIssuerConfig({
         SCHEMA_PATH: fixtureSchemaPath,
         ENABLE_LEGACY_VC_FORMAT: "false",
       });
-      expect(config.enableLegacyVcFormat).toBe(false);
+      expect(configFalse.enableLegacyVcFormat).toBe(false);
+
+      const configArbitrary = loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        ENABLE_LEGACY_VC_FORMAT: "random-string",
+      });
+      expect(configArbitrary.enableLegacyVcFormat).toBe(false);
     });
   });
 });
