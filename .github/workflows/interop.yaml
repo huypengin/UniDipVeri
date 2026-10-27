@@ -51,6 +51,8 @@ jobs:
           exit 1
 
       - name: Run Walt.id Interoperability Suite
+        env:
+          SCHEMA_PATH: ${{ github.workspace }}/schemas/graduation-record.v1.yaml
         run: devenv shell bun run test:interop
 
       - name: Collect verifier logs on failure
