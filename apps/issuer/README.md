@@ -1,10 +1,10 @@
 # @unidipveri/issuer
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![OpenID4VCI: Pre-Auth (1.0 Final audit)](https://img.shields.io/badge/OpenID4VCI-Pre--Auth%20(1.0%20Final%20audit)-yellow)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+[![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-green)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 [![Revocation: Token Status List](https://img.shields.io/badge/Revocation-draft--status--list--21-blue)](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/)
 
-`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
+`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
 
 > **Prototype, not production software.** All state is held in memory, the default signing key is ephemeral, and the portal, `/credential-offer` and `/admin/*` endpoints have **no authentication**. See [Known Limitations](#known-limitations).
 
@@ -112,11 +112,13 @@ Environment variables, validated with Zod:
 # Watch mode
 bun run dev
 
-# 179 automated tests covering the offer, token, nonce, credential, revocation, discovery, and smoke checks
+# Run tests
 bun test
 ```
 
-The tests exercise the implemented behavior. They are not an official OpenID conformance suite. The test suite includes an off-the-shelf library smoke check (`@sd-jwt/sd-jwt-vc` pinned in `devDependencies`) which serves strictly as a development regression test to verify wire output; it is **not** counted as independent third-party interoperability evidence. Independent verification is tracked in `docs/interop/matrix.md`.
+The test suite covers the OID4VCI protocol flow (credential offers, token exchange with pre-authorized codes, nonce lifecycle, holder proof-of-possession verification), credential issuance with selective disclosure and holder key binding, Token Status List revocation and status queries, issuer discovery and metadata endpoints (OpenID, DID document, JWT-VC issuer, VCT type metadata), the registrar portal UI and schema-driven form generation, OpenAPI specification and Swagger UI, application routing, CORS handling, error responses, and security edge cases (malformed inputs, replay protection, timing-safe comparisons).
+
+The tests exercise the implemented behavior. They are not an official OpenID conformance suite. The test suite includes an off-the-shelf library smoke check (`@sd-jwt/sd-jwt-vc` pinned in `devDependencies`) which serves strictly as a development regression test to verify wire output; it is **not** counted as independent third-party interoperability evidence.
 
 ---
 

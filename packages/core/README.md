@@ -133,12 +133,7 @@ const publicKey = await resolveDidVerificationKey("did:web:university.edu", "key
 
 ## Testing
 
-156 automated tests cover:
-- Disclosure and digest examples from RFC 9901.
-- Nested object and array element masking.
-- Signature generation and verification for `ES256`, `EdDSA` and `ES384`.
-- A salting experiment demonstrating that unsalted claims can be brute-forced while 128-bit salts resist it.
-- Schema validation edge cases and rejection of reserved claim names.
+The test suite covers disclosure encoding/decoding and digest computation, nested object and array element masking, claim reconstruction from presented disclosures, signature generation and verification across all supported algorithms (`ES256`, `EdDSA`, `ES384`), schema validation edge cases and rejection of reserved claim names, VCT resolution logic, `did:web` resolution, and a brute-force resistance experiment demonstrating that unsalted claims can be recovered while 128-bit salts resist it.
 
 ```bash
 bun test

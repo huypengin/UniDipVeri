@@ -8,9 +8,9 @@
 [![Runtime: Bun](https://img.shields.io/badge/Runtime-Bun-white?logo=bun)](https://bun.sh/)
 [![SD-JWT: RFC 9901](https://img.shields.io/badge/SD--JWT-RFC%209901-green)](https://datatracker.ietf.org/doc/rfc9901/)
 [![SD-JWT VC: draft-19](https://img.shields.io/badge/SD--JWT%20VC-draft--19-green)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)
-[![OpenID4VCI: Pre-Auth (1.0 Final audit)](https://img.shields.io/badge/OpenID4VCI-Pre--Auth%20(1.0%20Final%20audit)-yellow)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+[![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-green)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 
-**UniDipVeri** is a reference implementation of an SD-JWT Verifiable Credential **issuer** for academic credentials (diplomas, transcripts, course records). It implements **IETF RFC 9901 (Selective Disclosure for JWTs)** and **draft-ietf-oauth-sd-jwt-vc-19**, issues credentials over the **OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit**, and supports revocation with an **IETF Token Status List** (`draft-ietf-oauth-status-list-21`).
+**UniDipVeri** is a reference implementation of an SD-JWT Verifiable Credential ecosystem for academic credentials (diplomas, transcripts, course records). It implements **IETF RFC 9901 (Selective Disclosure for JWTs)** and **draft-ietf-oauth-sd-jwt-vc-19**, issues credentials over the **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**, supports revocation with an **IETF Token Status List** (`draft-ietf-oauth-status-list-21`), and demonstrates end-to-end verification through a **Playground showcase** backed by the [walt.id](https://walt.id) verifier.
 
 > **Status: research / reference prototype, not production software.**
 > It does not claim conformance with the OpenID4VC High Assurance Interoperability Profile (HAIP) or with any official conformance suite. See [Known Limitations](#known-limitations) before deploying anything.
@@ -22,12 +22,13 @@
 - **Selective disclosure (RFC 9901)**: Each selectively disclosable claim gets a salt from a CSPRNG (≥ 128 bits). Hidden claims are replaced by digests in sorted `_sd` arrays, or by `{"...": "<digest>"}` markers for array elements. Digest algorithms available: SHA-256 (default), SHA-384, SHA-512.
 - **SD-JWT VC profile (draft-19)**: Credentials use media type `application/dc+sd-jwt` and header `typ: "dc+sd-jwt"`, with holder binding via `cnf.jwk` and a `vct` resolved from the schema.
 - **Schema-agnostic core**: No credential schema is hardcoded. Credential types are declared in YAML and validated with Zod.
-- **OpenID4VCI Pre-Authorized Code flow (wire-format compatibility with 1.0 Final under audit)**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
+- **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
 - **Revocation via Token Status List**: An RFC 1950 ZLIB-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
 - **Registrar portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
+- **Playground showcase**: A verifier demonstration portal backed by [walt.id](https://walt.id) that lets holders present credentials from a mobile wallet and displays verified disclosures.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
-- **Third-Party Verifier Interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
+- **Third-party verifier interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
 
 ---
 
@@ -35,11 +36,11 @@
 
 Issuance was tested by scanning a credential offer and confirming that the wallet **received and stored** the credential:
 
-| Wallet | Version | Received the VC |
-| :--- | :--- | :--- |
-| Paradym Wallet | 1.20.2 | Yes |
-| Sphereon Wallet | 0.8.0 | Yes |
-| Lissi ID-Wallet | 3.3.0 | Yes |
+| Wallet | Version | Credential Receipt | Credential verification (walt.id) |
+| :--- | :--- | :--- | :--- |
+| Paradym Wallet | 1.20.2 | Yes | Yes |
+| Sphereon Wallet | 0.8.0 | Yes | No (SIOPv2 `response_uri` / `client_id` mismatch) |
+| Lissi ID-Wallet | 3.3.0 | Yes | No (QR code not recognized) |
 
 Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
 
@@ -64,12 +65,13 @@ flowchart TD
         W[Mobile / Web Wallet]
     end
 
-    subgraph Verifier ["Independent Third-Party Verifier"]
-        V[Off-the-shelf Verifier / Relying Party<br/>e.g. @sd-jwt/sd-jwt-vc, walt.id]
-    end
-
     subgraph Apps ["Applications"]
         IssuerApp["@unidipveri/issuer<br/>(OID4VCI issuer, status list, registrar portal)"]
+        PlaygroundApp["@unidipveri/playground<br/>(Verifier demonstration showcase)"]
+    end
+
+    subgraph External ["External Verifier"]
+        WaltID["walt.id verifier-api<br/>(off-the-shelf OID4VP verifier)"]
     end
 
     subgraph CoreEngine ["@unidipveri/core"]
@@ -86,8 +88,9 @@ flowchart TD
     W <-->|OID4VCI Pre-Authorized Code flow| IssuerApp
     IssuerApp --> CoreEngine
     CoreEngine --> Schemas
-    W -.->|Presents SD-JWT VC| V
-    V -.->|Resolves DID / Status List| IssuerApp
+    W -.->|Presents SD-JWT VC via OID4VP| WaltID
+    WaltID -.->|Resolves DID / Status List| IssuerApp
+    PlaygroundApp -->|Proxies verification sessions| WaltID
 ```
 
 ---
@@ -98,12 +101,12 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | SD-JWT | [RFC 9901](https://datatracker.ietf.org/doc/rfc9901/) | Published | Salted disclosures, nested object and array masking, reconstruction |
 | SD-JWT VC | [draft-ietf-oauth-sd-jwt-vc-19](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/) | Draft | `dc+sd-jwt` media type, `vct`, type metadata, `cnf` |
-| Issuance | [OpenID4VCI](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) | Pre-Auth (1.0 Final audit) | OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit |
+| Issuance | [OpenID4VCI 1.0 Final](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) | Final | Pre-Authorized Code flow |
 | Revocation | [draft-ietf-oauth-status-list-21](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) | Draft | `application/statuslist+jwt` |
 | Identifiers | [W3C DID Core](https://www.w3.org/TR/did-core/) with `did:web` | Recommendation | Publication and resolution over HTTPS |
 | JOSE | RFC 7515, 7517, 7518 | IETF Standards | `ES256`, `EdDSA`, `ES384` |
 
-Not implemented: OpenID4VP (presentation protocol), Authorization Code flow, DPoP, wallet/key attestation.
+Not implemented: OpenID4VP (presentation protocol — delegated to walt.id), Authorization Code flow, DPoP, wallet/key attestation.
 
 ---
 
@@ -112,25 +115,26 @@ Not implemented: OpenID4VP (presentation protocol), Authorization Code flow, DPo
 ```
 unidipveri/
 ├── apps/
-│   ├── issuer/        # OID4VCI issuer, status list, registrar portal (@unidipveri/issuer)
+│   ├── issuer/          # OID4VCI issuer, status list, registrar portal (@unidipveri/issuer)
 │   │   ├── src/
 │   │   │   ├── config.ts      # Zod environment configuration
 │   │   │   ├── services/      # KeyManager, SessionManager, StudentRecords, StatusList
 │   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Portal, Docs
 │   │   │   ├── app.ts         # HTTP request dispatcher and CORS
 │   │   │   └── server.ts      # Bun.serve entrypoint
-│   │   └── tests/             # 179 tests
-│   └── playground/    # Placeholder (package.json only)
+│   │   └── tests/
+│   └── playground/      # Verifier demonstration showcase backed by walt.id (@unidipveri/playground)
+│       ├── src/
+│       └── tests/
 ├── packages/
-│   └── core/          # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
-│       ├── src/       # schema/, sd-jwt/, signing/, did/, config/
-│       └── tests/     # 156 tests
-├── schemas/           # YAML credential schemas
-│   ├── graduation-record.v1.yaml
-│   └── graduation-record.v2.yaml
-├── devenv.nix
-├── package.json
-└── tsconfig.json
+│   └── core/            # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
+│       ├── src/         # schema/, sd-jwt/, signing/, did/, config/
+│       └── tests/
+├── schemas/             # YAML credential schemas (graduation-record.v1.yaml is the default)
+├── devenv.nix           # Nix-based dev environment (provisions all services)
+├── docker-compose.yml   # walt.id verifier container
+├── package.json         # Bun workspaces: ["packages/*", "apps/*"]
+└── tsconfig.json        # Shared: ESNext, Bundler resolution, strict
 ```
 
 ---
@@ -156,15 +160,27 @@ The issuance service:
 
 [Issuer documentation](apps/issuer/README.md)
 
+### `@unidipveri/playground`
+A verifier demonstration showcase that proxies [walt.id](https://walt.id)'s off-the-shelf OID4VP verifier:
+- Generates OpenID4VP authorization requests as scannable QR codes.
+- Polls verification session status and displays disclosed claims, policy results, and audit trails.
+- Persists verification evidence (JSON logs) for offline review.
+
+[Playground documentation](apps/playground/README.md)
+
 ---
 
 ## Getting Started
 
 ### Prerequisites
 
-- **[Bun](https://bun.sh/)** (≥ 1.1), or **[devenv](https://devenv.sh/)** / Nix for a reproducible environment (includes Bun and Cloudflare tunnel tooling).
+| Dependency | Required for | Install |
+| :--- | :--- | :--- |
+| **[devenv](https://devenv.sh/) / Nix** | Recommended path — provisions Bun, Cloudflare tunnels, and all services | [devenv.sh/getting-started](https://devenv.sh/getting-started/) |
+| **[Bun](https://bun.sh/)** (≥ 1.1) | Manual path — running the issuer and playground directly | [bun.sh](https://bun.sh/) |
+| **Docker or Podman** | Manual path — running the walt.id verifier container | [docker.com](https://docs.docker.com/get-docker/) or [podman.io](https://podman.io/getting-started/installation) |
 
-### Installation
+### Clone and Install
 
 ```bash
 git clone https://github.com/huypengin/unidipveri.git
@@ -172,49 +188,88 @@ cd unidipveri
 bun install --frozen-lockfile
 ```
 
-### Running Tests
+### Option A: `devenv up` (Recommended)
 
-The suite contains 335 automated tests (156 core + 179 issuer) covering the implemented behavior. It is not an official conformance suite.
-
-> **Note on Off-the-Shelf Library Smoke Test:** The issuer test suite includes a smoke check against `@sd-jwt/sd-jwt-vc` (pinned in `devDependencies`). This test is strictly a development regression check to detect wire serialization breakage; it is **not** counted as independent third-party interoperability evidence since it executes with in-process key callbacks. Independent interop is evaluated via external verifier services documented in `docs/interop/matrix.md`.
+One command provisions everything: the issuer with a Cloudflare tunnel, the walt.id verifier container, and the playground showcase. Mobile wallets can reach the issuer over HTTPS immediately.
 
 ```bash
-bun run test        # all workspaces
-bun run typecheck   # strict TypeScript checks
-
-cd packages/core && bun test
-cd apps/issuer && bun test
+devenv up
 ```
 
-### Starting the Issuer
+`devenv up` starts five coordinated processes:
 
-#### Option A: Bun
+| Service | Local address | What it does |
+| :--- | :--- | :--- |
+| **Issuer** | `http://localhost:3000` | OID4VCI issuer, registrar portal, Swagger UI |
+| **Issuer tunnel** | `https://<random>.trycloudflare.com` | Public HTTPS for mobile wallets |
+| **walt.id verifier** | `http://localhost:7004` | Off-the-shelf OID4VP verifier (container) |
+| **Verifier tunnel** | `https://<random>.trycloudflare.com` | Public HTTPS for cross-device presentation |
+| **Playground** | `http://localhost:3001` | Verifier demonstration showcase UI |
+
+Environment variables (`ISSUER_BASE_URL`, `ISSUER_DID`, `VCT_BASE_URL`, `VERIFIER_PUBLIC_URL`) are auto-configured from the tunnel URLs. No manual setup needed.
+
+**Quick workflow after `devenv up`:**
+
+1. Open the **Registrar Portal** at `http://localhost:3000` — fill in student data and generate a credential offer QR code.
+2. Scan the QR with a compatible wallet (Paradym, Sphereon, or Lissi) to receive the SD-JWT VC.
+3. Open the **Playground** at `http://localhost:3001` — scan the verification QR with the same wallet to present the credential.
+4. View the disclosed claims, policy results, and audit trail in the Playground UI.
+
+### Option B: Manual (Bun + Container)
+
+Use this if you cannot or prefer not to install Nix/devenv.
+
+#### 1. Start the Issuer
 
 ```bash
 export SCHEMA_PATH="$(pwd)/schemas/graduation-record.v1.yaml"
 export ISSUER_BASE_URL="http://localhost:3000"
 export ISSUER_DID="did:web:localhost%3A3000"
 
-bun run --filter "@unidipveri/issuer" dev
+bun run dev:issuer
 ```
 
-Plain HTTP on localhost is for local development only. Mobile wallets generally require a public HTTPS URL (see Option B).
+> **Note:** Plain HTTP on localhost is sufficient for local development and testing. Mobile wallets generally require a public HTTPS URL — use a reverse proxy or tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) to expose the issuer.
 
-#### Option B: devenv with a Cloudflare Quick Tunnel
-
-`devenv up` provisions dependencies, starts the issuer, and optionally opens a Cloudflare tunnel so mobile wallets can reach it over HTTPS:
+#### 2. Start the walt.id Verifier
 
 ```bash
-devenv up
+docker compose up        # or: podman-compose up
 ```
 
-Services:
-- Registrar portal: `http://localhost:3000/`
-- Swagger UI: `http://localhost:3000/docs`
-- Issuer metadata: `http://localhost:3000/.well-known/openid-credential-issuer`
-- DID document: `http://localhost:3000/.well-known/did.json`
+This starts the walt.id verifier API on `http://localhost:7004` using the pinned image in [`docker-compose.yml`](docker-compose.yml).
 
-When using a tunnel, set `ISSUER_BASE_URL` and `ISSUER_DID` to the public hostname, and set `ISSUER_PRIVATE_KEY_JWK` so the key survives restarts.
+#### 3. Start the Playground
+
+```bash
+export WALTID_BASE="http://localhost:7004"
+export ISSUER_BASE_URL="http://localhost:3000"    # or your tunnel URL
+export VERIFIER_PUBLIC_URL="http://localhost:7004" # or your tunnel URL
+
+bun run dev:playground
+```
+
+The playground UI is available at `http://localhost:3001`.
+
+> **Important:** For cross-device wallet presentation (scanning QR codes from a phone), both the issuer and the verifier need public HTTPS URLs. Set `ISSUER_BASE_URL` and `VERIFIER_PUBLIC_URL` to your tunnel hostnames.
+
+---
+
+## Running Tests
+
+The test suites verify behavioral correctness across schema validation, cryptographic primitives (salting, disclosures, digests), claim masking and reconstruction, signature generation and verification for all supported algorithms (`ES256`, `EdDSA`, `ES384`), OID4VCI protocol flows (credential offers, token exchange, nonce management, proof-of-possession), revocation via Token Status List, `did:web` resolution, issuer discovery endpoints, and security edge cases.
+
+> **Note:** The issuer test suite includes a smoke check against `@sd-jwt/sd-jwt-vc` (pinned in `devDependencies`). This is strictly a development regression check for wire serialization; it is **not** counted as independent third-party interoperability evidence. 
+
+```bash
+bun run test        # all workspaces
+bun run typecheck   # strict TypeScript checks
+
+# Per-package
+cd packages/core && bun test
+cd apps/issuer && bun test
+cd apps/playground && bun test
+```
 
 ---
 
@@ -299,7 +354,7 @@ UniDipVeri is a reference implementation. Before any real deployment:
 - **Key management**: Load keys from a KMS/HSM (AWS KMS, GCP Cloud KMS, Azure Key Vault, HashiCorp Vault) rather than environment variables or ephemeral memory.
 - **Access control**: Protect the portal, `/credential-offer` and `/admin/*` with institutional SSO (SAML 2.0 / OIDC) and RBAC.
 - **Traffic protection**: Add rate limiting and a WAF, and serve status lists (`/status/:id`) behind a CDN with sensible cache invalidation.
-- **Interoperability profile**: If HAIP conformance is a requirement, additional work is needed (see Known Limitations).
+- **Interoperability profile**: If HAIP conformance is a requirement, additional work is needed (see [Known Limitations](#known-limitations)).
 
 ---
 
