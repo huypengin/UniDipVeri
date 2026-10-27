@@ -7,7 +7,7 @@ import { loadIssuerConfig } from "./config.js";
 import { initializeKeyManager } from "./services/key-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { StudentRecordService } from "./services/student-records.js";
-import { StatusListService } from "./services/status-list.js";
+import { StatusListService, DEFAULT_STATUS_LIST_CAPACITY } from "./services/status-list.js";
 import { createApp } from "./app.js";
 
 /**
@@ -24,7 +24,7 @@ export async function startServer(
   const keyContext = await initializeKeyManager(config);
   const sessionManager = new SessionManager();
   const studentRecordsService = new StudentRecordService();
-  const statusListService = new StatusListService();
+  const statusListService = new StatusListService(DEFAULT_STATUS_LIST_CAPACITY, config.statusListPath);
 
   const app = createApp(
     config,
