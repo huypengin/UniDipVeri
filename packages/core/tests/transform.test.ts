@@ -11,7 +11,7 @@ import {
   reconstructClaims,
   transformClaims,
 } from "../src/sd-jwt/transform.js";
-import { decodeDisclosure } from "../src/sd-jwt/disclosure.js";
+import { decodeDisclosure, encodeObjectDisclosure } from "../src/sd-jwt/disclosure.js";
 import { computeDisclosureDigestSync } from "../src/sd-jwt/digest.js";
 
 describe("Claim Masking Transformer (RFC 9901)", () => {
@@ -615,7 +615,22 @@ describe("Claim Masking Transformer (RFC 9901)", () => {
 
       expect(() =>
         reconstructClaims(tamperedPayload, [disclosure.encoded])
-      ).toThrow(/Collision detected: claim "email" already exists as a plain property/);
+      ).toThrow(/Claim collision: claim "email" already exists in target object/);
+    });
+
+    it("throws error in reconstructClaims when two disclosures have the same claim name in one object", () => {
+      const disc1 = encodeObjectDisclosure("salt1_minimum_16_bytes", "role", "admin");
+      const disc2 = encodeObjectDisclosure("salt2_minimum_16_bytes", "role", "user");
+      const d1 = computeDisclosureDigestSync(disc1);
+      const d2 = computeDisclosureDigestSync(disc2);
+
+      const payload = {
+        _sd: [d1, d2],
+      };
+
+      expect(() => reconstructClaims(payload, [disc1, disc2])).toThrow(
+        /Claim collision: claim "role" already exists in target object/
+      );
     });
 
     it("rejects reserved SD keys (_sd, _sd_alg, ...) at root level of claimsData", () => {

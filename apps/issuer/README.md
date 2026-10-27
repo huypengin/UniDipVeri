@@ -1,10 +1,10 @@
 # @unidipveri/issuer
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-purple)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+[![OpenID4VCI: Pre-Auth (1.0 Final audit)](https://img.shields.io/badge/OpenID4VCI-Pre--Auth%20(1.0%20Final%20audit)-yellow)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 [![Revocation: Token Status List](https://img.shields.io/badge/Revocation-draft--status--list--21-blue)](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/)
 
-`@unidipveri/issuer` is a reference **credential issuer** that implements the **Pre-Authorized Code flow of OpenID4VCI 1.0 Final**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
+`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
 
 > **Prototype, not production software.** All state is held in memory, the default signing key is ephemeral, and the portal, `/credential-offer` and `/admin/*` endpoints have **no authentication**. See [Known Limitations](#known-limitations).
 
@@ -46,7 +46,8 @@ sequenceDiagram
 | `GET` | `/.well-known/openid-credential-issuer` | `application/json` | Issuer metadata (`credential_configurations_supported`, endpoints, display). |
 | `GET` | `/.well-known/oauth-authorization-server` | `application/json` | Authorization server metadata (token endpoint, grant types). |
 | `GET` | `/.well-known/openid-configuration` | `application/json` | Alias for the authorization server metadata. |
-| `GET` | `/.well-known/did.json` | `application/did+ld+json` | DID document with the issuer's active verification key. |
+| `GET` | `/.well-known/did.json` | `application/did+ld+json` | DID document with the issuer's active verification key (Variant A). |
+| `GET` | `/.well-known/jwt-vc-issuer` | `application/json` | SD-JWT VC Issuer Metadata Document with inline JWKS (Variant B). |
 | `GET` | `/types/*` | `application/json` | SD-JWT VC type metadata (JSON Schema and claim display definitions). |
 
 ### Issuance (OpenID4VCI, Pre-Authorized Code flow)
@@ -60,7 +61,7 @@ sequenceDiagram
 ### Revocation (Token Status List)
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/status/:id` | None | Signed Token Status List JWT (`application/statuslist+jwt`) containing a Gzip-compressed bitstring. |
+| `GET` | `/status/:id` | None | Signed Token Status List JWT (`application/statuslist+jwt`) containing an RFC 1950 ZLIB-compressed bitstring. |
 | `POST` | `/admin/revoke` | **None** | Marks a credential index as revoked. |
 | `GET` | `/admin/status/:idx` | **None** | Returns the revocation state for an index. |
 
@@ -92,6 +93,7 @@ Environment variables, validated with Zod:
 | :--- | :--- | :--- |
 | `SCHEMA_PATH` | Path to the credential YAML schema | *(required)* |
 | `ISSUER_BASE_URL` | Public base URL of the service (HTTPS outside local development) | `http://localhost:3000` |
+| `ISSUER_IDENTIFIER_MODE` | Issuer identifier format: `did` (Variant A, `did:web`) or `https` (Variant B, HTTPS URL) | `did` |
 | `VCT_BASE_URL` | Base URL used to construct canonical VCT URIs | `ISSUER_BASE_URL` |
 | `ISSUER_DID` | Issuer DID (`did:web:...`) | `did:web:localhost%3A3000` |
 | `SIGNING_ALGORITHM` | `ES256`, `EdDSA` or `ES384` | `ES256` |
@@ -110,11 +112,11 @@ Environment variables, validated with Zod:
 # Watch mode
 bun run dev
 
-# 171 automated tests covering the offer, token, nonce, credential and revocation endpoints
+# 179 automated tests covering the offer, token, nonce, credential, revocation, discovery, and smoke checks
 bun test
 ```
 
-The tests exercise the implemented behavior. They are not an official OpenID conformance suite.
+The tests exercise the implemented behavior. They are not an official OpenID conformance suite. The test suite includes an off-the-shelf library smoke check (`@sd-jwt/sd-jwt-vc` pinned in `devDependencies`) which serves strictly as a development regression test to verify wire output; it is **not** counted as independent third-party interoperability evidence. Independent verification is tracked in `docs/interop/matrix.md`.
 
 ---
 

@@ -121,6 +121,37 @@ export function generateOpenApiSpec(
           },
         },
       },
+      "/.well-known/jwt-vc-issuer": {
+        get: {
+          tags: ["Discovery & Metadata"],
+          summary: "SD-JWT VC Issuer Metadata Document",
+          description:
+            "Publishes Issuer metadata and JWKS per draft-ietf-oauth-sd-jwt-vc for HTTPS issuer identifiers.",
+          responses: {
+            "200": {
+              description: "SD-JWT VC Issuer Metadata Document with inline JWKS",
+              content: {
+                "application/json": {
+                  example: {
+                    issuer: config.baseUrl,
+                    jwks: {
+                      keys: [
+                        {
+                          kty: "EC",
+                          crv: "P-256",
+                          kid: config.keyId,
+                          use: "sig",
+                          alg: config.signingAlgorithm,
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       [vctPath]: {
         get: {
           tags: ["Discovery & Metadata"],
@@ -270,7 +301,7 @@ export function generateOpenApiSpec(
                     token_type: "Bearer",
                     expires_in: 600,
                     c_nonce: "cnonce_123456789...",
-                    c_nonce_expires_in: 86400,
+                    c_nonce_expires_in: 600,
                   },
                 },
               },
@@ -292,7 +323,7 @@ export function generateOpenApiSpec(
                 "application/json": {
                   example: {
                     c_nonce: "cnonce_standalone_123456789...",
-                    c_nonce_expires_in: 86400,
+                    c_nonce_expires_in: 600,
                   },
                 },
               },
@@ -343,7 +374,7 @@ export function generateOpenApiSpec(
                   example: {
                     credential: "<jwt>~<disc1>~<disc2>~...~",
                     c_nonce: "cnonce_next_rotated_nonce...",
-                    c_nonce_expires_in: 86400,
+                    c_nonce_expires_in: 600,
                   },
                 },
               },

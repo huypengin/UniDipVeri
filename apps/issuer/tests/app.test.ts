@@ -157,6 +157,19 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(oidcBody.token_endpoint).toBe("https://issuer.university.edu/token");
     });
 
+    it("serves GET /.well-known/jwt-vc-issuer through app dispatcher", async () => {
+      const res = await app(
+        new Request(
+          "https://issuer.university.edu/.well-known/jwt-vc-issuer",
+          { method: "GET" }
+        )
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.issuer).toBe("https://issuer.university.edu");
+      expect(body.jwks.keys[0].kid).toBe(config.keyId);
+    });
+
     it("serves GET /types/graduation-record/v1 through app dispatcher", async () => {
       const res = await app(
         new Request(

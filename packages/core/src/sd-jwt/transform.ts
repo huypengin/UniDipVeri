@@ -433,9 +433,21 @@ export function reconstructClaims(
         if (typeof d === "string") {
           const matched = digestMap.get(d);
           if (matched && matched.type === "object") {
-            if (matched.key in unmaskedObj) {
+            if (
+              matched.key === "_sd" ||
+              matched.key === "..." ||
+              matched.key === "_sd_alg"
+            ) {
               throw new Error(
-                `Collision detected: claim "${matched.key}" already exists as a plain property (RFC 9901 plaintext collision prohibition)`
+                `Invalid disclosure: claim key cannot be reserved identifier "${matched.key}"`
+              );
+            }
+            // A disclosed claim name that already exists in the target object
+            // (a cleartext claim, or another disclosure with the same name) must
+            // not be assigned over the existing value.
+            if (Object.prototype.hasOwnProperty.call(unmaskedObj, matched.key)) {
+              throw new Error(
+                `Claim collision: claim "${matched.key}" already exists in target object`
               );
             }
             unmaskedObj[matched.key] = unmaskValue(matched.value);

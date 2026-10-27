@@ -6,7 +6,10 @@ import {
   JWK_PRIVATE_KEY_PROPERTIES,
   type SigningAlgorithm,
 } from "@unidipveri/core";
-import { loadIssuerConfig } from "../src/config.js";
+import {
+  loadIssuerConfig,
+  getEffectiveIssuer,
+} from "../src/config.js";
 import {
   assertCryptographicConsistency,
   initializeKeyManager,
@@ -49,6 +52,28 @@ describe("Issuer Configuration Loading & Validation", () => {
     expect(config.issuerDid).toBe("did:web:localhost%3A3000");
     expect(config.keyId).toBe("key-1");
     expect(config.signingAlgorithm).toBe("ES256");
+    expect(config.issuerIdentifierMode).toBe("did");
+    expect(getEffectiveIssuer(config)).toBe("did:web:localhost%3A3000");
+  });
+
+  it("configures HTTPS issuer identifier mode (Variant B)", () => {
+    const config = loadIssuerConfig({
+      SCHEMA_PATH: fixtureSchemaPath,
+      ISSUER_BASE_URL: "https://issuer.university.edu",
+      ISSUER_IDENTIFIER_MODE: "https",
+    });
+
+    expect(config.issuerIdentifierMode).toBe("https");
+    expect(getEffectiveIssuer(config)).toBe("https://issuer.university.edu");
+  });
+
+  it("rejects invalid issuer identifier mode", () => {
+    expect(() =>
+      loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        ISSUER_IDENTIFIER_MODE: "ftp",
+      })
+    ).toThrow(/issuerIdentifierMode/);
   });
 
   it("rejects invalid port numbers (out of range or non-integer)", () => {

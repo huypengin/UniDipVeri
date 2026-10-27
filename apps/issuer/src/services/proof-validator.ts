@@ -3,14 +3,18 @@ import { JWK_PRIVATE_KEY_PROPERTIES } from "@unidipveri/core";
 
 /**
  * Standard error thrown when a holder proof-of-possession fails validation.
- * Yields OAuth 2.0 error code "invalid_or_missing_proof" per OpenID4VCI 1.0 Final proof error specification.
+ * Yields OAuth 2.0 error codes "invalid_proof" or "invalid_nonce" per OpenID4VCI 1.0 Final.
  */
 export class InvalidProofError extends Error {
-  readonly code = "invalid_or_missing_proof";
+  readonly code: "invalid_proof" | "invalid_nonce" | "invalid_or_missing_proof";
 
-  constructor(message: string) {
+  constructor(
+    message: string,
+    code: "invalid_proof" | "invalid_nonce" | "invalid_or_missing_proof" = "invalid_proof"
+  ) {
     super(message);
     this.name = "InvalidProofError";
+    this.code = code;
   }
 }
 
@@ -38,14 +42,51 @@ export interface VerifiedProofResult {
 export const SUPPORTED_PROOF_ALGORITHMS = ["ES256", "EdDSA", "ES384"] as const;
 
 /**
- * Permitted typ header values for holder proof tokens.
+ * Standard supported typ header values for holder proof tokens (OpenID4VCI 1.0 Final & Draft 11/13).
  */
-export const PERMITTED_PROOF_TYP_VALUES = [
+export const STANDARD_PROOF_TYP_VALUES = [
   "openid4vci-proof+jwt",
   "openid-credential-proof+jwt",
+] as const;
+
+/**
+ * Legacy typ header values for holder proof tokens, disabled by default.
+ */
+export const LEGACY_PROOF_TYP_VALUES = [
   "jwt",
   "JWT",
 ] as const;
+
+/**
+ * Permitted typ header values for holder proof tokens across standard and legacy modes.
+ */
+export const PERMITTED_PROOF_TYP_VALUES = [
+  ...STANDARD_PROOF_TYP_VALUES,
+  ...LEGACY_PROOF_TYP_VALUES,
+] as const;
+
+/**
+ * Configuration options for holder proof validation.
+ */
+export interface ProofValidationOptions {
+  /**
+   * Whether to accept deprecated generic "jwt" or "JWT" typ headers.
+   * Default: false (strictly enforces openid4vci-proof+jwt or openid-credential-proof+jwt).
+   */
+  allowLegacyProofTyp?: boolean;
+
+  /**
+   * Whether to accept deprecated non-standard body shapes (direct string, root jwt, arrays).
+   * Default: false (strictly enforces proofs.jwt[] or proof.jwt wire shapes).
+   */
+  allowLegacyShapes?: boolean;
+
+  /**
+   * Maximum allowed clock skew for proof iat validation in seconds.
+   * Default: 300 seconds.
+   */
+  maxClockSkewSeconds?: number;
+}
 
 /**
  * Strips any private key properties from a JWK to ensure public-only representation.
@@ -59,23 +100,36 @@ export function sanitizePublicJwk(jwk: jose.JWK): jose.JWK {
  * Robustly extracts the holder proof JWT string from an incoming OID4VCI Credential Request body
  * or proof parameter.
  *
- * Supports both modern OpenID4VCI 1.0 Final structures (proofs.jwt array or string)
- * and legacy Draft 11/13 structures (proof object or direct string).
+ * Enforces wire shapes seen on the wire:
+ * - proofs.jwt array or string (OpenID4VCI 1.0 Final)
+ * - proof.jwt object (Draft 11/13)
+ * Rejects requests containing both proof and proofs.
+ * Gates non-standard structures behind options.allowLegacyShapes.
  *
  * @param input Parsed Credential Request JSON body or raw proof object/string
+ * @param options Validation options including allowLegacyShapes
  * @returns Compact serialized JWT string, or null if missing
  */
-export function extractProofJwt(input: unknown): string | null {
+export function extractProofJwt(
+  input: unknown,
+  options?: ProofValidationOptions
+): string | null {
   if (!input) {
     return null;
   }
 
-  // 1. Direct compact JWT string
+  const allowLegacyShapes = options?.allowLegacyShapes ?? false;
+
+  // 1. Direct compact JWT string (legacy shape)
   if (typeof input === "string") {
+    if (!allowLegacyShapes) {
+      return null;
+    }
     const trimmed = input.trim();
     if (trimmed.length > 0 && trimmed.split(".").length === 3) {
       return trimmed;
     }
+    return null;
   }
 
   if (typeof input !== "object") {
@@ -84,31 +138,58 @@ export function extractProofJwt(input: unknown): string | null {
 
   const record = input as Record<string, unknown>;
 
+  // Reject mutual presence of both 'proof' and 'proofs'
+  if (record.proof !== undefined && record.proofs !== undefined) {
+    throw new InvalidProofError(
+      "Request must not contain both 'proof' and 'proofs' parameters",
+      "invalid_proof"
+    );
+  }
+
   // 2. Check input.proofs (OpenID4VCI 1.0 Final)
   if (record.proofs !== undefined && record.proofs !== null) {
     // Case 2a: proofs: { jwt: ["..."] } or proofs: { jwt: "..." }
     if (typeof record.proofs === "object" && !Array.isArray(record.proofs)) {
       const proofsObj = record.proofs as Record<string, unknown>;
-      if (Array.isArray(proofsObj.jwt) && proofsObj.jwt.length > 0) {
-        const candidate = proofsObj.jwt[0];
-        if (typeof candidate === "string" && candidate.trim().length > 0) {
-          return candidate.trim();
+      if (Array.isArray(proofsObj.jwt)) {
+        if (proofsObj.jwt.length > 1) {
+          throw new InvalidProofError(
+            "Multiple proofs in proofs.jwt are unsupported in single credential request; expected exactly 1 proof",
+            "invalid_proof"
+          );
+        }
+        if (proofsObj.jwt.length === 1) {
+          const candidate = proofsObj.jwt[0];
+          if (typeof candidate === "string" && candidate.trim().length > 0) {
+            return candidate.trim();
+          }
         }
       }
       if (typeof proofsObj.jwt === "string" && proofsObj.jwt.trim().length > 0) {
         return proofsObj.jwt.trim();
       }
     }
-    // Case 2b: proofs: [ { jwt: "..." } ] or proofs: [ "..." ]
-    if (Array.isArray(record.proofs) && record.proofs.length > 0) {
-      const first = record.proofs[0];
-      if (typeof first === "string" && first.trim().length > 0) {
-        return first.trim();
+    // Case 2b: proofs: [ { jwt: "..." } ] or proofs: [ "..." ] (legacy array shape)
+    if (Array.isArray(record.proofs)) {
+      if (!allowLegacyShapes) {
+        return null;
       }
-      if (first && typeof first === "object" && !Array.isArray(first)) {
-        const item = first as Record<string, unknown>;
-        if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
-          return item.jwt.trim();
+      if (record.proofs.length > 1) {
+        throw new InvalidProofError(
+          "Multiple proofs in proofs array are unsupported in single credential request; expected exactly 1 proof",
+          "invalid_proof"
+        );
+      }
+      if (record.proofs.length === 1) {
+        const first = record.proofs[0];
+        if (typeof first === "string" && first.trim().length > 0) {
+          return first.trim();
+        }
+        if (first && typeof first === "object" && !Array.isArray(first)) {
+          const item = first as Record<string, unknown>;
+          if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
+            return item.jwt.trim();
+          }
         }
       }
     }
@@ -116,9 +197,14 @@ export function extractProofJwt(input: unknown): string | null {
 
   // 3. Check input.proof (OpenID4VCI Draft 11/13 / common wallet implementations)
   if (record.proof !== undefined && record.proof !== null) {
-    // Case 3a: proof: "eyJ..." (direct compact JWT)
-    if (typeof record.proof === "string" && record.proof.trim().length > 0) {
-      return record.proof.trim();
+    // Case 3a: proof: "eyJ..." (direct compact JWT string)
+    if (typeof record.proof === "string") {
+      if (!allowLegacyShapes) {
+        return null;
+      }
+      if (record.proof.trim().length > 0) {
+        return record.proof.trim();
+      }
     }
     // Case 3b: proof: { proof_type: "jwt", jwt: "..." } or proof: { jwt: "..." }
     if (typeof record.proof === "object" && !Array.isArray(record.proof)) {
@@ -127,24 +213,36 @@ export function extractProofJwt(input: unknown): string | null {
         return proofObj.jwt.trim();
       }
     }
-    // Case 3c: proof: [ { jwt: "..." } ] or proof: [ "..." ]
-    if (Array.isArray(record.proof) && record.proof.length > 0) {
-      const first = record.proof[0];
-      if (typeof first === "string" && first.trim().length > 0) {
-        return first.trim();
+    // Case 3c: proof: [ { jwt: "..." } ] or proof: [ "..." ] (legacy array shape)
+    if (Array.isArray(record.proof)) {
+      if (!allowLegacyShapes) {
+        return null;
       }
-      if (first && typeof first === "object" && !Array.isArray(first)) {
-        const item = first as Record<string, unknown>;
-        if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
-          return item.jwt.trim();
+      if (record.proof.length > 0) {
+        const first = record.proof[0];
+        if (typeof first === "string" && first.trim().length > 0) {
+          return first.trim();
+        }
+        if (first && typeof first === "object" && !Array.isArray(first)) {
+          const item = first as Record<string, unknown>;
+          if (typeof item.jwt === "string" && item.jwt.trim().length > 0) {
+            return item.jwt.trim();
+          }
         }
       }
     }
   }
 
-  // 4. Check if the object itself is a proof object { jwt: "..." }
+  // 4. Input itself is a proof object: { proof_type: "...", jwt: "..." }
   if (typeof record.jwt === "string" && record.jwt.trim().length > 0) {
-    return record.jwt.trim();
+    // If it's a proof parameter object with proof_type, it's the wire proof object passed directly
+    if (record.proof_type !== undefined) {
+      return record.jwt.trim();
+    }
+    // Otherwise, it's a root-level jwt on the body without proof/proofs wrapper -> gate behind allowLegacyShapes
+    if (allowLegacyShapes) {
+      return record.jwt.trim();
+    }
   }
 
   return null;
@@ -154,7 +252,7 @@ export function extractProofJwt(input: unknown): string | null {
  * Verifies an incoming holder proof-of-possession JWT per OpenID4VCI 1.0 Final proof verification rules.
  *
  * Validates:
- * 1. Proof extraction (supports proofs.jwt, proof.jwt, compact JWT strings, and proof objects).
+ * 1. Proof extraction (proofs.jwt, proof.jwt, or gated legacy structures).
  * 2. Header typ and supported algorithm.
  * 3. Header jwk presence (or did:jwk in kid) and absence of private key material.
  * 4. JWS cryptographic signature using the embedded public JWK.
@@ -165,7 +263,7 @@ export function extractProofJwt(input: unknown): string | null {
  * @param proofOrBody Raw proof parameter, compact JWT string, or full Credential Request body
  * @param expectedAudience Expected audience URI(s) (e.g. issuer base URL, DID, or /credential endpoint)
  * @param expectedNonce Expected c_nonce challenge(s) or validator function
- * @param maxClockSkewSeconds Maximum allowed clock skew in seconds (default: 300)
+ * @param optionsOrClockSkew Validation options or clock skew number
  * @returns VerifiedProofResult with sanitized holder public JWK
  * @throws InvalidProofError on any validation or cryptographic failure
  */
@@ -173,9 +271,17 @@ export async function verifyHolderProof(
   proofOrBody: unknown,
   expectedAudience: string | string[],
   expectedNonce: string | string[] | ((nonce: string | undefined) => boolean),
-  maxClockSkewSeconds = 300
+  optionsOrClockSkew?: ProofValidationOptions | number
 ): Promise<VerifiedProofResult> {
-  const jwtString = extractProofJwt(proofOrBody);
+  const options: ProofValidationOptions =
+    typeof optionsOrClockSkew === "number"
+      ? { maxClockSkewSeconds: optionsOrClockSkew }
+      : (optionsOrClockSkew ?? {});
+
+  const maxClockSkewSeconds = options.maxClockSkewSeconds ?? 300;
+  const allowLegacyProofTyp = options.allowLegacyProofTyp ?? false;
+
+  const jwtString = extractProofJwt(proofOrBody, options);
   if (!jwtString) {
     throw new InvalidProofError("Missing or malformed proof object");
   }
@@ -203,15 +309,20 @@ export async function verifyHolderProof(
     throw new InvalidProofError(`Malformed proof protected header: ${message}`);
   }
 
-  // Check typ header (case-insensitive against allowed OID4VCI proof typ identifiers)
+  // Check typ header using PERMITTED_PROOF_TYP_VALUES constants
   const typ = decodedHeader.typ;
   const normalizedTyp = typ ? typ.toLowerCase() : "";
-  const allowedTypes = [
-    "openid4vci-proof+jwt",
-    "openid-credential-proof+jwt",
-    "jwt",
-  ];
+
+  const allowedTypes = allowLegacyProofTyp
+    ? (PERMITTED_PROOF_TYP_VALUES as readonly string[])
+    : (STANDARD_PROOF_TYP_VALUES as readonly string[]);
+
   if (!typ || !allowedTypes.includes(normalizedTyp)) {
+    if (normalizedTyp === "jwt" && !allowLegacyProofTyp) {
+      throw new InvalidProofError(
+        "Proof typ 'jwt' is rejected by default policy; expected 'openid4vci-proof+jwt' or 'openid-credential-proof+jwt'"
+      );
+    }
     throw new InvalidProofError(
       `Invalid proof typ header: expected one of [${allowedTypes.join(", ")}], received '${String(typ)}'`
     );
@@ -313,7 +424,8 @@ export async function verifyHolderProof(
 
   if (!nonceValid) {
     throw new InvalidProofError(
-      `Proof nonce does not match session c_nonce challenge`
+      `Proof nonce does not match session c_nonce challenge`,
+      "invalid_nonce"
     );
   }
 

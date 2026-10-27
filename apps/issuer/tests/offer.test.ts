@@ -19,6 +19,7 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
     baseUrl: "https://issuer.university.edu",
     vctBaseUrl: "https://issuer.university.edu",
     issuerDid: "did:web:issuer.university.edu",
+    issuerIdentifierMode: "did",
     keyId: "key-1",
     signingAlgorithm: "ES256",
     schemaPath: FIXTURE_SCHEMA_PATH,

@@ -61,7 +61,7 @@
         echo " DID Doc:     ''$ISSUER_BASE_URL/.well-known/did.json"
         echo "=========================================================="
 
-        bun run --watch apps/issuer/src/server.ts
+        bun run dev:issuer
       '';
     };
   };

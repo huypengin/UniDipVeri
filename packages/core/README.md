@@ -4,9 +4,9 @@
 [![SD-JWT: RFC 9901](https://img.shields.io/badge/SD--JWT-RFC%209901-green)](https://datatracker.ietf.org/doc/rfc9901/)
 [![SD-JWT VC: draft-19](https://img.shields.io/badge/SD--JWT%20VC-draft--19-green)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)
 
-`@unidipveri/core` is a schema-agnostic TypeScript engine for **issuing** SD-JWT Verifiable Credentials and for the building blocks a verifier needs (disclosure reconstruction, signature verification, `did:web` key lookup). It implements **IETF RFC 9901** and **draft-ietf-oauth-sd-jwt-vc-19** and is tested against the behavior described in those documents.
+`@unidipveri/core` is a schema-agnostic TypeScript engine for **issuing** SD-JWT Verifiable Credentials (claim masking, salted disclosures, signing, and `did:web` resolution). It implements **IETF RFC 9901** and **draft-ietf-oauth-sd-jwt-vc-19** and is tested against the behavior described in those documents.
 
-**Scope:** issuance, claim masking and reconstruction, signing/verification primitives, and `did:web` resolution. This package does not document a complete end-to-end SD-JWT VC verifier (for example digest matching against presented disclosures, `exp`/`nbf` checks, or Key Binding JWT handling).
+**Scope:** credential issuance, selective disclosure claim masking and reconstruction, algorithm-agnostic signing, and `did:web` key resolution. In accordance with the thesis scope, end-to-end credential verification is performed by independent, off-the-shelf third-party verifiers and standard libraries.
 
 ---
 

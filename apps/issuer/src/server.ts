@@ -66,6 +66,7 @@ if (import.meta.main) {
       console.log(`  - OID4VCI Metadata:  ${config.baseUrl}/.well-known/openid-credential-issuer`);
       console.log(`  - OAuth Metadata:    ${config.baseUrl}/.well-known/oauth-authorization-server`);
       console.log(`  - DID Document:      ${config.baseUrl}/.well-known/did.json`);
+      console.log(`  - JWT VC Issuer:     ${config.baseUrl}/.well-known/jwt-vc-issuer`);
       console.log(`  - Type Metadata:     ${config.baseUrl}/types/*`);
       console.log(`  - Credential Offer:  ${config.baseUrl}/credential-offer`);
       console.log(`  - Token Endpoint:    ${config.baseUrl}/token`);

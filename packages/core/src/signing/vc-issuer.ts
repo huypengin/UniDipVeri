@@ -426,9 +426,7 @@ export async function issueSdJwtVc(
 
   const assembledPayload: Record<string, unknown> = {
     ...transformResult.maskedPayload,
-    ...(transformResult.disclosures.length > 0
-      ? { _sd_alg: options.digestAlgorithm ?? "sha-256" }
-      : {}),
+    _sd_alg: options.digestAlgorithm ?? "sha-256",
     iss: options.issuer,
     vct,
     iat,

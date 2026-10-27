@@ -91,7 +91,7 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
       expect(result.accessToken).toStartWith("iat_");
       expect(result.cNonce).toStartWith("cnonce_");
       expect(result.expiresIn).toBe(600);
-      expect(result.cNonceExpiresIn).toBe(86400);
+      expect(result.cNonceExpiresIn).toBe(600);
 
       // Verify code was burned from pre-auth map
       expect(sessionManager.preAuthCodeCount).toBe(0);
@@ -231,7 +231,21 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
         sessionManager.exchangePreAuthorizedCode({
           code: session.code,
         })
-      ).toThrow("Invalid transaction code (PIN)");
+      ).toThrow("Transaction code (PIN) is required for this credential offer");
+    });
+
+    it("rejects when txCode is supplied but session did not configure one", () => {
+      const session = sessionManager.createPreAuthorizedCode({
+        studentId: "STU-NO-PIN",
+        credentialConfigurationId: "grad_vc",
+      });
+
+      expect(() =>
+        sessionManager.exchangePreAuthorizedCode({
+          code: session.code,
+          txCode: "1234",
+        })
+      ).toThrow("Transaction code (PIN) was supplied but not expected for this credential offer");
     });
   });
 
@@ -251,7 +265,7 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
       expect(retrieved).toBeUndefined();
     });
 
-    it("validates and rotates c_nonce challenge during issuance interaction", () => {
+    it("validates c_nonce challenge, rotates nonce, and marks access token used synchronously", () => {
       const session = sessionManager.createPreAuthorizedCode({
         studentId: "STU-ROTATION",
         credentialConfigurationId: "grad_vc",
@@ -261,21 +275,49 @@ describe("SessionManager OID4VCI Authorization & Session Store", () => {
         code: session.code,
       });
 
-      // 1. Verify matching nonce succeeds and rotates to fresh nonce
+      // 1. Verify matching nonce succeeds, returns active session, and rotates to fresh nonce
       const rotation1 = sessionManager.validateAndRotateNonce(accessToken, cNonce);
       expect(rotation1.valid).toBe(true);
       expect(rotation1.newNonce).toBeDefined();
       expect(rotation1.newNonce).not.toBe(cNonce);
+      expect(rotation1.session?.studentId).toBe("STU-ROTATION");
 
-      // 2. Old nonce is no longer valid
-      const oldCheck = sessionManager.validateAndRotateNonce(accessToken, cNonce);
-      expect(oldCheck.valid).toBe(false);
-      expect(oldCheck.error).toBe("mismatched_nonce");
+      // 2. Token is marked used synchronously (single-use issuance defense against race conditions)
+      const secondCall = sessionManager.validateAndRotateNonce(accessToken, rotation1.newNonce!);
+      expect(secondCall.valid).toBe(false);
+      expect(secondCall.error).toBe("invalid_token");
+    });
 
-      // 3. New rotated nonce succeeds
-      const rotation2 = sessionManager.validateAndRotateNonce(accessToken, rotation1.newNonce!);
-      expect(rotation2.valid).toBe(true);
-      expect(rotation2.newNonce).toBeDefined();
+    it("validates standalone nonces independently of whether the session nonce has expired", () => {
+      const session = sessionManager.createPreAuthorizedCode({
+        studentId: "STU-INDEP",
+        credentialConfigurationId: "grad_vc",
+      });
+
+      const { accessToken } = sessionManager.exchangePreAuthorizedCode({
+        code: session.code,
+        cNonceTtlSeconds: -5, // session c_nonce is already expired
+      });
+
+      // Obtain a fresh standalone nonce via generateStandaloneNonce (simulating unauthenticated POST /nonce)
+      const standalone = sessionManager.generateStandaloneNonce(600);
+
+      // Presenting the unauthenticated standalone nonce succeeds even though the session's initial c_nonce was expired
+      const rot = sessionManager.validateAndRotateNonce(accessToken, standalone.cNonce);
+      expect(rot.valid).toBe(true);
+      expect(rot.session?.studentId).toBe("STU-INDEP");
+    });
+
+    it("sweeps expired standalone nonces on insert and caps storage size", () => {
+      // Generate standalone nonce with negative TTL
+      sessionManager.generateStandaloneNonce(-10);
+
+      // Generate a fresh standalone nonce; should sweep expired entry
+      const fresh = sessionManager.generateStandaloneNonce(600);
+      expect(fresh.cNonce).toBeDefined();
+
+      // Clear sessions
+      sessionManager.clear();
     });
 
     it("cleans up expired sessions properly via cleanupExpired", () => {

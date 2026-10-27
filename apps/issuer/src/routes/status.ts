@@ -1,4 +1,7 @@
-import type { IssuerConfig } from "../config.js";
+import {
+  type IssuerConfig,
+  getEffectiveIssuer,
+} from "../config.js";
 import type { KeyContext } from "../services/key-manager.js";
 import {
   STATUS_LIST_CONTENT_TYPE,
@@ -68,8 +71,9 @@ export async function handleStatusListRequest(
   const statusListUri = `${config.baseUrl}/status/${statusListId}`;
 
   try {
+    const effectiveIssuer = getEffectiveIssuer(config);
     const token = await statusListService.generateStatusListToken({
-      issuer: config.issuerDid ?? config.baseUrl,
+      issuer: effectiveIssuer,
       statusListUri,
       keyContext,
       ttlSeconds: 300,

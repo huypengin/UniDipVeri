@@ -8,9 +8,9 @@
 [![Runtime: Bun](https://img.shields.io/badge/Runtime-Bun-white?logo=bun)](https://bun.sh/)
 [![SD-JWT: RFC 9901](https://img.shields.io/badge/SD--JWT-RFC%209901-green)](https://datatracker.ietf.org/doc/rfc9901/)
 [![SD-JWT VC: draft-19](https://img.shields.io/badge/SD--JWT%20VC-draft--19-green)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)
-[![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-purple)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+[![OpenID4VCI: Pre-Auth (1.0 Final audit)](https://img.shields.io/badge/OpenID4VCI-Pre--Auth%20(1.0%20Final%20audit)-yellow)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 
-**UniDipVeri** is a reference implementation of an SD-JWT Verifiable Credential **issuer** for academic credentials (diplomas, transcripts, course records). It implements **IETF RFC 9901 (Selective Disclosure for JWTs)** and **draft-ietf-oauth-sd-jwt-vc-19**, issues credentials over the **Pre-Authorized Code flow of OpenID4VCI 1.0 Final**, and supports revocation with an **IETF Token Status List** (`draft-ietf-oauth-status-list-21`).
+**UniDipVeri** is a reference implementation of an SD-JWT Verifiable Credential **issuer** for academic credentials (diplomas, transcripts, course records). It implements **IETF RFC 9901 (Selective Disclosure for JWTs)** and **draft-ietf-oauth-sd-jwt-vc-19**, issues credentials over the **OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit**, and supports revocation with an **IETF Token Status List** (`draft-ietf-oauth-status-list-21`).
 
 > **Status: research / reference prototype, not production software.**
 > It does not claim conformance with the OpenID4VC High Assurance Interoperability Profile (HAIP) or with any official conformance suite. See [Known Limitations](#known-limitations) before deploying anything.
@@ -22,11 +22,12 @@
 - **Selective disclosure (RFC 9901)**: Each selectively disclosable claim gets a salt from a CSPRNG (≥ 128 bits). Hidden claims are replaced by digests in sorted `_sd` arrays, or by `{"...": "<digest>"}` markers for array elements. Digest algorithms available: SHA-256 (default), SHA-384, SHA-512.
 - **SD-JWT VC profile (draft-19)**: Credentials use media type `application/dc+sd-jwt` and header `typ: "dc+sd-jwt"`, with holder binding via `cnf.jwk` and a `vct` resolved from the schema.
 - **Schema-agnostic core**: No credential schema is hardcoded. Credential types are declared in YAML and validated with Zod.
-- **OpenID4VCI 1.0 Final, Pre-Authorized Code flow only**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
-- **Revocation via Token Status List**: A Gzip-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
+- **OpenID4VCI Pre-Authorized Code flow (wire-format compatibility with 1.0 Final under audit)**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
+- **Revocation via Token Status List**: An RFC 1950 ZLIB-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
 - **Registrar portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
+- **Third-Party Verifier Interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
 
 ---
 
@@ -40,7 +41,7 @@ Issuance was tested by scanning a credential offer and confirming that the walle
 | Sphereon Wallet | 0.8.0 | Yes |
 | Lissi ID-Wallet | 3.3.0 | Yes |
 
-Presentation, verification, and revocation were **not** tested with these wallets. Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
+Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
 
 ---
 
@@ -49,9 +50,8 @@ Presentation, verification, and revocation were **not** tested with these wallet
 - **All state is in memory.** Sessions, nonces and the **revocation status list** are lost on restart, so previously revoked credentials will appear valid again after a restart.
 - **The default signing key is ephemeral.** If `ISSUER_PRIVATE_KEY_JWK` is not set, a new key is generated on every boot. The DID document changes, and credentials issued before the restart will no longer verify against it.
 - **No authentication on sensitive endpoints.** The registrar portal, `/credential-offer`, and `/admin/*` (including revocation) are open. Anyone who can reach the service can create offers with arbitrary claims or revoke credentials.
-- **Not HAIP-conformant.** HAIP 1.0 requires mechanisms this project does not implement (for example Authorization Code flow with PAR/PKCE, DPoP and wallet attestation). Only the signing-algorithm choices overlap.
+- **Pre-Authorized Code flow only.** The Authorization Code flow is not implemented. Wallets requiring Authorization Code flow or HAIP profile features (for example PAR/PKCE, DPoP and wallet attestation) are not supported.
 - **Limited privacy.** SD-JWT hides undisclosed claims but does not provide unlinkability: the issuer signature, `cnf.jwk`, and the digests are the same in every presentation of a credential, so verifiers can correlate them. It also offers no predicate proofs (for example "over 18" without the birth date).
-- **The playground is a placeholder.** `apps/playground` currently contains only a `package.json`; there is no verifier demo yet.
 - **Standards are moving.** The draft references (SD-JWT VC draft-19, Token Status List draft-21) are the revisions implemented here and may have been superseded.
 
 ---
@@ -64,9 +64,12 @@ flowchart TD
         W[Mobile / Web Wallet]
     end
 
+    subgraph Verifier ["Independent Third-Party Verifier"]
+        V[Off-the-shelf Verifier / Relying Party<br/>e.g. @sd-jwt/sd-jwt-vc, walt.id]
+    end
+
     subgraph Apps ["Applications"]
         IssuerApp["@unidipveri/issuer<br/>(OID4VCI issuer, status list, registrar portal)"]
-        PlaygroundApp["@unidipveri/playground<br/>(placeholder, not implemented)"]
     end
 
     subgraph CoreEngine ["@unidipveri/core"]
@@ -82,8 +85,9 @@ flowchart TD
 
     W <-->|OID4VCI Pre-Authorized Code flow| IssuerApp
     IssuerApp --> CoreEngine
-    PlaygroundApp -.-> CoreEngine
     CoreEngine --> Schemas
+    W -.->|Presents SD-JWT VC| V
+    V -.->|Resolves DID / Status List| IssuerApp
 ```
 
 ---
@@ -94,7 +98,7 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | SD-JWT | [RFC 9901](https://datatracker.ietf.org/doc/rfc9901/) | Published | Salted disclosures, nested object and array masking, reconstruction |
 | SD-JWT VC | [draft-ietf-oauth-sd-jwt-vc-19](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/) | Draft | `dc+sd-jwt` media type, `vct`, type metadata, `cnf` |
-| Issuance | [OpenID4VCI 1.0 Final](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) | Final | Pre-Authorized Code flow, `tx_code`, proof JWT, nonce endpoint |
+| Issuance | [OpenID4VCI](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) | Pre-Auth (1.0 Final audit) | OpenID4VCI Pre-Authorized Code flow; wire-format compatibility with 1.0 Final under audit |
 | Revocation | [draft-ietf-oauth-status-list-21](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) | Draft | `application/statuslist+jwt` |
 | Identifiers | [W3C DID Core](https://www.w3.org/TR/did-core/) with `did:web` | Recommendation | Publication and resolution over HTTPS |
 | JOSE | RFC 7515, 7517, 7518 | IETF Standards | `ES256`, `EdDSA`, `ES384` |
@@ -115,7 +119,7 @@ unidipveri/
 │   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Portal, Docs
 │   │   │   ├── app.ts         # HTTP request dispatcher and CORS
 │   │   │   └── server.ts      # Bun.serve entrypoint
-│   │   └── tests/             # 171 tests
+│   │   └── tests/             # 179 tests
 │   └── playground/    # Placeholder (package.json only)
 ├── packages/
 │   └── core/          # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
@@ -144,7 +148,7 @@ The cryptographic and data-model engine. It keeps no global state and takes sche
 
 ### `@unidipveri/issuer`
 The issuance service:
-- **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`.
+- **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`, `/.well-known/jwt-vc-issuer`.
 - **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, and key binding into `cnf.jwk`.
 - **Revocation**: Token Status List endpoint plus **unauthenticated** admin endpoints to revoke.
 - **Registrar portal**: Schema-driven form and disclosure-policy badges.
@@ -170,7 +174,9 @@ bun install --frozen-lockfile
 
 ### Running Tests
 
-The suite contains 327 automated tests (156 core + 171 issuer) covering the implemented behavior. It is not an official conformance suite.
+The suite contains 335 automated tests (156 core + 179 issuer) covering the implemented behavior. It is not an official conformance suite.
+
+> **Note on Off-the-Shelf Library Smoke Test:** The issuer test suite includes a smoke check against `@sd-jwt/sd-jwt-vc` (pinned in `devDependencies`). This test is strictly a development regression check to detect wire serialization breakage; it is **not** counted as independent third-party interoperability evidence since it executes with in-process key callbacks. Independent interop is evaluated via external verifier services documented in `docs/interop/matrix.md`.
 
 ```bash
 bun run test        # all workspaces
@@ -220,7 +226,8 @@ Environment variables, validated with Zod at startup:
 | :--- | :--- | :--- | :--- |
 | `SCHEMA_PATH` | Path to the credential schema YAML | none | **Yes** |
 | `SIGNING_ALGORITHM` | `ES256`, `EdDSA`, or `ES384` | `ES256` | No |
-| `KEY_ID` | Key identifier in the DID document | `key-1` | No |
+| `KEY_ID` | Key identifier in the DID document and JWKS | `key-1` | No |
+| `ISSUER_IDENTIFIER_MODE` | Issuer identifier format: `did` (Variant A, `did:web`) or `https` (Variant B, HTTPS URL with `/.well-known/jwt-vc-issuer`) | `did` | No |
 | `ISSUER_DID` | Issuer DID (must start with `did:`) | `did:web:localhost%3A3000` | No |
 | `ISSUER_BASE_URL` | Public base URL of the issuer (use HTTPS outside local development) | `http://localhost:3000` | No |
 | `VCT_BASE_URL` | Base URL used to resolve a relative `vctPath` | `ISSUER_BASE_URL` | No |

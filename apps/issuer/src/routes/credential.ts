@@ -1,10 +1,17 @@
 import {
   issueSdJwtVc,
   resolveIssuerKeyId,
+  resolveVct,
   type CredentialTypeConfig,
 } from "@unidipveri/core";
-import type { IssuerConfig } from "../config.js";
-import type { SessionManager } from "../services/session-manager.js";
+import {
+  type IssuerConfig,
+  getEffectiveIssuer,
+} from "../config.js";
+import {
+  type SessionManager,
+  DEFAULT_C_NONCE_TTL_SECONDS,
+} from "../services/session-manager.js";
 import type { KeyContext } from "../services/key-manager.js";
 import type { StudentRecordService } from "../services/student-records.js";
 import type { StatusListService } from "../services/status-list.js";
@@ -12,6 +19,7 @@ import {
   verifyHolderProof,
   InvalidProofError,
 } from "../services/proof-validator.js";
+import { writeIssuerLog } from "../services/logger.js";
 
 /**
  * Context options passed into handleCredentialRequest.
@@ -31,6 +39,7 @@ export interface HandleCredentialRequestOptions {
  */
 export interface Oid4vciCredentialResponse {
   credential: string;
+  credentials: Array<{ credential: string }>;
   c_nonce: string;
   c_nonce_expires_in: number;
 }
@@ -166,6 +175,20 @@ export async function handleCredentialRequest(
     );
   }
 
+  // Reject requests containing both 'proof' and 'proofs'
+  if (body.proof !== undefined && body.proofs !== undefined) {
+    return Response.json(
+      {
+        error: "invalid_request",
+        error_description: "Request must not contain both 'proof' and 'proofs' parameters",
+      },
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }
+    );
+  }
+
   // 4. Credential Configuration ID Validation
   let requestedConfigId: string | undefined = undefined;
   if (typeof body.credential_configuration_id === "string") {
@@ -173,13 +196,43 @@ export async function handleCredentialRequest(
   } else if (typeof body.credential_identifier === "string") {
     requestedConfigId = body.credential_identifier.trim();
   } else if (
-    body.format === "dc+sd-jwt" ||
-    body.format === "vc+sd-jwt" ||
+    body.format !== undefined ||
     body.vct !== undefined ||
     body.credential_definition !== undefined ||
     body.types !== undefined
   ) {
-    // Graceful fallback for Draft 11/13 wallets that identify credentials via format/types/vct
+    // If no credential_configuration_id is given and vct/format are present, require them to match the session's configuration
+    const isLegacySession = session.credentialConfigurationId.endsWith("_legacy");
+    const expectedFormat = isLegacySession ? "vc+sd-jwt" : "dc+sd-jwt";
+    if (typeof body.format === "string" && body.format !== expectedFormat) {
+      return Response.json(
+        {
+          error: "unsupported_credential_format",
+          error_description: `Requested format '${body.format}' does not match authorized configuration format '${expectedFormat}'`,
+        },
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        }
+      );
+    }
+
+    if (typeof body.vct === "string") {
+      const canonicalVct = resolveVct(schemaConfig.vctPath, config.vctBaseUrl);
+      if (body.vct !== canonicalVct && body.vct !== schemaConfig.vctPath) {
+        return Response.json(
+          {
+            error: "unsupported_credential_configuration_id",
+            error_description: `Requested vct '${body.vct}' does not match authorized schema configuration vct '${canonicalVct}'`,
+          },
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          }
+        );
+      }
+    }
+
     requestedConfigId = session.credentialConfigurationId;
   }
 
@@ -213,14 +266,19 @@ export async function handleCredentialRequest(
   }
 
   // 5. Holder Proof-of-Possession Verification
+  const effectiveIssuer = getEffectiveIssuer(config);
+  const debugLogBody = process.env.DEBUG_LOG_CREDENTIAL_REQUEST_BODY === "true";
+
   let verifiedProof;
   try {
     const validAudiences = [
-      config.baseUrl,
+      effectiveIssuer,
       config.baseUrl.replace(/\/+$/, ""),
       `${config.baseUrl.replace(/\/+$/, "")}/credential`,
-      config.issuerDid,
     ];
+    if (config.issuerDid && !validAudiences.includes(config.issuerDid)) {
+      validAudiences.push(config.issuerDid);
+    }
 
     verifiedProof = await verifyHolderProof(
       body,
@@ -228,19 +286,21 @@ export async function handleCredentialRequest(
       (nonce) => sessionManager.isValidNonce(session, nonce ?? "")
     );
 
-    console.log(
+    writeIssuerLog(
       `[Credential Endpoint ✅] Proof verified: holder alg=${verifiedProof.header.alg}, jwk=${verifiedProof.holderJwk.kty}/${verifiedProof.holderJwk.crv ?? "rsa"}, aud="${String(verifiedProof.payload.aud)}"`
     );
   } catch (err) {
     const freshNonce = sessionManager.rotateSessionNonce(accessToken);
     if (err instanceof InvalidProofError) {
-      console.warn(`[Credential Endpoint ⚠️] Proof validation rejected: ${err.message}`);
-      console.warn(`[Credential Endpoint ⚠️] Request body was:`, JSON.stringify(body, null, 2));
+      writeIssuerLog(`[Credential Endpoint ⚠️] Proof validation rejected: ${err.message}`);
+      if (debugLogBody) {
+        writeIssuerLog(`[Credential Endpoint ⚠️] Request body: ${JSON.stringify(body, null, 2)}`);
+      }
       return Response.json(
         {
           error: err.code,
           error_description: err.message,
-          ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: 86400 } : {}),
+          ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS } : {}),
         },
         {
           status: 400,
@@ -250,12 +310,14 @@ export async function handleCredentialRequest(
     }
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[Credential Endpoint ❌] Unexpected proof error: ${message}`);
-    console.error(`[Credential Endpoint ❌] Request body was:`, JSON.stringify(body, null, 2));
+    if (debugLogBody) {
+      console.error(`[Credential Endpoint ❌] Request body:`, JSON.stringify(body, null, 2));
+    }
     return Response.json(
       {
-        error: "invalid_or_missing_proof",
+        error: "invalid_proof",
         error_description: `Holder proof verification failed: ${message}`,
-        ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: 86400 } : {}),
+        ...(freshNonce ? { c_nonce: freshNonce, c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS } : {}),
       },
       {
         status: 400,
@@ -264,16 +326,31 @@ export async function handleCredentialRequest(
     );
   }
 
-  // 6. Nonce Rotation
+  // 6. Nonce Validation, Atomic One-Shot Token Consumption & Nonce Rotation
   const proofNonce = verifiedProof.payload.nonce as string;
   const rotation = sessionManager.validateAndRotateNonce(accessToken, proofNonce);
   if (!rotation.valid || !rotation.newNonce) {
+    if (rotation.error === "invalid_token") {
+      return Response.json(
+        {
+          error: "invalid_token",
+          error_description: "The access token is expired, invalid, or has already been used",
+        },
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "WWW-Authenticate": 'Bearer error="invalid_token", error_description="Token already used or expired"',
+          },
+        }
+      );
+    }
     return Response.json(
       {
         error: "invalid_nonce",
         error_description: "The c_nonce challenge is invalid or has expired",
         c_nonce: rotation.newNonce,
-        c_nonce_expires_in: 86400,
+        c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS,
       },
       {
         status: 400,
@@ -282,12 +359,14 @@ export async function handleCredentialRequest(
     );
   }
 
+  const activeSession = rotation.session ?? session;
+
   // 7. Resolve Academic Claims
   let rawClaims: Record<string, unknown>;
-  if (session.claims && Object.keys(session.claims).length > 0) {
-    rawClaims = session.claims;
+  if (activeSession.claims && Object.keys(activeSession.claims).length > 0) {
+    rawClaims = activeSession.claims;
   } else {
-    rawClaims = studentRecordsService.getStudentRecord(session.studentId);
+    rawClaims = studentRecordsService.getStudentRecord(activeSession.studentId);
   }
 
   // 8. Allocate Status List Revocation Index
@@ -312,11 +391,15 @@ export async function handleCredentialRequest(
 
   // 9. Issue SD-JWT VC via Core Engine
   try {
-    const effectiveKeyId = resolveIssuerKeyId(config.issuerDid, keyContext.keyId);
-    const requestedTyp = body.format === "vc+sd-jwt" ? "vc+sd-jwt" : "dc+sd-jwt";
+    const effectiveIssuer = getEffectiveIssuer(config);
+    const effectiveKeyId = resolveIssuerKeyId(effectiveIssuer, keyContext.keyId);
+    const isLegacyConfig =
+      session.credentialConfigurationId.endsWith("_legacy") ||
+      (requestedConfigId !== undefined && requestedConfigId.endsWith("_legacy"));
+    const requestedTyp = isLegacyConfig ? "vc+sd-jwt" : "dc+sd-jwt";
 
     const issued = await issueSdJwtVc(rawClaims, schemaConfig, {
-      issuer: config.issuerDid,
+      issuer: effectiveIssuer,
       signingKey: {
         privateKey: keyContext.privateKey,
         alg: keyContext.alg,
@@ -336,14 +419,22 @@ export async function handleCredentialRequest(
       typ: requestedTyp,
     });
 
+    // ATOMIC CONSUMPTION: Enforce one-shot issuance per access token session
+    sessionManager.consumeAccessToken(accessToken);
+
     const responseBody: Oid4vciCredentialResponse = {
       credential: issued.compact,
+      credentials: [
+        {
+          credential: issued.compact,
+        },
+      ],
       c_nonce: rotation.newNonce,
-      c_nonce_expires_in: 86400,
+      c_nonce_expires_in: DEFAULT_C_NONCE_TTL_SECONDS,
     };
 
-    console.log(
-      `[Credential Endpoint 🎓] SD-JWT VC issued successfully: studentId="${session.studentId}", statusIndex=${revocationIndex}, disclosures=${issued.disclosures.length}`
+    writeIssuerLog(
+      `[Credential Endpoint 🎓] SD-JWT VC issued successfully: studentId="${activeSession.studentId}", statusIndex=${revocationIndex}, disclosures=${issued.disclosures.length}`
     );
 
     return Response.json(responseBody, {

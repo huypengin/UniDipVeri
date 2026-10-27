@@ -1,6 +1,7 @@
 import type { CredentialTypeConfig } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
+import { writeIssuerLog } from "../services/logger.js";
 
 /**
  * OpenID4VCI 1.0 Final Credential Offer parameters.
@@ -149,12 +150,13 @@ export async function handleOfferRequest(
   }
 
   // Determine credential configuration identifier
+  const legacyConfigId = `${DEFAULT_CREDENTIAL_CONFIG_ID}_legacy`;
   const targetConfigId =
     credentialConfigurationId && credentialConfigurationId.trim().length > 0
       ? credentialConfigurationId.trim()
       : DEFAULT_CREDENTIAL_CONFIG_ID;
 
-  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID) {
+  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID && targetConfigId !== legacyConfigId) {
     return Response.json(
       {
         error: "invalid_request",
@@ -206,7 +208,7 @@ export async function handleOfferRequest(
     expires_in: Math.floor((session.expiresAt - session.createdAt) / 1000),
   };
 
-  console.log(
+  writeIssuerLog(
     `[Offer Endpoint ✅] Generated credential offer: studentId="${studentId}", config="${targetConfigId}", code=${session.code.slice(0, 10)}... (PIN: ${session.txCode ?? "none"})`
   );
 

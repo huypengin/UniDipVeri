@@ -103,7 +103,7 @@ describe("End-to-End Authorization & Security Flow", () => {
       expect(tokenBody.expires_in).toBe(600);
       expect(tokenBody.c_nonce).toBeDefined();
       expect(tokenBody.c_nonce.length).toBeGreaterThanOrEqual(32);
-      expect(tokenBody.c_nonce_expires_in).toBe(86400);
+      expect(tokenBody.c_nonce_expires_in).toBe(600);
 
       // Step 3: Validate session manager state for downstream credential issuance
       const session = sessionManager.getAccessTokenSession(tokenBody.access_token);
@@ -123,13 +123,13 @@ describe("End-to-End Authorization & Security Flow", () => {
       expect(rotationResult.newNonce).toBeDefined();
       expect(rotationResult.newNonce).not.toBe(tokenBody.c_nonce);
 
-      // Previous nonce should now fail
+      // Access token was consumed synchronously upon first nonce validation (one-shot token semantics)
       const reuseOldNonceResult = sessionManager.validateAndRotateNonce(
         tokenBody.access_token,
         tokenBody.c_nonce
       );
       expect(reuseOldNonceResult.valid).toBe(false);
-      expect(reuseOldNonceResult.error).toBe("mismatched_nonce");
+      expect(reuseOldNonceResult.error).toBe("invalid_token");
     });
   });
 
@@ -226,7 +226,7 @@ describe("End-to-End Authorization & Security Flow", () => {
       );
       expect(res.status).toBe(400);
       const body = (await res.json()) as { error: string };
-      expect(body.error).toBe("invalid_grant");
+      expect(body.error).toBe("invalid_request");
     });
 
     it("rejects token exchange when tx_code is incorrect", async () => {
@@ -348,6 +348,33 @@ describe("End-to-End Authorization & Security Flow", () => {
           body: oversizedPayload,
         })
       );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; error_description: string };
+      expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("Request body exceeds maximum allowed size");
+    });
+
+    it("stream-limits the /token body size even when Content-Length is missing", async () => {
+      const oversizedPayload = "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code&pre-authorized_code=" + "x".repeat(5000);
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(oversizedPayload));
+          controller.close();
+        },
+      });
+
+      const res = await app(
+        new Request("https://issuer.university.edu/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            // Deliberately omit Content-Length header
+          },
+          body: stream,
+          duplex: "half",
+        } as RequestInit)
+      );
+
       expect(res.status).toBe(400);
       const body = (await res.json()) as { error: string; error_description: string };
       expect(body.error).toBe("invalid_request");

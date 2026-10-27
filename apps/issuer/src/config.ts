@@ -83,6 +83,14 @@ export const IssuerConfigSchema = z.object({
       message: "issuerDid must start with 'did:' (e.g. did:web:example.edu)",
     }),
 
+  /**
+   * Issuer identifier mode controlling the format of the 'iss' claim in credentials
+   * and status list tokens:
+   * - 'did': Uses issuerDid (e.g. did:web:example.edu) with /.well-known/did.json (Variant A)
+   * - 'https': Uses baseUrl (e.g. https://example.edu) with /.well-known/jwt-vc-issuer (Variant B)
+   */
+  issuerIdentifierMode: z.enum(["did", "https"]).default("did"),
+
   /** Key identifier in DID document and outer JWS header 'kid' */
   keyId: z.string().min(1, "keyId cannot be empty").default("key-1"),
 
@@ -102,6 +110,17 @@ export const IssuerConfigSchema = z.object({
 });
 
 export type IssuerConfig = z.infer<typeof IssuerConfigSchema>;
+
+/**
+ * Resolves the effective issuer identifier for credentials and status tokens
+ * based on the configured issuerIdentifierMode.
+ *
+ * @param config Validated IssuerConfig
+ * @returns Base URL if mode is 'https', otherwise issuerDid
+ */
+export function getEffectiveIssuer(config: IssuerConfig): string {
+  return config.issuerIdentifierMode === "https" ? config.baseUrl : config.issuerDid;
+}
 
 /**
  * Loads and validates Issuer configuration from environment variables and optional overrides.
@@ -132,6 +151,7 @@ export function loadIssuerConfig(
     baseUrl: resolvedBaseUrl,
     vctBaseUrl: rawVctBaseUrl,
     issuerDid: env.ISSUER_DID ?? defaultDid,
+    issuerIdentifierMode: env.ISSUER_IDENTIFIER_MODE ?? "did",
     keyId: env.KEY_ID ?? "key-1",
     signingAlgorithm: env.SIGNING_ALGORITHM ?? "ES256",
     schemaPath: env.SCHEMA_PATH,
