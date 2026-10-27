@@ -33,6 +33,7 @@ const schemaConfig = await loadSchemaFromFile(schemaPath);
 const issuerConfig = loadIssuerConfig({
   ISSUER_BASE_URL: "https://issuer.university.edu",
   SCHEMA_PATH: schemaPath,
+  ENABLE_LEGACY_VC_FORMAT: "false",
 });
 
 describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
@@ -122,6 +123,39 @@ describe("OID4VCI & SD-JWT VC Discovery Engine", () => {
 
       expect(config.claims.studentId).toBeDefined();
       expect(config.claims.studentId.mandatory).toBe(true);
+
+      // By default, legacy configuration is omitted
+      expect(
+        metadata.credential_configurations_supported[`${configId}_legacy`]
+      ).toBeUndefined();
+      expect(metadata.credentials_supported?.length).toBe(1);
+      expect(metadata.credentials_supported?.[0].id).toBe(configId);
+      expect(metadata.credentials_supported?.[0].format).toBe("dc+sd-jwt");
+    });
+
+    it("offers both dc+sd-jwt and legacy vc+sd-jwt when enableLegacyVcFormat is true", () => {
+      const legacyEnabledConfig = loadIssuerConfig({
+        ISSUER_BASE_URL: "https://issuer.university.edu",
+        VCT_BASE_URL: "https://credentials.university.edu",
+        SCHEMA_PATH: schemaPath,
+        ENABLE_LEGACY_VC_FORMAT: "true",
+      });
+
+      const metadata = generateIssuerMetadata(legacyEnabledConfig, schemaConfig);
+      const configId = "graduation_record_sd_jwt_vc";
+
+      expect(metadata.credential_configurations_supported[configId]).toBeDefined();
+      expect(metadata.credential_configurations_supported[configId].format).toBe("dc+sd-jwt");
+
+      const legacyConfig = metadata.credential_configurations_supported[`${configId}_legacy`];
+      expect(legacyConfig).toBeDefined();
+      expect(legacyConfig.format as string).toBe("vc+sd-jwt");
+
+      expect(metadata.credentials_supported?.length).toBe(2);
+      expect(metadata.credentials_supported?.[0].id).toBe(`${configId}_legacy`);
+      expect(metadata.credentials_supported?.[0].format).toBe("vc+sd-jwt");
+      expect(metadata.credentials_supported?.[1].id).toBe(configId);
+      expect(metadata.credentials_supported?.[1].format).toBe("dc+sd-jwt");
     });
 
     it("handleMetadataRequest returns 200 OK with application/json and CORS headers", async () => {

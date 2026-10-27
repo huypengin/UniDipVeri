@@ -22,6 +22,7 @@ describe("Token Status List Revocation Engine (draft-ietf-oauth-status-list-21)"
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    enableLegacyVcFormat: false,
   };
 
   it("allocates sequential indices starting from 0", () => {

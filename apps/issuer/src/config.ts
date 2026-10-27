@@ -110,6 +110,12 @@ export const IssuerConfigSchema = z.object({
 
   /** Optional file path for persisting Token Status List state across server restarts */
   statusListPath: z.string().optional(),
+
+  /**
+   * Flag controlling whether legacy vc+sd-jwt format is offered and issued.
+   * Defaults to false (only draft-19 dc+sd-jwt is offered and issued).
+   */
+  enableLegacyVcFormat: z.boolean().default(false),
 });
 
 export type IssuerConfig = z.infer<typeof IssuerConfigSchema>;
@@ -160,6 +166,7 @@ export function loadIssuerConfig(
     schemaPath: env.SCHEMA_PATH,
     privateKeyJwkJson: env.ISSUER_PRIVATE_KEY_JWK,
     statusListPath: env.STATUS_LIST_PATH,
+    enableLegacyVcFormat: env.ENABLE_LEGACY_VC_FORMAT === "true",
   };
 
   const parseResult = IssuerConfigSchema.safeParse(rawConfig);

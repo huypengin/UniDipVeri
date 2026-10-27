@@ -2,9 +2,22 @@ import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import * as fs from "node:fs";
+import { createServer as createNetServer } from "node:net";
 import * as jose from "jose";
 import { decompressAndGetBit } from "../src/services/status-list.js";
 import { startServer } from "../src/server.js";
+
+async function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const s = createNetServer();
+    s.listen(0, () => {
+      const address = s.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      s.close(() => resolve(port));
+    });
+    s.on("error", reject);
+  });
+}
 
 describe("Issuer Restart Persistence (Key Retention & Status List Durability)", () => {
   const schemaPath = join(
@@ -43,7 +56,7 @@ describe("Issuer Restart Persistence (Key Retention & Status List Durability)", 
     );
     const statusListPath = join(testDir, "status-list.json");
 
-    const port1 = 38123;
+    const port1 = await getAvailablePort();
     const baseUrl1 = `http://localhost:${port1}`;
     const did1 = `did:web:localhost%3A${port1}`;
 
@@ -184,7 +197,7 @@ describe("Issuer Restart Persistence (Key Retention & Status List Durability)", 
       expect(fs.existsSync(statusListPath)).toBe(true);
 
       // 5. START SERVER 2 with identical key and file storage path
-      const port2 = 38124;
+      const port2 = await getAvailablePort();
       const baseUrl2 = `http://localhost:${port2}`;
       const did2 = `did:web:localhost%3A${port2}`;
 

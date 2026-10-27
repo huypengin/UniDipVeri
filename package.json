@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev:issuer": "bun --filter @unidipveri/issuer dev",
+    "dev:playground": "bun --filter @unidipveri/playground dev",
     "typecheck": "bun --filter \"*\" typecheck",
     "test": "bun --filter \"*\" test",
     "test:interop": "bun run scripts/issuer-verifier.interop.test.ts"

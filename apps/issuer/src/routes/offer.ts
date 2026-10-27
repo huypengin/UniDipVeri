@@ -2,6 +2,7 @@ import type { CredentialTypeConfig } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 import { writeIssuerLog } from "../services/logger.js";
+import { deriveCredentialConfigurationId } from "../services/claims-metadata.js";
 
 /**
  * OpenID4VCI 1.0 Final Credential Offer parameters.
@@ -32,11 +33,6 @@ export interface CredentialOfferResponse {
 }
 
 /**
- * Default credential configuration ID used for the academic graduation record.
- */
-export const DEFAULT_CREDENTIAL_CONFIG_ID = "graduation_record_sd_jwt_vc";
-
-/**
  * Handles GET and POST requests for /credential-offer.
  *
  * Implements OpenID for Verifiable Credential Issuance 1.0 Final Credential Offer endpoint.
@@ -51,7 +47,7 @@ export async function handleOfferRequest(
   req: Request,
   config: IssuerConfig,
   sessionManager: SessionManager,
-  _schemaConfig: CredentialTypeConfig
+  schemaConfig: CredentialTypeConfig
 ): Promise<Response> {
   let studentId: string | null = null;
   let credentialConfigurationId: string | null = null;
@@ -149,14 +145,21 @@ export async function handleOfferRequest(
     );
   }
 
-  // Determine credential configuration identifier
-  const legacyConfigId = `${DEFAULT_CREDENTIAL_CONFIG_ID}_legacy`;
+  // Determine credential configuration identifier from active schema
+  const activeConfigId = deriveCredentialConfigurationId(
+    schemaConfig.vctPath,
+    schemaConfig.name
+  );
+  const legacyConfigId = `${activeConfigId}_legacy`;
   const targetConfigId =
     credentialConfigurationId && credentialConfigurationId.trim().length > 0
       ? credentialConfigurationId.trim()
-      : DEFAULT_CREDENTIAL_CONFIG_ID;
+      : activeConfigId;
 
-  if (targetConfigId !== DEFAULT_CREDENTIAL_CONFIG_ID && targetConfigId !== legacyConfigId) {
+  if (
+    targetConfigId !== activeConfigId &&
+    (targetConfigId !== legacyConfigId || !config.enableLegacyVcFormat)
+  ) {
     return Response.json(
       {
         error: "invalid_request",

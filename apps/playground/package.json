@@ -4,9 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo 'Playground web application scheduled for implementation in Weeks 5-6' && exit 0"
+    "dev": "bun run --watch src/server.ts",
+    "test": "bun test tests/",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@unidipveri/core": "workspace:*"
+    "@unidipveri/core": "workspace:*",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "^5.6.2"
   }
 }

@@ -23,6 +23,7 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    enableLegacyVcFormat: false,
   };
 
   it("generates comprehensive OpenAPI 3.0 specification with all core endpoints", async () => {

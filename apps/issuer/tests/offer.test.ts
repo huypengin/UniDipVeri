@@ -2,7 +2,8 @@ import { describe, expect, it, beforeEach } from "bun:test";
 import { join } from "node:path";
 import { loadSchemaFromFile } from "@unidipveri/core";
 import { SessionManager } from "../src/services/session-manager.js";
-import { handleOfferRequest, DEFAULT_CREDENTIAL_CONFIG_ID, type CredentialOfferResponse } from "../src/routes/offer.js";
+import { handleOfferRequest, type CredentialOfferResponse } from "../src/routes/offer.js";
+import { deriveCredentialConfigurationId } from "../src/services/claims-metadata.js";
 import type { IssuerConfig } from "../src/config.js";
 
 const FIXTURE_SCHEMA_PATH = join(
@@ -23,6 +24,7 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
     keyId: "key-1",
     signingAlgorithm: "ES256",
     schemaPath: FIXTURE_SCHEMA_PATH,
+    enableLegacyVcFormat: false,
   };
 
   beforeEach(async () => {
@@ -49,7 +51,8 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
       // Verify credential_offer structure
       const offer = body.credential_offer;
       expect(offer.credential_issuer).toBe("https://issuer.university.edu"); // Immune to evil-attacker.com
-      expect(offer.credential_configuration_ids).toEqual([DEFAULT_CREDENTIAL_CONFIG_ID]);
+      const expectedConfigId = deriveCredentialConfigurationId(schemaConfig.vctPath, schemaConfig.name);
+      expect(offer.credential_configuration_ids).toEqual([expectedConfigId]);
 
       const grant = offer.grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"];
       expect(grant).toBeDefined();
@@ -104,6 +107,36 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
     });
+
+    it("rejects legacy credential_configuration_id by default when ENABLE_LEGACY_VC_FORMAT is false", async () => {
+      const req = new Request(
+        "http://localhost:3000/credential-offer?studentId=STU-1&credential_configuration_id=graduation_record_sd_jwt_vc_legacy"
+      );
+      const res = await handleOfferRequest(req, mockConfig, sessionManager, schemaConfig);
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string; error_description: string };
+      expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("Unsupported credential_configuration_id");
+    });
+
+    it("accepts legacy credential_configuration_id when ENABLE_LEGACY_VC_FORMAT is true", async () => {
+      const legacyEnabledConfig = {
+        ...mockConfig,
+        enableLegacyVcFormat: true,
+      };
+
+      const req = new Request(
+        "http://localhost:3000/credential-offer?studentId=STU-1&credential_configuration_id=graduation_record_sd_jwt_vc_legacy"
+      );
+      const res = await handleOfferRequest(req, legacyEnabledConfig, sessionManager, schemaConfig);
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as CredentialOfferResponse;
+      expect(body.credential_offer.credential_configuration_ids).toEqual([
+        "graduation_record_sd_jwt_vc_legacy",
+      ]);
+    });
   });
 
   describe("POST /credential-offer", () => {
@@ -155,6 +188,23 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
       expect(res.status).toBe(400);
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
+    });
+
+    it("dynamically resolves credential configuration id from custom schema vctPath", async () => {
+      const showAllSchemaPath = join(
+        import.meta.dir,
+        "../../../schemas/show-all-policy.yaml"
+      );
+      const customSchema = await loadSchemaFromFile(showAllSchemaPath);
+      const req = new Request("http://localhost:3000/credential-offer?studentId=STU-SHOW-ALL");
+
+      const res = await handleOfferRequest(req, mockConfig, sessionManager, customSchema);
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as CredentialOfferResponse;
+      expect(body.credential_offer.credential_configuration_ids).toEqual([
+        "show_all_policy_sd_jwt_vc",
+      ]);
     });
   });
 

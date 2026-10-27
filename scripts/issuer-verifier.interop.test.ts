@@ -488,6 +488,7 @@ async function main() {
     SIGNING_ALGORITHM: "ES256",
     KEY_ID: "issuer-key-1",
     ISSUER_PRIVATE_KEY_JWK: issuerPrivKeyJson,
+    ENABLE_LEGACY_VC_FORMAT: "true",
   });
 
   const schemaConfig = await loadSchemaFromFile(config.schemaPath);
@@ -554,6 +555,9 @@ async function main() {
         credential_configuration_id: "graduation_record_sd_jwt_vc",
       }),
     });
+    if (!offerResFinal.ok) {
+      throw new Error(`Final credential offer failed: HTTP ${offerResFinal.status} ${await offerResFinal.text()}`);
+    }
     const offerDataFinal = (await offerResFinal.json()) as OfferResponseData;
     const preAuthCodeFinal =
       offerDataFinal.credential_offer.grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"][
@@ -568,6 +572,9 @@ async function main() {
         "pre-authorized_code": preAuthCodeFinal,
       }).toString(),
     });
+    if (!tokenResFinal.ok) {
+      throw new Error(`Final token request failed: HTTP ${tokenResFinal.status} ${await tokenResFinal.text()}`);
+    }
     const tokenDataFinal = (await tokenResFinal.json()) as TokenResponseData;
     const accessTokenFinal = tokenDataFinal.access_token;
 
@@ -631,6 +638,9 @@ async function main() {
         credential_configuration_id: "graduation_record_sd_jwt_vc_legacy",
       }),
     });
+    if (!offerResLegacy.ok) {
+      throw new Error(`Legacy credential offer failed: HTTP ${offerResLegacy.status} ${await offerResLegacy.text()}`);
+    }
     const offerDataLegacy = (await offerResLegacy.json()) as OfferResponseData;
     const preAuthCodeLegacy =
       offerDataLegacy.credential_offer.grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"][
@@ -645,6 +655,9 @@ async function main() {
         "pre-authorized_code": preAuthCodeLegacy,
       }).toString(),
     });
+    if (!tokenResLegacy.ok) {
+      throw new Error(`Legacy token request failed: HTTP ${tokenResLegacy.status} ${await tokenResLegacy.text()}`);
+    }
     const tokenDataLegacy = (await tokenResLegacy.json()) as TokenResponseData;
     const accessTokenLegacy = tokenDataLegacy.access_token;
     const cNonceLegacy = tokenDataLegacy.c_nonce;

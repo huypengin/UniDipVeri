@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
+import { Resolver } from "did-resolver";
+import { getResolver } from "web-did-resolver";
 import {
   loadSchemaFromFile,
   resolveDidVerificationKey,
@@ -50,6 +52,7 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
 
       const doc = (await res.json()) as DidDocument;
       expect(doc.id).toBe("did:web:issuer.university.edu");
+      expect(doc.controller).toBe("did:web:issuer.university.edu");
       expect(doc["@context"]).toContain("https://www.w3.org/ns/did/v1");
 
       // Verify verificationMethod
@@ -106,6 +109,33 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       );
       expect(keyResult.keyId).toBe("did:web:issuer.university.edu#key-test-1");
       expect(keyResult.publicKeyJwk).toEqual(keyContext.publicKeyJwk);
+    });
+
+    it("interoperability: DIF web-did-resolver resolves against the issuer app", async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = (async (input: string | URL | Request) => {
+          const url = typeof input === "string" ? input : input.toString();
+          return app(new Request(url, { method: "GET" }));
+        }) as unknown as typeof fetch;
+
+        const webResolver = getResolver();
+        const difResolver = new Resolver({ ...webResolver });
+        const res = await difResolver.resolve("did:web:issuer.university.edu");
+
+        expect(res.didResolutionMetadata.error).toBeUndefined();
+        expect(res.didDocument).toBeDefined();
+        expect(res.didDocument?.id).toBe("did:web:issuer.university.edu");
+        expect(res.didDocument?.controller).toBe("did:web:issuer.university.edu");
+        expect(res.didDocument?.verificationMethod?.[0].id).toBe(
+          "did:web:issuer.university.edu#key-test-1"
+        );
+        expect(res.didDocument?.verificationMethod?.[0].publicKeyJwk).toEqual(
+          keyContext.publicKeyJwk
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 

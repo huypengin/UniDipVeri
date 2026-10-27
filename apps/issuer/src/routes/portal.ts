@@ -1,7 +1,7 @@
 import type { CredentialTypeConfig, ClaimDef, SdPolicy } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
 import { PRELOADED_STUDENT_RECORDS } from "../services/student-records.js";
-import { DEFAULT_CREDENTIAL_CONFIG_ID } from "./offer.js";
+import { deriveCredentialConfigurationId } from "../services/claims-metadata.js";
 
 /**
  * Escapes characters for safe HTML inclusion.
@@ -249,6 +249,10 @@ export function renderPortalHtml(
   config: IssuerConfig,
   schemaConfig: CredentialTypeConfig
 ): string {
+  const activeConfigId = deriveCredentialConfigurationId(
+    schemaConfig.vctPath,
+    schemaConfig.name
+  );
   const preloadedJson = JSON.stringify(PRELOADED_STUDENT_RECORDS);
   const dynamicFormHtml = renderSchemaFormFields(schemaConfig.claims);
 
@@ -698,8 +702,8 @@ export function renderPortalHtml(
     }
     .uri-box {
       width: 100%;
-      background: #0f172a;
-      color: #cbd5e1;
+      background: #f8fafc;
+      color: #475569;
       font-family: var(--font-mono);
       font-size: 0.75rem;
       padding: 12px 14px;
@@ -790,8 +794,8 @@ export function renderPortalHtml(
       background: #e2e8f0;
     }
     .json-preview {
-      background: #0f172a;
-      color: #a5b4fc;
+      background: #f8fafc;
+      color: #475569;
       font-family: var(--font-mono);
       font-size: 0.75rem;
       padding: 12px;
@@ -891,7 +895,7 @@ export function renderPortalHtml(
           <div id="pinNotice" style="display: none;"></div>
           <div id="openWalletContainer" style="display: none;"></div>
           <div id="uriContainer" class="uri-wrapper" style="display: none;">
-            <button type="button" class="copy-btn" id="copyUriBtn" onclick="copyUri()" title="Copy Offer URI to clipboard">
+            <button class="copy-btn" id="copyUriBtn" onclick="copyUri()" title="Copy Offer URI to clipboard">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
               <span>Copy</span>
             </button>
@@ -1095,6 +1099,7 @@ export function renderPortalHtml(
       const minimalRecord = {
         studentId: 'STU-MINIMAL',
         fullName: 'Alex Doe',
+        dateOfBirth: '2003-01-01',
         papers: {
           diploma: {
             degreeName: 'Bachelor of Science',
@@ -1202,7 +1207,7 @@ export function renderPortalHtml(
 
         const payload = {
           studentId: String(subjectId),
-          credential_configuration_id: '${DEFAULT_CREDENTIAL_CONFIG_ID}',
+          credential_configuration_id: '${activeConfigId}',
           claims
         };
         if (txCode) payload.tx_code = txCode;

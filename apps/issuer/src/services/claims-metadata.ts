@@ -323,7 +323,7 @@ export function generateIssuerMetadata(
   };
 
   const legacySupportedCredential = {
-    id: configId,
+    id: `${configId}_legacy`,
     format: "vc+sd-jwt",
     scope,
     vct,
@@ -339,7 +339,7 @@ export function generateIssuerMetadata(
   };
 
   const modernSupportedCredential = {
-    id: `${configId}_v2`,
+    id: configId,
     format: "dc+sd-jwt",
     scope,
     vct,
@@ -354,6 +354,25 @@ export function generateIssuerMetadata(
     claims,
   };
 
+  const credentialConfigurations: Record<
+    string,
+    CredentialConfigurationSupported
+  > = {
+    [configId]: configuration,
+  };
+
+  const credentialsSupported: Array<Record<string, unknown>> = [
+    modernSupportedCredential,
+  ];
+
+  if (config.enableLegacyVcFormat) {
+    credentialConfigurations[`${configId}_legacy`] = {
+      ...configuration,
+      format: "vc+sd-jwt" as unknown as "dc+sd-jwt",
+    };
+    credentialsSupported.unshift(legacySupportedCredential);
+  }
+
   return {
     credential_issuer: config.baseUrl,
     credential_endpoint: `${config.baseUrl}/credential`,
@@ -361,14 +380,8 @@ export function generateIssuerMetadata(
     nonce_endpoint: `${config.baseUrl}/nonce`,
     authorization_servers: [config.baseUrl],
     authorization_server: config.baseUrl,
-    credential_configurations_supported: {
-      [configId]: configuration,
-      [`${configId}_legacy`]: {
-        ...configuration,
-        format: "vc+sd-jwt" as unknown as "dc+sd-jwt",
-      },
-    },
-    credentials_supported: [legacySupportedCredential, modernSupportedCredential],
+    credential_configurations_supported: credentialConfigurations,
+    credentials_supported: credentialsSupported,
   };
 }
 

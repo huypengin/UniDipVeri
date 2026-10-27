@@ -34,6 +34,7 @@ describe("Off-The-Shelf SD-JWT VC Library Acceptance Smoke Test (Regression Chec
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    enableLegacyVcFormat: false,
   };
 
   it("ensures an off-the-shelf SD-JWT VC reference library accepts and validates an issued credential", async () => {

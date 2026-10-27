@@ -32,6 +32,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    enableLegacyVcFormat: false,
   };
 
   let sessionManager: SessionManager;
@@ -658,8 +659,34 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     expect(decodedPayload._sd_alg).toBe("sha-256");
   });
 
-  it("issues SD-JWT VC with typ vc+sd-jwt when requested by legacy wallet format", async () => {
+  it("rejects legacy vc+sd-jwt format by default when enableLegacyVcFormat is false", async () => {
     const offerRes = await app(
+      new Request("https://issuer.university.edu/credential-offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: "STU-2026-FINAL",
+          credential_configuration_id: "graduation_record_sd_jwt_vc_legacy",
+        }),
+      })
+    );
+    expect(offerRes.status).toBe(400);
+    const offerErr = (await offerRes.json()) as any;
+    expect(offerErr.error).toBe("invalid_request");
+    expect(offerErr.error_description).toContain("Unsupported credential_configuration_id");
+  });
+
+  it("issues SD-JWT VC with typ vc+sd-jwt when enableLegacyVcFormat is true", async () => {
+    const legacyApp = createApp(
+      { ...mockConfig, enableLegacyVcFormat: true },
+      keyContext,
+      await loadSchemaFromFile(schemaPath),
+      sessionManager,
+      studentRecordsService,
+      statusListService
+    );
+
+    const offerRes = await legacyApp(
       new Request("https://issuer.university.edu/credential-offer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -675,7 +702,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
         "urn:ietf:params:oauth:grant-type:pre-authorized_code"
       ]["pre-authorized_code"];
 
-    const tokenRes = await app(
+    const tokenRes = await legacyApp(
       new Request("https://issuer.university.edu/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -691,7 +718,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
       typ: "openid4vci-proof+jwt",
     });
 
-    const credRes = await app(
+    const credRes = await legacyApp(
       new Request("https://issuer.university.edu/credential", {
         method: "POST",
         headers: {

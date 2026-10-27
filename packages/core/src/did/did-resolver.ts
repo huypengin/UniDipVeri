@@ -7,7 +7,7 @@ import { z } from "zod";
 export const VerificationMethodSchema = z.object({
   id: z.string().min(1, "VerificationMethod 'id' cannot be empty"),
   type: z.string().min(1, "VerificationMethod 'type' cannot be empty"),
-  controller: z.string().min(1, "VerificationMethod 'controller' cannot be empty"),
+  controller: z.string().min(1, "VerificationMethod 'controller' cannot be empty").optional(),
   publicKeyJwk: z
     .custom<jose.JWK>(
       (val) => typeof val === "object" && val !== null && !Array.isArray(val)
@@ -32,8 +32,9 @@ export type DidService = z.infer<typeof DidServiceSchema>;
  * W3C DID Document Schema conforming to W3C DID v1.0.
  */
 export const DidDocumentSchema = z.object({
-  "@context": z.union([z.string(), z.array(z.string())]),
+  "@context": z.union([z.string(), z.array(z.string())]).optional(),
   id: z.string().startsWith("did:", "DID id must start with 'did:'"),
+  controller: z.union([z.string(), z.array(z.string())]).optional(),
   verificationMethod: z.array(VerificationMethodSchema).optional(),
   authentication: z.array(z.union([z.string(), VerificationMethodSchema])).optional(),
   assertionMethod: z.array(z.union([z.string(), VerificationMethodSchema])).optional(),
@@ -41,6 +42,39 @@ export const DidDocumentSchema = z.object({
 });
 
 export type DidDocument = z.infer<typeof DidDocumentSchema>;
+
+/**
+ * Normalizes a DID Document by ensuring '@context', 'controller', and 'assertionMethod'
+ * are populated according to W3C DID Core defaults if missing.
+ *
+ * Defaults applied:
+ * - '@context': defaults to ["https://www.w3.org/ns/did/v1"] if absent.
+ * - 'controller': defaults to document 'id' if absent.
+ * - 'verificationMethod[].controller': defaults to document 'id' if absent.
+ * - 'assertionMethod': defaults to the IDs of available verification methods if absent.
+ *
+ * @param doc Validated DidDocument
+ * @returns Normalized DidDocument
+ */
+export function normalizeDidDocument(doc: DidDocument): DidDocument {
+  const context = doc["@context"] ?? ["https://www.w3.org/ns/did/v1"];
+  const controller = doc.controller ?? doc.id;
+  const verificationMethod = doc.verificationMethod?.map((vm) => ({
+    ...vm,
+    controller: vm.controller ?? doc.id,
+  }));
+  const assertionMethod =
+    doc.assertionMethod ??
+    (verificationMethod ? verificationMethod.map((vm) => vm.id) : undefined);
+
+  return {
+    ...doc,
+    "@context": context,
+    controller,
+    verificationMethod,
+    assertionMethod,
+  };
+}
 
 /**
  * Translates a did:web identifier into its canonical HTTPS URL per W3C did:web Method Specification.
@@ -153,7 +187,7 @@ export async function resolveDidWeb(
     );
   }
 
-  return doc;
+  return normalizeDidDocument(doc);
 }
 
 /**

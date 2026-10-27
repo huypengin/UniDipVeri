@@ -204,17 +204,31 @@ export async function handleCredentialRequest(
     // If no credential_configuration_id is given and vct/format are present, require them to match the session's configuration
     const isLegacySession = session.credentialConfigurationId.endsWith("_legacy");
     const expectedFormat = isLegacySession ? "vc+sd-jwt" : "dc+sd-jwt";
-    if (typeof body.format === "string" && body.format !== expectedFormat) {
-      return Response.json(
-        {
-          error: "unsupported_credential_format",
-          error_description: `Requested format '${body.format}' does not match authorized configuration format '${expectedFormat}'`,
-        },
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-        }
-      );
+    if (typeof body.format === "string") {
+      if (body.format === "vc+sd-jwt" && !config.enableLegacyVcFormat) {
+        return Response.json(
+          {
+            error: "unsupported_credential_format",
+            error_description: "Legacy format 'vc+sd-jwt' is not enabled on this issuer",
+          },
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          }
+        );
+      }
+      if (body.format !== expectedFormat) {
+        return Response.json(
+          {
+            error: "unsupported_credential_format",
+            error_description: `Requested format '${body.format}' does not match authorized configuration format '${expectedFormat}'`,
+          },
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+          }
+        );
+      }
     }
 
     if (typeof body.vct === "string") {
@@ -241,6 +255,22 @@ export async function handleCredentialRequest(
       {
         error: "invalid_request",
         error_description: "Missing required parameter 'credential_configuration_id'",
+      },
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }
+    );
+  }
+
+  if (
+    requestedConfigId.endsWith("_legacy") &&
+    !config.enableLegacyVcFormat
+  ) {
+    return Response.json(
+      {
+        error: "unsupported_credential_configuration_id",
+        error_description: `Legacy credential configuration '${requestedConfigId}' is not enabled on this issuer`,
       },
       {
         status: 400,
