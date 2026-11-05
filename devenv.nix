@@ -56,6 +56,7 @@
 
         export SCHEMA_PATH="''${SCHEMA_PATH:-$DEVENV_ROOT/schemas/graduation-record.v1.yaml}"
         export PORT="''${PORT:-3000}"
+        export STATUS_LIST_TTL_SECONDS="''${STATUS_LIST_TTL_SECONDS:-300}"
         export ENABLE_LEGACY_VC_FORMAT="''${ENABLE_LEGACY_VC_FORMAT:-false}"
 
         echo "=========================================================="

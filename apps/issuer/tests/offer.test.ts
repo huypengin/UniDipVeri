@@ -24,6 +24,7 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
     keyId: "key-1",
     signingAlgorithm: "ES256",
     schemaPath: FIXTURE_SCHEMA_PATH,
+    statusListTtlSeconds: 300,
     enableLegacyVcFormat: false,
   };
 

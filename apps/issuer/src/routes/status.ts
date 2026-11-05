@@ -72,29 +72,34 @@ export async function handleStatusListRequest(
 
   try {
     const effectiveIssuer = getEffectiveIssuer(config);
+    const ttlSeconds = config.statusListTtlSeconds;
     const token = await statusListService.generateStatusListToken({
       issuer: effectiveIssuer,
       statusListUri,
       keyContext,
-      ttlSeconds: 300,
+      ttlSeconds,
     });
+
+    const cacheControl =
+      ttlSeconds === 0
+        ? "no-cache, no-store, must-revalidate"
+        : `public, max-age=${ttlSeconds}`;
+
+    const headers = {
+      "Content-Type": STATUS_LIST_CONTENT_TYPE,
+      "Cache-Control": cacheControl,
+    };
 
     if (req.method === "HEAD") {
       return new Response(null, {
         status: 200,
-        headers: {
-          "Content-Type": STATUS_LIST_CONTENT_TYPE,
-          "Cache-Control": "public, max-age=300",
-        },
+        headers,
       });
     }
 
     return new Response(token, {
       status: 200,
-      headers: {
-        "Content-Type": STATUS_LIST_CONTENT_TYPE,
-        "Cache-Control": "public, max-age=300",
-      },
+      headers,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

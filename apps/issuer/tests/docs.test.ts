@@ -23,6 +23,7 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    statusListTtlSeconds: 300,
     enableLegacyVcFormat: false,
   };
 
