@@ -33,12 +33,12 @@
           echo "Using preconfigured ISSUER_BASE_URL: ''$ISSUER_BASE_URL"
         else
           echo "Waiting for Issuer Cloudflare Tunnel public URL to be assigned..."
-          for i in {1..60}; do
+          for i in {1..30}; do
             if [ -f .devenv/issuer-tunnel.log ] && grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log >/dev/null 2>&1; then
               TUNNEL_URL=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log | head -n 1)
               break
             fi
-            sleep 0.5
+            sleep 1
           done
 
           if [ -z "''${TUNNEL_URL:-}" ]; then
@@ -111,45 +111,80 @@
         export LOG_DIR="''$LOGS_DIR"
         mkdir -p "''$LOGS_DIR"
 
-        if [ -z "''${ISSUER_BASE_URL:-}" ]; then
-          for i in {1..60}; do
-            if [ -f .devenv/issuer-tunnel.log ] && grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log >/dev/null 2>&1; then
-              export ISSUER_BASE_URL=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log | head -n 1)
-              break
-            fi
-            sleep 0.5
-          done
-        fi
+        # Resolves service public URL (prefers env var, then Cloudflare tunnel URL, fallback to local URL)
+        resolve_url() {
+          local name="''$1"
+          local log_file="''$2"
+          local fallback="''$3"
+          local explicit="''${4:-}"
 
-        echo "Waiting for Verifier Cloudflare Tunnel public URL to be assigned..."
-        for i in {1..60}; do
-          if [ -f .devenv/verifier-tunnel.log ] && grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/verifier-tunnel.log >/dev/null 2>&1; then
-            VERIFIER_PUBLIC_URL=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/verifier-tunnel.log | head -n 1)
-            break
+          if [ -n "''$explicit" ]; then
+            echo "''$explicit"
+            return 0
           fi
-          sleep 0.5
-        done
 
-        if [ -z "''${VERIFIER_PUBLIC_URL:-}" ]; then
-          echo "Notice: Verifier tunnel not detected, using http://localhost:7004"
-          export VERIFIER_PUBLIC_URL="http://localhost:7004"
-        else
-          export VERIFIER_PUBLIC_URL="''$VERIFIER_PUBLIC_URL"
-        fi
+          echo "Waiting for ''$name Cloudflare Tunnel public URL to be assigned..." >&2
+          for i in {1..40}; do
+            if [ -f "''$log_file" ]; then
+              local url
+              url=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' "''$log_file" 2>/dev/null | head -n 1)
+              if [ -n "''$url" ]; then
+                echo "✓ ''$name Tunnel URL detected: ''$url" >&2
+                echo "''$url"
+                return 0
+              fi
+            fi
+            sleep 1
+          done
+
+          echo "Notice: ''$name tunnel not detected, falling back to ''$fallback" >&2
+          echo "''$fallback"
+        }
+
+        # Waits for service readiness (accepts HTTP 200 or 302)
+        # Checks primary URL first (good result: Cloudflare), falls back to checking local URL
+        wait_for_readiness() {
+          local name="''$1"
+          local primary_url="''$2"
+          local local_url="''$3"
+          local max_attempts="''${4:-40}"
+
+          echo "Waiting for ''$name readiness on ''$primary_url..."
+          for i in $(seq 1 "''$max_attempts"); do
+            local code
+            code=$(curl -s -o /dev/null -w '%{http_code}' "''${primary_url%/}/" 2>/dev/null || true)
+            if [ "''$code" = "200" ] || [ "''$code" = "302" ]; then
+              echo "✓ ''$name is ready (HTTP ''$code)"
+              return 0
+            fi
+
+            if [ "''$primary_url" != "''$local_url" ]; then
+              local local_code
+              local_code=$(curl -s -o /dev/null -w '%{http_code}' "''${local_url%/}/" 2>/dev/null || true)
+              if [ "''$local_code" = "200" ] || [ "''$local_code" = "302" ]; then
+                if [ "''$i" -ge 10 ]; then
+                  echo "✓ ''$name is ready locally on ''$local_url (HTTP ''$local_code)"
+                  return 0
+                fi
+              fi
+            fi
+
+            sleep 1
+          done
+
+          echo "Warning: ''$name readiness check timed out on ''$primary_url (last HTTP: ''$code)"
+          return 1
+        }
+
+        export ISSUER_BASE_URL="$(resolve_url "Issuer" ".devenv/issuer-tunnel.log" "http://localhost:3000" "''${ISSUER_BASE_URL:-}")"
+        export VERIFIER_PUBLIC_URL="$(resolve_url "Verifier" ".devenv/verifier-tunnel.log" "http://localhost:7004" "''${VERIFIER_PUBLIC_URL:-}")"
+
+        wait_for_readiness "Issuer" "''$ISSUER_BASE_URL" "http://localhost:3000" 40
+        wait_for_readiness "Walt.id Verifier" "''$VERIFIER_PUBLIC_URL" "http://localhost:7004" 40
 
         export PORT="''${PORT:-3001}"
         export VCT_TYPE="''${VCT_TYPE:-graduation-record}"
         export VCT_VERSION="''${VCT_VERSION:-v1}"
-
-        echo "Waiting for Walt.id Verifier readiness on http://localhost:7004..."
-        for i in {1..40}; do
-          STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:7004/ 2>/dev/null || true)
-          if [ "''$STATUS" = "302" ] || [ "''$STATUS" = "200" ]; then
-            echo "✓ Walt.id Verifier is ready"
-            break
-          fi
-          sleep 1
-        done
 
         echo "=========================================================="
         echo " UniDipVeri Playground Showcase running"
