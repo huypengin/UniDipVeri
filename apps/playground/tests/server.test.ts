@@ -10,6 +10,7 @@ import {
   resolveLogsDir,
   extractSessionAuditData,
   formatAuditSummaryMarkdown,
+  isLeafClaimPath,
   type PlaygroundConfig,
   type VerificationSessionInfo,
 } from "../src/server.js";
@@ -449,7 +450,7 @@ describe("Playground Showcase Service (apps/playground)", () => {
     }
   });
 
-  it("renders the interactive HTML portal on GET /", async () => {
+  it("renders the interactive HTML portal on GET / including dynamic DCQL query builder", async () => {
     const originalFetch = globalThis.fetch;
     try {
       globalThis.fetch = (async (input: string | URL | Request) => {
@@ -471,6 +472,14 @@ describe("Playground Showcase Service (apps/playground)", () => {
       expect(res.headers.get("Content-Type")).toContain("text/html");
       const html = await res.text();
       expect(html).toContain("UniDipVeri Presentation Showcase");
+      expect(html).toContain("Verification Policy &amp; DCQL Query Builder");
+      expect(html).toContain("presetPills");
+      expect(html).toContain("rawDcqlTextarea");
+      expect(html).toContain("min-height: 540px;");
+      expect(html).toContain("applyQueryBtn");
+      expect(typeof isLeafClaimPath).toBe("function");
+      expect(html).toContain("discovery-data");
+      expect(html).toContain("initial-dcql");
       expect(html).toContain("<svg");
       expect(html).toContain("rejectionBanner");
       expect(html).toContain("rejectionTitle");
@@ -480,5 +489,131 @@ describe("Playground Showcase Service (apps/playground)", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("serves GET /api/discovery with no-cache headers and discovered metadata", async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () => {
+        throw new Error("Network unreachable");
+      }) as unknown as typeof fetch;
+
+      const app = createPlaygroundApp(mockConfig);
+      const res = await app(new Request("http://localhost:3001/api/discovery"));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("application/json");
+      expect(res.headers.get("Cache-Control")).toBe(
+        "no-cache, no-store, must-revalidate"
+      );
+
+      const data = (await res.json()) as any;
+      expect(data.vct).toBe(mockConfig.vctUrl);
+      expect(Array.isArray(data.claims)).toBe(true);
+      expect(Array.isArray(data.presets)).toBe(true);
+      expect(data.claims.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("creates a verification session with custom DCQL query via POST /api/session", async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      let sentBody: any = null;
+
+      globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/verification-session/create")) {
+          if (init?.body) {
+            sentBody = JSON.parse(init.body as string);
+          }
+          return Response.json({
+            sessionId: "session-custom-dcql",
+            fullAuthorizationRequestUrl:
+              "openid4vp://?client_id=http://localhost:7004/test&nonce=custom",
+          });
+        }
+        return new Response("Not Found", { status: 404 });
+      }) as unknown as typeof fetch;
+
+      const customQuery = {
+        credentials: [
+          {
+            id: "custom-query-id",
+            format: "dc+sd-jwt",
+            meta: {
+              vct_values: [mockConfig.vctUrl],
+            },
+            claims: [
+              { path: ["studentId"] },
+              { path: ["fullName"] },
+            ],
+          },
+        ],
+      };
+
+      const app = createPlaygroundApp(mockConfig);
+      const res = await app(
+        new Request("http://localhost:3001/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dcql_query: customQuery }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as any;
+      expect(data.sessionId).toBe("session-custom-dcql");
+      expect(data.dcqlQuery).toBeDefined();
+
+      expect(sentBody).not.toBeNull();
+      const queriedClaims = sentBody.core_flow?.dcql_query?.credentials?.[0]?.claims;
+      expect(queriedClaims).toEqual([
+        { path: ["studentId"] },
+        { path: ["fullName"] },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("rejects invalid DCQL query with 400 Bad Request on POST /api/session", async () => {
+    const app = createPlaygroundApp(mockConfig);
+    const res = await app(
+      new Request("http://localhost:3001/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dcql_query: {
+            credentials: [
+              {
+                format: "invalid-format",
+              },
+            ],
+          },
+        }),
+      })
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as any;
+    expect(body.error).toBe("invalid_dcql_query");
+    expect(body.error_description).toContain("dc+sd-jwt");
+  });
+
+  it("rejects non-JSON payload with 400 Bad Request on POST /api/session", async () => {
+    const app = createPlaygroundApp(mockConfig);
+    const res = await app(
+      new Request("http://localhost:3001/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{ this is not valid json",
+      })
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as any;
+    expect(body.error).toBe("invalid_json");
   });
 });

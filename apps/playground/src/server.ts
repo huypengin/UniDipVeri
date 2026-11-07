@@ -1,7 +1,41 @@
-import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
 import QRCode from "qrcode";
+import {
+  resolveDiscoveryMetadata,
+  FALLBACK_DISCOVERED_CLAIMS,
+  formatClaimLabel,
+  categorizeClaimPath,
+  isLeafClaimPath,
+  type PlaygroundDiscoveryResult,
+  type DiscoveredClaim,
+} from "./discovery.js";
+import {
+  DEFAULT_ACADEMIC_PRESETS,
+  filterPresetPaths,
+  resolveScenarioPresets,
+  type ScenarioPreset,
+} from "./presets.js";
+import {
+  buildDcqlQuery,
+  validateDcqlQuery,
+} from "./dcql.js";
+
+export {
+  resolveDiscoveryMetadata,
+  FALLBACK_DISCOVERED_CLAIMS,
+  formatClaimLabel,
+  categorizeClaimPath,
+  isLeafClaimPath,
+  type PlaygroundDiscoveryResult,
+  type DiscoveredClaim,
+  DEFAULT_ACADEMIC_PRESETS,
+  filterPresetPaths,
+  resolveScenarioPresets,
+  type ScenarioPreset,
+  buildDcqlQuery,
+  validateDcqlQuery,
+};
 
 export interface PlaygroundConfig {
   port: number;
@@ -213,8 +247,13 @@ export function rewriteAuthorizationUrl(
  * Creates an OID4VP cross-device verification session on Walt.id verifier.
  */
 export async function createWaltidSession(
-  config: PlaygroundConfig
-): Promise<{ sessionId: string; fullAuthorizationRequestUrl: string }> {
+  config: PlaygroundConfig,
+  customDcqlQuery?: Record<string, unknown>
+): Promise<{
+  sessionId: string;
+  fullAuthorizationRequestUrl: string;
+  dcqlQuery: Record<string, unknown>;
+}> {
   const isPublicVerifier =
     config.verifierPublicUrl &&
     !config.verifierPublicUrl.includes("localhost") &&
@@ -239,6 +278,20 @@ export async function createWaltidSession(
     }
   } catch {}
 
+  const defaultPaths = [
+    ["dateOfBirth"],
+    ["papers", "diploma", "degreeName"],
+    ["papers", "diploma", "major"],
+    ["papers", "diploma", "graduationDate"],
+  ];
+
+  const dcqlQuery = customDcqlQuery
+    ? (() => {
+        const val = validateDcqlQuery(customDcqlQuery);
+        return val.normalizedQuery || (customDcqlQuery as Record<string, unknown>);
+      })()
+    : buildDcqlQuery(targetVct, defaultPaths);
+
   const payload: Record<string, unknown> = {
     flow_type: "cross_device",
     ...(isPublicVerifier
@@ -258,26 +311,7 @@ export async function createWaltidSession(
           },
         },
       },
-      dcql_query: {
-        credentials: [
-          {
-            // Per OpenID4VP 1.0 Final (DCQL), the query item 'id' is a local identifier chosen by
-            // the verifier strictly for this verification session to correlate requested queries with
-            // returned credentials and policy results. It is decoupled from the issuer's credential_configuration_id.
-            id: randomUUID(),
-            format: "dc+sd-jwt",
-            meta: {
-              vct_values: [targetVct],
-            },
-            claims: [
-              { path: ["dateOfBirth"] },
-              { path: ["papers", "diploma", "degreeName"] },
-              { path: ["papers", "diploma", "major"] },
-              { path: ["papers", "diploma", "graduationDate"] },
-            ],
-          },
-        ],
-      },
+      dcql_query: dcqlQuery,
       policies: {
         // In OpenID4VP, verification is policy-driven: verifiers only evaluate checks
         // explicitly requested in the verification session configuration.
@@ -332,6 +366,7 @@ export async function createWaltidSession(
   return {
     sessionId: data.sessionId,
     fullAuthorizationRequestUrl: rewrittenUrl,
+    dcqlQuery,
   };
 }
 
@@ -647,10 +682,57 @@ export function persistSessionEvidence(
  * Generates the Playground HTML portal.
  */
 export function renderPlaygroundHtml(
-  session: { sessionId: string; qrUri: string; qrSvg: string },
-  _config: PlaygroundConfig
+  session: {
+    sessionId: string;
+    qrUri: string;
+    qrSvg: string;
+    dcqlQuery?: Record<string, unknown>;
+  },
+  _config: PlaygroundConfig,
+  discovery?: PlaygroundDiscoveryResult,
+  presets?: ScenarioPreset[]
 ): string {
   const { sessionId, qrUri, qrSvg } = session;
+  const disc: PlaygroundDiscoveryResult = discovery || {
+    vct: _config.vctUrl,
+    credentialName: "Graduation Academic Record",
+    claims: FALLBACK_DISCOVERED_CLAIMS,
+  };
+  const activePresets: ScenarioPreset[] = presets || resolveScenarioPresets(disc.claims);
+
+  const activeQuery =
+    session.dcqlQuery ||
+    buildDcqlQuery(disc.vct, [
+      ["dateOfBirth"],
+      ["papers", "diploma", "degreeName"],
+      ["papers", "diploma", "major"],
+      ["papers", "diploma", "graduationDate"],
+    ]);
+
+  const activePathsSet = new Set<string>();
+  if (Array.isArray(activeQuery.credentials)) {
+    const firstCred = activeQuery.credentials[0] as Record<string, unknown>;
+    if (Array.isArray(firstCred?.claims)) {
+      for (const c of firstCred.claims) {
+        if (c && typeof c === "object" && Array.isArray((c as Record<string, unknown>).path)) {
+          activePathsSet.add(
+            ((c as Record<string, unknown>).path as Array<string | number>).join(".")
+          );
+        }
+      }
+    }
+  }
+
+  // Group claims by category
+  const categories: Record<string, DiscoveredClaim[]> = {};
+  for (const claim of disc.claims) {
+    if (!categories[claim.category]) {
+      categories[claim.category] = [];
+    }
+    categories[claim.category].push(claim);
+  }
+
+  const categoryEntries = Object.entries(categories);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -692,13 +774,13 @@ export function renderPlaygroundHtml(
       }
 
       .container {
-        max-width: 680px;
+        max-width: 760px;
         width: 100%;
       }
 
       .header {
         text-align: center;
-        margin-bottom: 28px;
+        margin-bottom: 24px;
       }
 
       h1 {
@@ -712,6 +794,312 @@ export function renderPlaygroundHtml(
         color: var(--text-muted);
         font-size: 0.95rem;
         margin: 0;
+      }
+
+      .query-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px 28px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        margin-bottom: 24px;
+        text-align: left;
+      }
+
+      .card-header-row {
+        margin-bottom: 16px;
+      }
+
+      .card-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0 0 4px 0;
+        color: var(--text);
+      }
+
+      .card-desc {
+        color: var(--text-muted);
+        font-size: 0.88rem;
+        margin: 0;
+      }
+
+      .section-heading {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      .preset-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .preset-pill {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 9999px;
+        padding: 7px 16px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+      }
+
+      .preset-pill:hover {
+        background: #e2e8f0;
+        border-color: #94a3b8;
+      }
+
+      .preset-pill.active {
+        background: var(--primary);
+        border-color: var(--primary-hover);
+        color: #ffffff;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+      }
+
+      .preset-desc {
+        font-size: 0.82rem;
+        color: #475569;
+        margin: 0 0 18px 0;
+        min-height: 1.2rem;
+        font-style: italic;
+      }
+
+      .claims-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        border-top: 1px solid var(--border);
+        padding-top: 14px;
+      }
+
+      .claims-toolbar-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .selected-count {
+        font-weight: normal;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+
+      .bulk-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .btn-text {
+        background: none;
+        border: none;
+        color: var(--primary);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .btn-text:hover {
+        text-decoration: underline;
+      }
+
+      .claims-categories-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .category-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+
+      .category-header {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 8px;
+      }
+
+      .claims-category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 8px;
+      }
+
+      .claim-item {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8px 10px;
+        transition: border-color 0.15s;
+      }
+
+      .claim-item:hover {
+        border-color: #93c5fd;
+      }
+
+      .claim-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        width: 100%;
+      }
+
+      .claim-checkbox {
+        margin-top: 3px;
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary);
+      }
+
+      .claim-text-col {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .claim-name-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .claim-title {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .badge {
+        font-size: 0.68rem;
+        font-weight: 700;
+        border-radius: 4px;
+        padding: 1px 6px;
+        letter-spacing: 0.02em;
+        flex-shrink: 0;
+      }
+
+      .badge-sd {
+        color: #1e40af;
+        background: #dbeafe;
+      }
+
+      .badge-always {
+        color: #475569;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+      }
+
+      .claim-path-code {
+        font-family: monospace;
+        font-size: 0.74rem;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .raw-dcql-details {
+        margin: 14px 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .raw-dcql-details summary {
+        padding: 10px 14px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        user-select: none;
+        background: #f8fafc;
+      }
+
+      .raw-dcql-details summary:hover {
+        color: var(--primary);
+      }
+
+      .editor-wrapper {
+        padding: 12px;
+      }
+
+      .raw-dcql-textarea {
+        width: 100%;
+        min-height: 540px;
+        font-family: monospace;
+        font-size: 0.8rem;
+        background: #0f172a;
+        color: #f8fafc;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 10px;
+        box-sizing: border-box;
+        resize: vertical;
+        line-height: 1.4;
+      }
+
+      .dcql-error-msg {
+        font-size: 0.8rem;
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        padding: 6px 10px;
+        margin-top: 6px;
+      }
+
+      .apply-query-btn {
+        width: 100%;
+        background: var(--primary);
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .apply-query-btn:hover {
+        background: var(--primary-hover);
+      }
+
+      .apply-query-btn:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
       }
 
       .card {
@@ -843,7 +1231,7 @@ export function renderPlaygroundHtml(
         border-color: #818cf8;
       }
 
-      .copy-btn:active
+      .copy-btn:active,
       .refresh-btn:active {
         transform: scale(0.96);
       }
@@ -1076,8 +1464,9 @@ export function renderPlaygroundHtml(
           padding: 20px 12px;
         }
 
+        .query-card,
         .card {
-          padding: 24px 16px;
+          padding: 20px 14px;
         }
 
         .qr-frame svg {
@@ -1095,6 +1484,10 @@ export function renderPlaygroundHtml(
           text-align: left;
           overflow-wrap: anywhere;
         }
+
+        .claims-category-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -1103,7 +1496,9 @@ export function renderPlaygroundHtml(
         }
 
         .copy-btn,
-        .refresh-btn {
+        .refresh-btn,
+        .preset-pill,
+        .apply-query-btn {
           transition: none;
         }
       }
@@ -1116,6 +1511,93 @@ export function renderPlaygroundHtml(
       <p class="subtitle">Present your SD-JWT VC to Walt.id Verifier 2 via OID4VP &amp; DCQL</p>
     </div>
 
+    <!-- Interactive DCQL Verification Query Builder -->
+    <div class="query-card">
+      <div class="card-header-row">
+        <h2 class="card-title">Verification Policy &amp; DCQL Query Builder</h2>
+        <p class="card-desc">Select a preset or customize field disclosures discovered from the institutional schema.</p>
+      </div>
+
+      <div class="section-heading">Verification Presets</div>
+      <div class="preset-pills" id="presetPills">
+        ${activePresets.map((preset, idx) => `
+          <button
+            type="button"
+            class="preset-pill ${idx === 0 ? "active" : ""}"
+            data-preset-id="${preset.id}"
+            title="${preset.description}"
+          >
+            ${preset.name}
+          </button>
+        `).join("")}
+      </div>
+      <p id="presetDescription" class="preset-desc">${activePresets[0]?.description || ""}</p>
+
+      <div class="claims-toolbar">
+        <div class="claims-toolbar-title">
+          <span>Credential Claims</span>
+          <span id="selectedCount" class="selected-count">(${activePathsSet.size} selected)</span>
+        </div>
+        <div class="bulk-actions">
+          <button id="selectAllBtn" type="button" class="btn-text">Select All</button>
+          <span>&middot;</span>
+          <button id="clearAllBtn" type="button" class="btn-text">Clear All</button>
+        </div>
+      </div>
+
+      <div class="claims-categories-wrapper">
+        ${categoryEntries.map(([catName, catClaims]) => `
+          <div class="category-card">
+            <div class="category-header">${catName}</div>
+            <div class="claims-category-grid">
+              ${catClaims.map((claim) => {
+                const isChecked = activePathsSet.has(claim.pathKey);
+                const isSd = claim.sdPolicy === "selectively_disclosable";
+                return `
+                  <div class="claim-item">
+                    <label class="claim-label">
+                      <input
+                        type="checkbox"
+                        class="claim-checkbox"
+                        data-path="${claim.pathKey}"
+                        ${isChecked ? "checked" : ""}
+                      />
+                      <span class="claim-text-col">
+                        <span class="claim-name-row">
+                          <span class="claim-title">${claim.label}</span>
+                          <span class="badge ${isSd ? "badge-sd" : "badge-always"}">
+                            ${isSd ? "Selective" : "Always"}
+                          </span>
+                        </span>
+                        <span class="claim-path-code">${claim.pathKey}</span>
+                      </span>
+                    </label>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      <details class="raw-dcql-details">
+        <summary>View &amp; Edit Raw DCQL JSON Query</summary>
+        <div class="editor-wrapper">
+          <p style="margin: 0 0 8px 0; font-size: 0.75rem; color: var(--text-muted);">
+            Checkboxes only expose individual leaf claims to prevent accidental over-disclosure. To query parent container objects or entire subtrees, edit the raw DCQL JSON query below.
+          </p>
+          <textarea id="rawDcqlTextarea" class="raw-dcql-textarea" spellcheck="false">${JSON.stringify(activeQuery, null, 2)}</textarea>
+          <div id="dcqlError" class="dcql-error-msg" style="display: none;"></div>
+        </div>
+      </details>
+
+      <button id="applyQueryBtn" class="apply-query-btn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        <span>Apply Query &amp; Generate QR Code</span>
+      </button>
+    </div>
+
+    <!-- Active Verification Session & QR Card -->
     <div class="card">
       <div class="action-bar">
         <button id="newSessionBtn" class="refresh-btn">New Verification Session</button>
@@ -1188,8 +1670,16 @@ export function renderPlaygroundHtml(
     </div>
   </div>
 
+  <!-- Discovery & Initial Query Embeds -->
+  <script id="discovery-data" type="application/json">${JSON.stringify({ ...disc, presets: activePresets })}</script>
+  <script id="initial-dcql" type="application/json">${JSON.stringify(activeQuery)}</script>
+
   <script>
+    const discovery = JSON.parse(document.getElementById("discovery-data").textContent);
     let currentSessionId = ${JSON.stringify(sessionId)};
+    let currentQuery = JSON.parse(document.getElementById("initial-dcql").textContent);
+    let activePresetId = "diploma";
+
     const statusBadge = document.getElementById("statusBadge");
     const statusText = document.getElementById("statusText");
     const rejectionBanner = document.getElementById("rejectionBanner");
@@ -1207,9 +1697,19 @@ export function renderPlaygroundHtml(
     const uriText = document.getElementById("uriText");
     const newSessionBtn = document.getElementById("newSessionBtn");
 
+    const rawDcqlTextarea = document.getElementById("rawDcqlTextarea");
+    const dcqlError = document.getElementById("dcqlError");
+    const applyQueryBtn = document.getElementById("applyQueryBtn");
+    const presetPills = document.querySelectorAll(".preset-pill");
+    const presetDescription = document.getElementById("presetDescription");
+    const claimCheckboxes = document.querySelectorAll(".claim-checkbox");
+    const selectedCountEl = document.getElementById("selectedCount");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+
     function copyUri() {
       if (!uriText) return;
-      navigator.clipboard.writeText(uriText).then(() => {
+      navigator.clipboard.writeText(uriText.innerText).then(() => {
         const btn = document.getElementById('copyUriBtn');
         if (btn) {
           const originalContent = btn.innerHTML;
@@ -1240,6 +1740,197 @@ export function renderPlaygroundHtml(
       evidenceMessage.innerText = "";
     }
 
+    function updateSelectedCount() {
+      let count = 0;
+      claimCheckboxes.forEach(cb => { if (cb.checked) count++; });
+      if (selectedCountEl) {
+        selectedCountEl.innerText = "(" + count + " selected)";
+      }
+    }
+
+    function setActivePresetButton(presetId) {
+      activePresetId = presetId;
+      presetPills.forEach(pill => {
+        if (pill.dataset.presetId === presetId) {
+          pill.classList.add("active");
+        } else {
+          pill.classList.remove("active");
+        }
+      });
+      const p = discovery.presets.find(pr => pr.id === presetId);
+      if (presetDescription) {
+        presetDescription.innerText = p ? p.description : "";
+      }
+    }
+
+    function detectMatchingPreset(selectedPathKeySet) {
+      for (const preset of discovery.presets) {
+        if (preset.id === "custom") continue;
+        if (preset.id === "full") {
+          const allDiscoveredKeys = discovery.claims.map(c => c.pathKey);
+          if (allDiscoveredKeys.length > 0 && allDiscoveredKeys.every(k => selectedPathKeySet.has(k)) && selectedPathKeySet.size === allDiscoveredKeys.length) {
+            return "full";
+          }
+          continue;
+        }
+        const presetKeys = preset.claimPaths.map(p => p.join("."));
+        if (presetKeys.length === selectedPathKeySet.size && presetKeys.every(k => selectedPathKeySet.has(k))) {
+          return preset.id;
+        }
+      }
+      return "custom";
+    }
+
+    function updateQueryFromCheckboxes() {
+      const selectedPaths = [];
+      const selectedKeySet = new Set();
+      claimCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          selectedPaths.push(cb.dataset.path.split("."));
+          selectedKeySet.add(cb.dataset.path);
+        }
+      });
+
+      const existingId = (currentQuery && currentQuery.credentials && currentQuery.credentials[0] && currentQuery.credentials[0].id)
+        ? currentQuery.credentials[0].id
+        : undefined;
+
+      currentQuery = {
+        credentials: [
+          {
+            id: existingId || (crypto.randomUUID ? crypto.randomUUID() : "cred-" + Date.now()),
+            format: "dc+sd-jwt",
+            meta: {
+              vct_values: [discovery.vct],
+            },
+            claims: selectedPaths.map(path => ({ path })),
+          },
+        ],
+      };
+
+      rawDcqlTextarea.value = JSON.stringify(currentQuery, null, 2);
+      dcqlError.style.display = "none";
+      updateSelectedCount();
+      const match = detectMatchingPreset(selectedKeySet);
+      setActivePresetButton(match);
+    }
+
+    function updateCheckboxesFromQuery(query) {
+      const pathSet = new Set();
+      if (query && Array.isArray(query.credentials) && query.credentials[0] && Array.isArray(query.credentials[0].claims)) {
+        for (const c of query.credentials[0].claims) {
+          if (c && Array.isArray(c.path)) {
+            pathSet.add(c.path.join("."));
+          }
+        }
+      }
+      claimCheckboxes.forEach(cb => {
+        cb.checked = pathSet.has(cb.dataset.path);
+      });
+      updateSelectedCount();
+      const match = detectMatchingPreset(pathSet);
+      setActivePresetButton(match);
+    }
+
+    function setPreset(presetId) {
+      const preset = discovery.presets.find(p => p.id === presetId);
+      if (!preset) return;
+
+      if (preset.id === "full") {
+        claimCheckboxes.forEach(cb => { cb.checked = true; });
+      } else if (preset.id === "custom") {
+        // preserve current checkbox selections
+      } else {
+        const targetSet = new Set(preset.claimPaths.map(p => p.join(".")));
+        claimCheckboxes.forEach(cb => {
+          cb.checked = targetSet.has(cb.dataset.path);
+        });
+      }
+      setActivePresetButton(preset.id);
+      updateQueryFromCheckboxes();
+    }
+
+    presetPills.forEach(pill => {
+      pill.addEventListener("click", () => {
+        setPreset(pill.dataset.presetId);
+      });
+    });
+
+    claimCheckboxes.forEach(cb => {
+      cb.addEventListener("change", () => {
+        updateQueryFromCheckboxes();
+      });
+    });
+
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener("click", () => {
+        setPreset("full");
+      });
+    }
+
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener("click", () => {
+        claimCheckboxes.forEach(cb => { cb.checked = false; });
+        updateQueryFromCheckboxes();
+      });
+    }
+
+    rawDcqlTextarea.addEventListener("input", () => {
+      try {
+        const parsed = JSON.parse(rawDcqlTextarea.value);
+        dcqlError.style.display = "none";
+        currentQuery = parsed;
+        updateCheckboxesFromQuery(parsed);
+      } catch (err) {
+        dcqlError.innerText = "Invalid JSON: " + err.message;
+        dcqlError.style.display = "block";
+      }
+    });
+
+    async function applyActiveQuery() {
+      try {
+        currentQuery = JSON.parse(rawDcqlTextarea.value);
+        dcqlError.style.display = "none";
+      } catch (err) {
+        dcqlError.innerText = "Please resolve JSON syntax errors: " + err.message;
+        dcqlError.style.display = "block";
+        return;
+      }
+
+      applyQueryBtn.disabled = true;
+      const originalText = applyQueryBtn.innerHTML;
+      applyQueryBtn.innerHTML = "<span>Generating Session...</span>";
+
+      try {
+        const res = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dcql_query: currentQuery }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error_description || "Server returned HTTP " + res.status);
+        }
+        const data = await res.json();
+        currentSessionId = data.sessionId;
+        uriText.innerText = data.qrUri;
+        document.getElementById("qrContainer").innerHTML = data.qrSvg;
+        if (data.dcqlQuery) {
+          currentQuery = data.dcqlQuery;
+          rawDcqlTextarea.value = JSON.stringify(currentQuery, null, 2);
+        }
+        resetView();
+        document.getElementById("qrContainer").scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (err) {
+        alert("Failed to apply query and create session: " + err.message);
+      } finally {
+        applyQueryBtn.disabled = false;
+        applyQueryBtn.innerHTML = originalText;
+      }
+    }
+
+    applyQueryBtn.addEventListener("click", applyActiveQuery);
+
     newSessionBtn.addEventListener("click", async () => {
       newSessionBtn.disabled = true;
       newSessionBtn.innerText = "Creating...";
@@ -1247,7 +1938,7 @@ export function renderPlaygroundHtml(
         const res = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ dcql_query: currentQuery }),
         });
         const data = await res.json();
         currentSessionId = data.sessionId;
@@ -1433,10 +2124,61 @@ export function createPlaygroundApp(config: PlaygroundConfig = loadPlaygroundCon
       });
     }
 
+    // Route: GET /api/discovery
+    if (method === "GET" && pathname === "/api/discovery") {
+      try {
+        const discovery = await resolveDiscoveryMetadata(config);
+        const presets = resolveScenarioPresets(discovery.claims);
+        return Response.json(
+          {
+            ...discovery,
+            presets,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+          }
+        );
+      } catch (err) {
+        return Response.json(
+          { error: "discovery_failed", error_description: (err as Error).message },
+          { status: 500 }
+        );
+      }
+    }
+
     // Route: POST /api/session
     if (method === "POST" && pathname === "/api/session") {
       try {
-        const session = await createWaltidSession(config);
+        let customDcqlQuery: Record<string, unknown> | undefined;
+
+        if (req.headers.get("content-type")?.includes("application/json")) {
+          try {
+            const body = (await req.json()) as { dcql_query?: unknown };
+            if (body && body.dcql_query) {
+              const validation = validateDcqlQuery(body.dcql_query);
+              if (!validation.valid) {
+                return Response.json(
+                  { error: "invalid_dcql_query", error_description: validation.error },
+                  { status: 400 }
+                );
+              }
+              customDcqlQuery = (validation.normalizedQuery || body.dcql_query) as Record<
+                string,
+                unknown
+              >;
+            }
+          } catch {
+            return Response.json(
+              { error: "invalid_json", error_description: "Request body is not valid JSON" },
+              { status: 400 }
+            );
+          }
+        }
+
+        const session = await createWaltidSession(config, customDcqlQuery);
         const qrSvg = await QRCode.toString(session.fullAuthorizationRequestUrl, {
           type: "svg",
           margin: 1,
@@ -1455,6 +2197,7 @@ export function createPlaygroundApp(config: PlaygroundConfig = loadPlaygroundCon
           sessionId: session.sessionId,
           qrUri: session.fullAuthorizationRequestUrl,
           qrSvg,
+          dcqlQuery: session.dcqlQuery,
           status: "PENDING",
         });
       } catch (err) {
@@ -1516,7 +2259,21 @@ export function createPlaygroundApp(config: PlaygroundConfig = loadPlaygroundCon
     // Route: GET / (Portal HTML)
     if (method === "GET" && pathname === "/") {
       try {
-        const session = await createWaltidSession(config);
+        const discovery = await resolveDiscoveryMetadata(config);
+        const presets = resolveScenarioPresets(discovery.claims);
+        const diplomaPreset = presets.find((p) => p.id === "diploma");
+        const initialPaths =
+          diplomaPreset && diplomaPreset.claimPaths.length > 0
+            ? diplomaPreset.claimPaths
+            : [
+                ["dateOfBirth"],
+                ["papers", "diploma", "degreeName"],
+                ["papers", "diploma", "major"],
+                ["papers", "diploma", "graduationDate"],
+              ];
+        const initialQuery = buildDcqlQuery(discovery.vct, initialPaths);
+
+        const session = await createWaltidSession(config, initialQuery);
         const qrSvg = await QRCode.toString(session.fullAuthorizationRequestUrl, {
           type: "svg",
           margin: 1,
@@ -1532,8 +2289,15 @@ export function createPlaygroundApp(config: PlaygroundConfig = loadPlaygroundCon
         });
 
         const html = renderPlaygroundHtml(
-          { sessionId: session.sessionId, qrUri: session.fullAuthorizationRequestUrl, qrSvg },
-          config
+          {
+            sessionId: session.sessionId,
+            qrUri: session.fullAuthorizationRequestUrl,
+            qrSvg,
+            dcqlQuery: session.dcqlQuery,
+          },
+          config,
+          discovery,
+          presets
         );
 
         return new Response(html, {
