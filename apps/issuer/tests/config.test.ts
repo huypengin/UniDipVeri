@@ -44,6 +44,7 @@ describe("Issuer Configuration Loading & Validation", () => {
   it("applies standard defaults for optional parameters", () => {
     const config = loadIssuerConfig({
       SCHEMA_PATH: fixtureSchemaPath,
+      STATUS_LIST_TTL_SECONDS: undefined,
     });
 
     expect(config.port).toBe(3000);
