@@ -9,6 +9,10 @@ import {
   decompressAndGetBit,
   StatusListFileSchema,
 } from "../src/services/status-list.js";
+import {
+  handleStatusListRequest,
+  DEFAULT_STATUS_LIST_ID,
+} from "../src/routes/status.js";
 import { initializeKeyManager } from "../src/services/key-manager.js";
 import type { IssuerConfig } from "../src/config.js";
 
@@ -22,6 +26,7 @@ describe("Token Status List Revocation Engine (draft-ietf-oauth-status-list-21)"
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    statusListTtlSeconds: 300,
     enableLegacyVcFormat: false,
   };
 
@@ -331,6 +336,143 @@ describe("Token Status List Revocation Engine (draft-ietf-oauth-status-list-21)"
       } finally {
         fs.rmSync(testDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("Status List HTTP Route Handler", () => {
+    it("serves status list token with standard cache-control header (300s)", async () => {
+      const keyContext = await initializeKeyManager(mockConfig);
+      const service = new StatusListService(64);
+      service.allocateIndex();
+
+      const req = new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "GET",
+      });
+
+      const res = await handleStatusListRequest(req, DEFAULT_STATUS_LIST_ID, {
+        config: mockConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("application/statuslist+jwt");
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+
+      const token = await res.text();
+      const decoded = jose.decodeJwt(token);
+      expect(decoded.ttl).toBe(300);
+      expect(decoded.exp).toBeDefined();
+    });
+
+    it("serves status list token with custom cache-control header", async () => {
+      const customConfig: IssuerConfig = {
+        ...mockConfig,
+        statusListTtlSeconds: 15,
+      };
+      const keyContext = await initializeKeyManager(customConfig);
+      const service = new StatusListService(64);
+
+      const req = new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "GET",
+      });
+
+      const res = await handleStatusListRequest(req, DEFAULT_STATUS_LIST_ID, {
+        config: customConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=15");
+
+      const token = await res.text();
+      const decoded = jose.decodeJwt(token);
+      expect(decoded.ttl).toBe(15);
+    });
+
+    it("serves status list token with no-cache header when statusListTtlSeconds is 0", async () => {
+      const zeroTtlConfig: IssuerConfig = {
+        ...mockConfig,
+        statusListTtlSeconds: 0,
+      };
+      const keyContext = await initializeKeyManager(zeroTtlConfig);
+      const service = new StatusListService(64);
+
+      const req = new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "GET",
+      });
+
+      const res = await handleStatusListRequest(req, DEFAULT_STATUS_LIST_ID, {
+        config: zeroTtlConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+
+      const token = await res.text();
+      const decoded = jose.decodeJwt(token);
+      expect(decoded.ttl).toBe(0);
+    });
+
+    it("serves HEAD requests with matching Content-Type and Cache-Control headers without body", async () => {
+      const keyContext = await initializeKeyManager(mockConfig);
+      const service = new StatusListService(64);
+
+      const req = new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "HEAD",
+      });
+
+      const res = await handleStatusListRequest(req, DEFAULT_STATUS_LIST_ID, {
+        config: mockConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("application/statuslist+jwt");
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("rejects non-existent status list identifier with 404", async () => {
+      const keyContext = await initializeKeyManager(mockConfig);
+      const service = new StatusListService(64);
+
+      const req = new Request("https://issuer.university.edu/status/unknown-list", {
+        method: "GET",
+      });
+
+      const res = await handleStatusListRequest(req, "unknown-list", {
+        config: mockConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("not_found");
+    });
+
+    it("rejects non-GET/HEAD methods with 405 Method Not Allowed", async () => {
+      const keyContext = await initializeKeyManager(mockConfig);
+      const service = new StatusListService(64);
+
+      const req = new Request("https://issuer.university.edu/status/status-list-1", {
+        method: "POST",
+      });
+
+      const res = await handleStatusListRequest(req, DEFAULT_STATUS_LIST_ID, {
+        config: mockConfig,
+        keyContext,
+        statusListService: service,
+      });
+
+      expect(res.status).toBe(405);
+      expect(res.headers.get("Allow")).toBe("GET, HEAD");
     });
   });
 });

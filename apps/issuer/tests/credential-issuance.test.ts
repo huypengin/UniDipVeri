@@ -32,6 +32,7 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    statusListTtlSeconds: 300,
     enableLegacyVcFormat: false,
   };
 

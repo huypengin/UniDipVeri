@@ -287,19 +287,21 @@ export class StatusListService {
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const expSeconds = nowSeconds + ttlSeconds;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       iss: issuer,
       sub: statusListUri,
       iat: nowSeconds,
       ttl: ttlSeconds,
-      exp: expSeconds,
       status_list: {
         bits: 1,
         lst: this.getLst(),
       },
     };
+
+    if (ttlSeconds > 0) {
+      payload.exp = nowSeconds + ttlSeconds;
+    }
 
     return new jose.SignJWT(payload)
       .setProtectedHeader({

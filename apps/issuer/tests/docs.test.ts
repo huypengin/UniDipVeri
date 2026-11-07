@@ -23,6 +23,7 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
     vctBaseUrl: "https://issuer.university.edu",
     issuerIdentifierMode: "did",
     port: 3000,
+    statusListTtlSeconds: 300,
     enableLegacyVcFormat: false,
   };
 
@@ -63,7 +64,7 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
     expect(html).toContain("UniDipVeri Issuer API Explorer");
   });
 
-  it("handles GET /docs/openapi.json returning JSON with cache headers", async () => {
+  it("handles GET /docs/openapi.json returning JSON with no-cache headers", async () => {
     const schemaConfig = await loadSchemaFromFile(schemaPath);
     const req = new Request("https://issuer.university.edu/docs/openapi.json", {
       method: "GET",
@@ -72,13 +73,14 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
     const res = handleDocsRequest(req, mockConfig, schemaConfig);
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("application/json");
-    expect(res.headers.get("Cache-Control")).toContain("max-age=");
+    expect(res.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+    expect(res.headers.get("Pragma")).toBe("no-cache");
 
     const body = (await res.json()) as { openapi: string };
     expect(body.openapi).toBe("3.0.3");
   });
 
-  it("handles GET /docs and GET /swagger returning HTML documentation page", async () => {
+  it("handles GET /docs and GET /swagger returning HTML documentation page with no-cache headers", async () => {
     const schemaConfig = await loadSchemaFromFile(schemaPath);
 
     for (const path of ["/docs", "/swagger"]) {
@@ -89,6 +91,8 @@ describe("OpenAPI Specification & Swagger UI Documentation", () => {
       const res = handleDocsRequest(req, mockConfig, schemaConfig);
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/html");
+      expect(res.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
+      expect(res.headers.get("Pragma")).toBe("no-cache");
       const html = await res.text();
       expect(html).toContain("swagger-ui");
     }

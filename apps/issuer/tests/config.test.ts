@@ -44,6 +44,7 @@ describe("Issuer Configuration Loading & Validation", () => {
   it("applies standard defaults for optional parameters", () => {
     const config = loadIssuerConfig({
       SCHEMA_PATH: fixtureSchemaPath,
+      STATUS_LIST_TTL_SECONDS: undefined,
     });
 
     expect(config.port).toBe(3000);
@@ -53,7 +54,35 @@ describe("Issuer Configuration Loading & Validation", () => {
     expect(config.keyId).toBe("key-1");
     expect(config.signingAlgorithm).toBe("ES256");
     expect(config.issuerIdentifierMode).toBe("did");
+    expect(config.statusListTtlSeconds).toBe(300);
     expect(getEffectiveIssuer(config)).toBe("did:web:localhost%3A3000");
+  });
+
+  it("configures custom Token Status List cache duration", () => {
+    const config = loadIssuerConfig({
+      SCHEMA_PATH: fixtureSchemaPath,
+      STATUS_LIST_TTL_SECONDS: "60",
+    });
+
+    expect(config.statusListTtlSeconds).toBe(60);
+  });
+
+  it("configures zero Token Status List cache duration for immediate cache invalidation", () => {
+    const config = loadIssuerConfig({
+      SCHEMA_PATH: fixtureSchemaPath,
+      STATUS_LIST_TTL_SECONDS: "0",
+    });
+
+    expect(config.statusListTtlSeconds).toBe(0);
+  });
+
+  it("rejects negative Token Status List cache duration", () => {
+    expect(() =>
+      loadIssuerConfig({
+        SCHEMA_PATH: fixtureSchemaPath,
+        STATUS_LIST_TTL_SECONDS: "-1",
+      })
+    ).toThrow(/statusListTtlSeconds cannot be negative/);
   });
 
   it("configures HTTPS issuer identifier mode (Variant B)", () => {

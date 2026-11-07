@@ -112,6 +112,17 @@ export const IssuerConfigSchema = z.object({
   statusListPath: z.string().optional(),
 
   /**
+   * Token Status List cache duration in seconds.
+   * Controls both the 'ttl' claim in the signed JWT and the HTTP Cache-Control header max-age.
+   * Defaults to 300 (5 minutes). Set to 0 to disable caching (no-cache, no-store).
+   */
+  statusListTtlSeconds: z.coerce
+    .number()
+    .int("statusListTtlSeconds must be an integer")
+    .min(0, "statusListTtlSeconds cannot be negative")
+    .default(300),
+
+  /**
    * Flag controlling whether legacy vc+sd-jwt format is offered and issued.
    * Defaults to false (only draft-19 dc+sd-jwt is offered and issued).
    */
@@ -166,6 +177,7 @@ export function loadIssuerConfig(
     schemaPath: env.SCHEMA_PATH,
     privateKeyJwkJson: env.ISSUER_PRIVATE_KEY_JWK,
     statusListPath: env.STATUS_LIST_PATH,
+    statusListTtlSeconds: env.STATUS_LIST_TTL_SECONDS,
     enableLegacyVcFormat: env.ENABLE_LEGACY_VC_FORMAT === "true",
   };
 
