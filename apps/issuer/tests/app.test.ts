@@ -137,6 +137,20 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
         globalThis.fetch = originalFetch;
       }
     });
+
+    it("serves DID document at /did.json and handles HEAD requests", async () => {
+      const getRes = await app(
+        new Request("https://issuer.university.edu/did.json", { method: "GET" })
+      );
+      expect(getRes.status).toBe(200);
+      const doc = (await getRes.json()) as DidDocument;
+      expect(doc.id).toBe("did:web:issuer.university.edu");
+
+      const headRes = await app(
+        new Request("https://issuer.university.edu/did.json", { method: "HEAD" })
+      );
+      expect(headRes.status).toBe(200);
+    });
   });
 
   describe("Routing Dispatcher & Endpoints", () => {

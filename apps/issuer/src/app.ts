@@ -143,8 +143,11 @@ export function createApp(
         return respond(handleOAuthMetadataRequest(config));
       }
 
-      // Route: GET /.well-known/did.json
-      if (method === "GET" && pathname === "/.well-known/did.json") {
+      // Route: GET /.well-known/did.json or /did.json (supports root and subpath did:web)
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/.well-known/did.json" || pathname === "/did.json")
+      ) {
         return respond(handleDidRequest(config, keyContext));
       }
 
