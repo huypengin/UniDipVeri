@@ -263,4 +263,32 @@ describe("Issuer Restart Persistence (Key Retention & Status List Durability)", 
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  it("robustly recovers from terminal line-wrapping and accidental newlines in ISSUER_PRIVATE_KEY_JWK", async () => {
+    const kp = await jose.generateKeyPair("ES256", { extractable: true });
+    const privJwk = await jose.exportJWK(kp.privateKey);
+    privJwk.kid = "wrapped-key";
+    const compactJson = JSON.stringify(privJwk);
+
+    // Simulate accidental terminal wrapping (break string value across a newline)
+    const mid = Math.floor(compactJson.length / 2);
+    const wrappedJson = compactJson.slice(0, mid) + "\n" + compactJson.slice(mid);
+
+    const port = await getAvailablePort();
+    const runtime = await startServer({
+      PORT: String(port),
+      KEY_ID: "wrapped-key",
+      SCHEMA_PATH: schemaPath,
+      ISSUER_BASE_URL: `http://localhost:${port}`,
+      ISSUER_PRIVATE_KEY_JWK: wrappedJson,
+    });
+
+    try {
+      expect(runtime.keyContext.keyId).toBe("wrapped-key");
+      expect(runtime.keyContext.publicKeyJwk.x).toBe(privJwk.x);
+      expect(runtime.keyContext.publicKeyJwk.y).toBe(privJwk.y);
+    } finally {
+      await runtime.server.stop(true);
+    }
+  });
 });
