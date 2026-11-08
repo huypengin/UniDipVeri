@@ -79,5 +79,8 @@ The repository includes an automated release workflow in [`.github/workflows/dep
 2. **Quality Gates**:
    - Runs `bun install --frozen-lockfile`, `bun run typecheck`, and `bun run test`.
    - 100% test pass rate is strictly required before any deployment hook is invoked.
-3. **Deployment Hook & Health Verification**:
-   - If secrets `RENDER_DEPLOY_HOOK_URL` and `RENDER_SERVICE_URL` are configured in GitHub repository secrets, the workflow triggers the deploy hook and polls `/health` for up to 10 minutes until HTTP 200 OK is confirmed.
+3. **Deployment Hook & Ref Binding**:
+   - `deploy/render.yaml` specifies `autoDeployTrigger: 'off'` so Render never builds or deploys on arbitrary branch pushes.
+   - When the quality gates pass, GitHub Actions appends `&ref=${{ github.sha }}` to `RENDER_DEPLOY_HOOK_URL`, commanding Render to build and deploy the exact commit SHA associated with the release tag.
+4. **Health Verification**:
+   - If `RENDER_SERVICE_URL` is configured in GitHub repository secrets, the workflow polls `/health` for up to 10 minutes until HTTP 200 OK is confirmed.
