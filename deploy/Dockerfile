@@ -1,41 +1,34 @@
 # ==============================================================================
 # Multi-Stage Production Dockerfile for UniDipVeri Public Showcase on Render
-# Combines UniDipVeri Issuer, Verifier Showcase, Caddy Gateway, and Walt.id Verifier 2
+# Uses official Walt.id Verifier 2 (Ubuntu + Java 21) as base image,
+# and copies Bun and Caddy binaries directly.
 # ==============================================================================
 
-# Stage 1: Walt.id Verifier 2 binary & libraries
-FROM docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76ee7fee4bb5ee68369e2ea1864733039e9a AS waltid-src
-
-# Stage 2: Caddy Web Server Binary
+# Stage 1: Caddy Static Binary
 FROM docker.io/caddy:2.8-alpine AS caddy-src
 
-# Stage 3: Official Eclipse Temurin OpenJDK 21 JRE (glibc runtime)
-FROM docker.io/eclipse-temurin:21-jre AS java-runtime
+# Stage 2: Bun Static Binary
+FROM oven/bun:1.2-slim AS bun-src
 
-# Stage 4: Unified Production Runtime (Debian + Bun 1.x)
-FROM oven/bun:1.2-slim AS final
+# Stage 3: Unified Production Runtime (Walt.id Verifier 2 Base)
+FROM docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76ee7fee4bb5ee68369e2ea1864733039e9a AS final
 
-# Install curl, ca-certificates, and bash (standard packages in Debian 12)
+USER root
+
+# Install curl and ca-certificates for health polling
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        ca-certificates \
-        bash && \
+        ca-certificates && \
     rm -rf /var/lib/apt/lists/*
-
-# Install Eclipse Temurin Java 21 JRE runtime from multi-stage builder
-ENV JAVA_HOME=/opt/java/openjdk
-COPY --from=java-runtime ${JAVA_HOME} ${JAVA_HOME}
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Install Caddy reverse proxy gateway binary into system PATH
 COPY --from=caddy-src /usr/bin/caddy /usr/local/bin/caddy
 
-# Install Walt.id Verifier 2 application
-COPY --from=waltid-src /app /opt/waltid
-RUN chmod +x /opt/waltid/bin/verifier-api2
+# Install Bun runtime binary into system PATH
+COPY --from=bun-src /usr/local/bin/bun /usr/local/bin/bun
 
-WORKDIR /app
+WORKDIR /unidipveri
 
 # Copy dependency manifests for efficient Docker layer caching
 COPY package.json bun.lock tsconfig.json ./
@@ -43,7 +36,7 @@ COPY packages/core/package.json ./packages/core/
 COPY apps/issuer/package.json ./apps/issuer/
 COPY apps/playground/package.json ./apps/playground/
 
-# Install dependencies using frozen lockfile
+# Install workspace dependencies with frozen lockfile
 RUN bun install --frozen-lockfile
 
 # Copy application sources, schemas, scripts, and deployment configuration
@@ -55,13 +48,13 @@ COPY scripts ./scripts
 COPY deploy ./deploy
 
 # Ensure entrypoint script is executable
-RUN chmod +x /app/deploy/entrypoint.sh
+RUN chmod +x /unidipveri/deploy/entrypoint.sh
 
 # Production environment defaults
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Expose public gateway port (Render automatically maps external traffic here)
+# Expose ports: 8080 (Gateway / Render public), 3000 (Issuer), 3001 (Playground), 7004 (Walt.id)
 EXPOSE 8080 3000 3001 7004
 
-ENTRYPOINT ["/app/deploy/entrypoint.sh"]
+ENTRYPOINT ["/unidipveri/deploy/entrypoint.sh"]

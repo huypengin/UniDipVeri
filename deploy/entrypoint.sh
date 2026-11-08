@@ -13,7 +13,7 @@ if [ -z "${ISSUER_PRIVATE_KEY_JWK:-}" ]; then
   echo "⚠️ Generating ephemeral signing keys for this session."
   echo "⚠️ Note: In the demo environment without persistent keys, credentials issued"
   echo "⚠️ in previous sessions cannot be verified after server spin-downs or restarts."
-  export ISSUER_PRIVATE_KEY_JWK=$(bun run /app/scripts/generate-key.ts --json)
+  export ISSUER_PRIVATE_KEY_JWK=$(bun run /unidipveri/scripts/generate-key.ts --json)
 else
   echo "✓ Loaded persistent demo signing key from environment settings."
 fi
@@ -22,7 +22,7 @@ fi
 export ISSUER_BASE_URL="${PUBLIC_URL}/issuer"
 export VCT_BASE_URL="${PUBLIC_URL}/issuer"
 export ISSUER_DID="did:web:${DOMAIN}:issuer"
-export SCHEMA_PATH="/app/schemas/graduation-record.v1.yaml"
+export SCHEMA_PATH="/unidipveri/schemas/graduation-record.v1.yaml"
 export STATUS_LIST_PATH="${STATUS_LIST_PATH:-/tmp/status-list.json}"
 
 export WALTID_BASE="http://127.0.0.1:7004"
@@ -36,19 +36,19 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# 5. Launch Walt.id Verifier 2
+# 5. Launch Walt.id Verifier 2 via native Jib classpath
 echo "Starting Walt.id Verifier 2 on internal port 7004..."
-/opt/waltid/bin/verifier-api2 &
+(cd /waltid-verifier-api2 && java -cp "@/app/jib-classpath-file" id.walt.verifier2.MainKt) &
 WALTID_PID=$!
 
 # 6. Launch UniDipVeri Issuer
 echo "Starting UniDipVeri Issuer on internal port 3000..."
-PORT=3000 bun run /app/apps/issuer/src/server.ts &
+PORT=3000 bun run /unidipveri/apps/issuer/src/server.ts &
 ISSUER_PID=$!
 
 # 7. Launch UniDipVeri Playground Showcase
 echo "Starting UniDipVeri Playground Showcase on internal port 3001..."
-PORTAL_PORT=3001 PORT=3001 bun run /app/apps/playground/src/server.ts &
+PORTAL_PORT=3001 PORT=3001 bun run /unidipveri/apps/playground/src/server.ts &
 PLAYGROUND_PID=$!
 
 # 8. Readiness Verification Loop
@@ -80,4 +80,4 @@ echo " DID Document:      ${PUBLIC_URL}/issuer/did.json"
 echo " Health Probe:      ${PUBLIC_URL}/health"
 echo "=========================================================="
 
-PORT="${GATEWAY_PORT}" exec caddy run --config /app/deploy/Caddyfile --adapter caddyfile
+PORT="${GATEWAY_PORT}" exec caddy run --config /unidipveri/deploy/Caddyfile --adapter caddyfile
