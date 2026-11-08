@@ -56,9 +56,10 @@ echo "Starting UniDipVeri Playground Showcase on internal port 3001..."
 PORTAL_PORT=3001 PORT=3001 bun run /unidipveri/apps/playground/src/server.ts &
 PLAYGROUND_PID=$!
 
-# 8. Readiness Verification Loop
+# 8. Readiness Verification Loop (up to 90s for Walt.id JVM warm-up on cold starts)
 echo "Verifying readiness of internal services..."
-for i in {1..30}; do
+ALL_READY=false
+for i in {1..90}; do
   ISSUER_OK=false
   PLAYGROUND_OK=false
   VERIFIER_OK=false
@@ -68,11 +69,20 @@ for i in {1..30}; do
   if curl -s http://127.0.0.1:7004/livez >/dev/null 2>&1 || curl -s http://127.0.0.1:7004/health >/dev/null 2>&1; then VERIFIER_OK=true; fi
 
   if [ "$ISSUER_OK" = "true" ] && [ "$PLAYGROUND_OK" = "true" ] && [ "$VERIFIER_OK" = "true" ]; then
-    echo "✓ All internal services are healthy and responsive."
+    echo "✓ All internal services are healthy and responsive (elapsed: ${i}s)."
+    ALL_READY=true
     break
   fi
   sleep 1
 done
+
+if [ "$ALL_READY" != "true" ]; then
+  echo "❌ FATAL: Internal microservices failed to become ready within 90s:"
+  echo "  - UniDipVeri Issuer (port 3000):     ${ISSUER_OK}"
+  echo "  - Playground Showcase (port 3001):   ${PLAYGROUND_OK}"
+  echo "  - Walt.id Verifier 2 (port 7004):    ${VERIFIER_OK}"
+  exit 1
+fi
 
 # 9. Launch Caddy Gateway in Foreground
 echo "=========================================================="

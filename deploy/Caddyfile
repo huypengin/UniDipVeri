@@ -1,3 +1,7 @@
+{
+    admin off
+}
+
 :{$PORT:8080} {
     # Root redirect to Playground showcase
     redir / /playground/ 302

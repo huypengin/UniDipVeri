@@ -160,6 +160,17 @@ export async function initializeKeyManager(
       throw new Error("Parsed private key JWK must be a valid JSON object with a 'kty' property");
     }
 
+    // Clean any accidental whitespace or newlines inside JWK string properties (e.g. x, y, d, k)
+    const cleanedJwk: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(rawPrivateKeyJwk)) {
+      if (typeof val === "string") {
+        cleanedJwk[key] = val.trim().replace(/\s+/g, "");
+      } else {
+        cleanedJwk[key] = val;
+      }
+    }
+    rawPrivateKeyJwk = cleanedJwk as unknown as jose.JWK;
+
     rawPublicKeyJwk = sanitizePublicJwk(rawPrivateKeyJwk);
   } else {
     // Generate ephemeral keypair for dev/test environments
@@ -176,7 +187,16 @@ export async function initializeKeyManager(
   };
 
   // Pre-import the private key once into a native CryptoKey / KeyLike
-  const privateKey = await jose.importJWK(rawPrivateKeyJwk, signingAlgorithm);
+  let privateKey: CryptoKey | jose.KeyLike | Uint8Array;
+  try {
+    privateKey = await jose.importJWK(rawPrivateKeyJwk, signingAlgorithm);
+  } catch (err) {
+    throw new Error(
+      `Failed to import private key JWK for algorithm '${signingAlgorithm}': ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 
   // Assert cryptographic consistency before returning key context
   await assertCryptographicConsistency(privateKey, publicKeyJwk, signingAlgorithm);

@@ -291,4 +291,32 @@ describe("Issuer Restart Persistence (Key Retention & Status List Durability)", 
       await runtime.server.stop(true);
     }
   });
+
+  it("robustly cleans spaces inside JWK coordinates and parameters", async () => {
+    const kp = await jose.generateKeyPair("ES256", { extractable: true });
+    const privJwk = await jose.exportJWK(kp.privateKey);
+    privJwk.kid = "spaced-key";
+
+    // Simulate accidental space introduced into base64url coordinates
+    const originalY = privJwk.y as string;
+    const spacedY = originalY.slice(0, 10) + " " + originalY.slice(10);
+    const spacedJwk = { ...privJwk, y: spacedY };
+    const spacedJson = JSON.stringify(spacedJwk);
+
+    const port = await getAvailablePort();
+    const runtime = await startServer({
+      PORT: String(port),
+      KEY_ID: "spaced-key",
+      SCHEMA_PATH: schemaPath,
+      ISSUER_BASE_URL: `http://localhost:${port}`,
+      ISSUER_PRIVATE_KEY_JWK: spacedJson,
+    });
+
+    try {
+      expect(runtime.keyContext.keyId).toBe("spaced-key");
+      expect(runtime.keyContext.publicKeyJwk.y).toBe(originalY);
+    } finally {
+      await runtime.server.stop(true);
+    }
+  });
 });
