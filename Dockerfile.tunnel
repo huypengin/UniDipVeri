@@ -1,0 +1,9 @@
+FROM docker.io/cloudflare/cloudflared:2026.9.1 AS cloudflared-bin
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=cloudflared-bin /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+COPY scripts/run-tunnel.sh /usr/local/bin/run-tunnel.sh
+RUN chmod +x /usr/local/bin/run-tunnel.sh
+
+ENTRYPOINT ["/usr/local/bin/run-tunnel.sh"]

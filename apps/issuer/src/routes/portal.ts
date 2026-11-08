@@ -828,9 +828,9 @@ export function renderPortalHtml(
       </div>
     </div>
     <nav class="nav-links">
-      <a href="/docs" target="_blank">Swagger API</a>
-      <a href="/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
-      <a href="/.well-known/did.json" target="_blank">DID Document</a>
+      <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
+      <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
+      <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>
       <span class="nav-badge">dc+sd-jwt</span>
     </nav>
   </header>
@@ -1212,7 +1212,7 @@ export function renderPortalHtml(
         };
         if (txCode) payload.tx_code = txCode;
 
-        const res = await fetch('/credential-offer', {
+        const res = await fetch('${config.baseUrl}/credential-offer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

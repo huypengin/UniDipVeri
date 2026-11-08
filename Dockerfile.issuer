@@ -1,0 +1,22 @@
+FROM oven/bun:1.2-slim AS base
+WORKDIR /app
+
+# Copy root manifests for dependency layer caching
+COPY package.json bun.lock tsconfig.json ./
+COPY packages/core/package.json ./packages/core/
+COPY apps/issuer/package.json ./apps/issuer/
+COPY apps/playground/package.json ./apps/playground/
+
+# Install workspace dependencies
+RUN bun install --frozen-lockfile
+
+# Copy application and schema source files
+COPY packages/core ./packages/core
+COPY apps/issuer ./apps/issuer
+COPY schemas ./schemas
+
+ENV PORT=3000
+ENV SCHEMA_PATH=/app/schemas/graduation-record.v1.yaml
+EXPOSE 3000
+
+ENTRYPOINT ["sh", "-c", "WAITED=0; while [ ! -f /shared/tunnel.env ] && [ $WAITED -lt 30 ]; do sleep 1; WAITED=$((WAITED + 1)); done; if [ -f /shared/tunnel.env ]; then . /shared/tunnel.env; echo '[Issuer] Successfully loaded tunnel environment: '$PUBLIC_URL; else echo '[Issuer] Warning: Tunnel env not found after 30s timeout, using defaults'; export ISSUER_BASE_URL=http://localhost:8080/issuer; export VCT_BASE_URL=http://localhost:8080/issuer; export ISSUER_DID=did:web:localhost%3A8080:issuer; fi; exec bun run apps/issuer/src/server.ts"]
