@@ -1,0 +1,19 @@
+# ==============================================================================
+# Render Blueprint Specification for UniDipVeri Public Showcase
+# Deploys a unified container (Issuer + Verifier + Walt.id + Caddy Gateway)
+# ==============================================================================
+
+services:
+  - type: web
+    name: unidipveri-demo
+    runtime: docker
+    plan: free
+    dockerContext: .
+    dockerfilePath: deploy/Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ISSUER_PRIVATE_KEY_JWK
+        sync: false
+      - key: STATUS_LIST_PATH
+        value: /tmp/status-list.json

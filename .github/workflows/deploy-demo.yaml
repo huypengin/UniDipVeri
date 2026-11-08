@@ -1,0 +1,74 @@
+name: Deploy Demo
+
+on:
+  push:
+    tags:
+      - 'unidipveri-demo-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: Monorepo Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun Runtime
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Monorepo Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck All Packages
+        run: bun run typecheck
+
+      - name: Run Test Suites
+        run: bun run test
+
+  deploy-render:
+    name: Deploy to Render Showcase
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "⚠️ RENDER_DEPLOY_HOOK_URL secret is not configured; skipping automatic Render deployment hook."
+            exit 0
+          fi
+          echo "Triggering Render deployment via webhook..."
+          curl -f -sS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "✓ Render deploy hook successfully triggered."
+
+      - name: Verify Live Service Health
+        env:
+          RENDER_SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          if [ -z "$RENDER_SERVICE_URL" ]; then
+            echo "ℹ️ RENDER_SERVICE_URL secret is not configured; skipping health verification poll."
+            exit 0
+          fi
+          HEALTH_URL="${RENDER_SERVICE_URL%/}/health"
+          echo "Polling health endpoint: $HEALTH_URL (up to 10 minutes)..."
+          for i in {1..60}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Deployment verified! Service is healthy and responding with HTTP 200 (attempt $i)."
+              exit 0
+            fi
+            echo "Attempt $i: received HTTP $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "❌ Timed out waiting for service to become healthy at $HEALTH_URL"
+          exit 1
