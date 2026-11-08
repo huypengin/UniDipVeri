@@ -25,7 +25,7 @@
 - **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
 - **Revocation via Token Status List**: An RFC 1950 ZLIB-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
-- **Registrar portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
+- **Issuer portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
 - **Playground showcase**: A verifier demonstration portal backed by [walt.id](https://walt.id) that lets holders present credentials from a mobile wallet and displays verified disclosures.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
 - **Third-party verifier interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
@@ -34,12 +34,12 @@
 
 ## Tested Wallets
 
-Issuance was tested by scanning a credential offer and confirming that the wallet **received and stored** the credential:
+Wallet compatibility was evaluated by scanning a credential offer and checking whether the wallet successfully received and stored the issued credential. Credential verification was then tested separately using the `walt.id` verifier, as successful receipt does not necessarily imply successful verification.
 
-| Wallet | Version | Credential Receipt | Credential verification (walt.id) |
+| Wallet | Version | Credential Receipt | Credential Verification (walt.id) |
 | :--- | :--- | :--- | :--- |
-| Paradym Wallet | 1.20.2 | Yes | Yes |
-| Sphereon Wallet | 0.8.0 | Yes | No (SIOPv2 `response_uri` / `client_id` mismatch) |
+| Paradym Wallet | 1.23.0 | Yes | Yes |
+| Sphereon Wallet | 0.9.0 | Yes | No (SIOPv2 `response_uri` / `client_id` mismatch) |
 | Lissi ID-Wallet | 3.3.0 | Yes | No (QR code not recognized) |
 
 Other wallets were either not tested or failed to receive the credential. Wallets that require flows this issuer does not implement (for example the Authorization Code flow) are expected to fail.
@@ -48,11 +48,12 @@ Other wallets were either not tested or failed to receive the credential. Wallet
 
 ## Known Limitations
 
-- **All state is in memory.** Sessions, nonces and the **revocation status list** are lost on restart, so previously revoked credentials will appear valid again after a restart.
+- **In-memory state by default.** Authorization sessions and nonces are ephemeral and lost on restart. The revocation status list is also in-memory by default (causing revoked credentials to appear valid again after reboot) unless persisted to disk via `STATUS_LIST_PATH`.
 - **The default signing key is ephemeral.** If `ISSUER_PRIVATE_KEY_JWK` is not set, a new key is generated on every boot. The DID document changes, and credentials issued before the restart will no longer verify against it.
 - **No authentication on sensitive endpoints.** The registrar portal, `/credential-offer`, and `/admin/*` (including revocation) are open. Anyone who can reach the service can create offers with arbitrary claims or revoke credentials.
 - **Pre-Authorized Code flow only.** The Authorization Code flow is not implemented. Wallets requiring Authorization Code flow or HAIP profile features (for example PAR/PKCE, DPoP and wallet attestation) are not supported.
 - **Limited privacy.** SD-JWT hides undisclosed claims but does not provide unlinkability: the issuer signature, `cnf.jwk`, and the digests are the same in every presentation of a credential, so verifiers can correlate them. It also offers no predicate proofs (for example "over 18" without the birth date).
+- **DCQL query expressiveness.** DCQL queries rely on static path arrays and cannot perform relational/SQL-style filtering inside arrays of objects (for example, expressing `SELECT grade FROM courses WHERE code = "CS101"`), nor do they support regex pattern matching or substring filtering (such as matching `"Database"` against `"Database Systems"` in value constraints). To evaluate individual array elements or complex patterns, the containing array or element must be disclosed and filtered post-hoc by relying party application policy logic.
 - **Standards are moving.** The draft references (SD-JWT VC draft-19, Token Status List draft-21) are the revisions implemented here and may have been superseded.
 
 ---
@@ -130,7 +131,12 @@ unidipveri/
 │   └── core/            # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
 │       ├── src/         # schema/, sd-jwt/, signing/, did/, config/
 │       └── tests/
+├── docs/                # Architecture specifications, ADRs, and documentation index
+│   ├── README.md        # Documentation index & paper reference tables
+│   ├── architecture/    # Threat model, standards profiles, system dataflow, schema model, governance
+│   └── adr/             # Architecture Decision Records (MADR format, 0001-0006)
 ├── schemas/             # YAML credential schemas (graduation-record.v1.yaml is the default)
+├── scripts/             # Benchmark runner (benchmark.ts), key generator (generate-key.ts), and third-party interop suite
 ├── devenv.nix           # Nix-based dev environment (provisions all services)
 ├── docker-compose.yml   # walt.id verifier container
 ├── package.json         # Bun workspaces: ["packages/*", "apps/*"]
@@ -162,7 +168,8 @@ The issuance service:
 
 ### `@unidipveri/playground`
 A verifier demonstration showcase that proxies [walt.id](https://walt.id)'s off-the-shelf OID4VP verifier:
-- Generates OpenID4VP authorization requests as scannable QR codes.
+- Generates OpenID4VP authorization requests as scannable QR codes for mobile wallet presentation.
+- Constructs dynamic DCQL queries from schema-discovered leaf claims (`/api/discovery`) or verification scenario presets (Diploma, Transcript & GPA, Student Identity, Full Academic Record).
 - Polls verification session status and displays disclosed claims, policy results, and audit trails.
 - Persists verification evidence (JSON logs) for offline review.
 
@@ -225,6 +232,7 @@ Use this if you cannot or prefer not to install Nix/devenv.
 export SCHEMA_PATH="$(pwd)/schemas/graduation-record.v1.yaml"
 export ISSUER_BASE_URL="http://localhost:3000"
 export ISSUER_DID="did:web:localhost%3A3000"
+eval $(bun run keygen --env)   # Optional: set persistent private key across restarts
 
 bun run dev:issuer
 ```
@@ -273,6 +281,40 @@ cd apps/playground && bun test
 
 ---
 
+## Empirical Benchmarks
+
+To evaluate cryptographic performance, selective disclosure wire efficiency, and preimage resistance under brute-force attacks, execute the benchmark runner:
+
+```bash
+bun run benchmark
+```
+
+> [!NOTE]
+> **Synthetic Micro-Benchmark Notice:** This reproduction script is a synthetic micro-benchmark designed for relative comparison, empirical verification, and research paper tables. It is **not** a real-world production load test or official standard conformance test suite.
+
+### 1. Preimage Resistance (Security Proof)
+
+| Target Attribute | Naive Unsalted Baseline | UniDipVeri (RFC 9901 CSPRNG) | Domain Search Space |
+| :--- | :--- | :--- | :--- |
+| **Cumulative GPA** | Cracked in < 1 ms (386 iterations) | Infeasible (> 10²³ years) | 401 candidate values |
+| **Letter Grade** | Cracked in < 0.01 ms (1–2 iterations) | Infeasible (> 10²³ years) | 11 candidate values |
+
+> **Context note on selective disclosure granularity:** Legacy credential systems (such as IU-VC) anchor whole PDF documents or certificate papers into a Merkle tree root, permitting only coarse document-level disclosure (all-or-nothing per document). When transitioning to fine-grained attribute-level selective disclosure, committing claims naively without random salts creates fatal dictionary vulnerabilities on low-entropy attributes. UniDipVeri enforces RFC 9901 CSPRNG salting (≥ 128 bits) to guarantee cryptographic confidentiality.
+
+### 2. Cryptographic Latency & Selective Disclosure Wire Efficiency
+
+| Dimension | ES256 (NIST P-256) | EdDSA (Ed25519) | ES384 (NIST P-384) | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Issuance Latency** | ~0.22 ms | ~0.14 ms | ~1.03 ms | Claim transform + JWS signing |
+| **Plain Payload** | 584 B | 584 B | 584 B | Unmasked JSON (no selective disclosure) |
+| **Full Presentation** | 2,494 B | 2,494 B | 2,494 B | All claims revealed |
+| **Selective (Degree Only)** | 1,129 B (55% reduction) | 1,129 B (55% reduction) | 1,129 B (55% reduction) | Redacts GPA, birthdate, transcript |
+| **Selective (GPA Only)** | 1,029 B (59% reduction) | 1,029 B (59% reduction) | 1,029 B (59% reduction) | Redacts diploma honors, coursework |
+
+For full empirical evaluation methodology, raw benchmark metrics, Architecture Decision Records (ADRs), and architecture specifications, see [**`docs/README.md`**](docs/README.md).
+
+---
+
 ## Configuration Reference
 
 Environment variables, validated with Zod at startup:
@@ -291,6 +333,14 @@ Environment variables, validated with Zod at startup:
 | `ISSUER_PRIVATE_KEY_JWK` | Private signing key as a JWK JSON string | **Ephemeral key generated on every boot** | No (strongly recommended) |
 
 > **Warning:** Without `ISSUER_PRIVATE_KEY_JWK`, every restart changes the issuer key and invalidates verification of earlier credentials. Revocation state is also lost on restart.
+>
+> Generate a persistent private key using `bun run keygen`:
+> ```bash
+> bun run keygen                     # Generate ES256 keypair with shell export snippet
+> bun run keygen EdDSA               # Generate EdDSA (Ed25519) keypair
+> eval $(bun run keygen --env)       # Export SIGNING_ALGORITHM, KEY_ID, and ISSUER_PRIVATE_KEY_JWK into shell
+> bun run keygen --json > key.json   # Export compact private JWK to file
+> ```
 
 ---
 

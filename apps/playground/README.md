@@ -2,7 +2,7 @@
 
 `@unidipveri/playground` is a **verifier demonstration showcase** that provides a web UI for presenting and verifying SD-JWT VCs issued by the UniDipVeri issuer. It delegates credential verification to the [walt.id](https://walt.id) off-the-shelf OID4VP verifier and displays the results in a human-readable format.
 
-> **Prototype, not production software.** This service is intended for demonstrations and thesis evaluation, not real-world relying-party use.
+> **Prototype, not production software.** This service is intended for demonstrations and academic evaluation, not real-world relying-party use.
 
 ---
 
@@ -15,7 +15,8 @@ sequenceDiagram
     participant Playground as Playground UI
     participant WaltID as walt.id Verifier
 
-    Playground->>WaltID: Create OID4VP verification session
+    Playground->>Playground: Select scenario preset or custom claims (GET /api/discovery)
+    Playground->>WaltID: Create OID4VP session with DCQL query (POST /api/session)
     WaltID-->>Playground: Authorization request URL
     Playground-->>Holder: QR code (openid4vp://authorize?...)
     Holder->>WaltID: Present SD-JWT VC (direct_post)
@@ -30,9 +31,11 @@ sequenceDiagram
 ## Features
 
 - **QR-based verification**: Generates OpenID4VP authorization requests as scannable QR codes for cross-device wallet presentation.
+- **Dynamic DCQL query builder**: Constructs DCQL queries dynamically from schema-discovered leaf claims or custom field selections (operating on static claim paths, as DCQL does not support SQL-style filtering inside array objects or regex value matching).
+- **Scenario presets**: Pre-configured verification scenarios (Diploma Verification, Transcript & GPA, Student Identity, Full Academic Record).
 - **Real-time status polling**: Monitors the walt.id verification session and updates the UI when the wallet responds.
 - **Audit trail**: Displays disclosed claims, policy evaluation results (signature validity, credential status), and raw verification data.
-- **Evidence persistence**: Saves complete verification session data (JSON) to disk for offline review and thesis documentation.
+- **Evidence persistence**: Saves complete verification session data (JSON) to disk for offline review and evaluation documentation.
 - **Tunnel-aware**: Auto-discovers Cloudflare Quick Tunnel URLs from devenv logs, rewriting internal `localhost` references to public HTTPS URLs in authorization requests.
 
 ---
@@ -84,8 +87,9 @@ The UI is available at `http://localhost:3001`.
 
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` | Playground UI — creates a verification session and renders a QR code |
-| `POST` | `/api/session` | Creates a new walt.id verification session (JSON API) |
+| `GET` | `/` | Playground UI — renders verification interface, claim selector, and scannable QR code |
+| `GET` | `/api/discovery` | Returns schema-discovered leaf claims and scenario presets for dynamic DCQL query construction |
+| `POST` | `/api/session` | Creates a new walt.id verification session (JSON API, accepts optional custom `dcql_query`) |
 | `GET` | `/api/status?sessionId=...` | Polls session status and returns verification results |
 | `GET` | `/health` | Health check with configuration summary |
 

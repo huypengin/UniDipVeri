@@ -101,8 +101,18 @@ Environment variables, validated with Zod:
 | `PORT` | HTTP listener port | `3000` |
 | `ISSUER_HOST` | Bind address | `0.0.0.0` |
 | `ISSUER_PRIVATE_KEY_JWK` | Private signing key as a JWK JSON string | **Ephemeral key, regenerated on every boot** |
+| `STATUS_LIST_PATH` | File path for persisting Token Status List state across server restarts | *(in-memory if omitted)* |
+| `STATUS_LIST_TTL_SECONDS` | Token Status List cache duration in seconds (`ttl` claim and Cache-Control max-age). Set to `0` to disable caching (`no-cache, no-store`) | `300` |
+| `ENABLE_LEGACY_VC_FORMAT` | Flag controlling whether legacy `vc+sd-jwt` format is offered and issued (`true` or `false`) | `false` |
 
 > **Warning:** If `ISSUER_PRIVATE_KEY_JWK` is omitted, each restart generates a new key. The DID document changes and credentials issued earlier will no longer verify against it. Plain HTTP defaults are for local development only; wallets generally require a public HTTPS URL.
+>
+> Use the keygen helper to generate a persistent private key:
+> ```bash
+> bun run keygen                     # Generate default ES256 keypair with export snippet
+> bun run keygen EdDSA               # Generate EdDSA (Ed25519) keypair
+> eval $(bun run keygen --env)       # Export directly into current environment
+> ```
 
 ---
 
@@ -124,11 +134,12 @@ The tests exercise the implemented behavior. They are not an official OpenID con
 
 ## Known Limitations
 
-1. **Everything is in memory.** Sessions, `c_nonce` values and the **revocation status list** (`SessionManager`, `StatusList`) are lost on restart. After a restart, previously revoked credentials appear valid again.
+1. **In-memory defaults.** By default, sessions and `c_nonce` values are held in memory. The Token Status List is also in-memory unless `STATUS_LIST_PATH` is configured to persist bitstring state across server restarts.
 2. **Ephemeral signing key by default.** See the warning in Configuration. Set `ISSUER_PRIVATE_KEY_JWK` to keep the same key across restarts.
 3. **No authentication** on the registrar portal, `/credential-offer` (which accepts custom claims, and also via `GET`) and `/admin/*`. Anyone who can reach the service can mint offers with arbitrary claims or revoke credentials.
 4. **Key storage.** Keys live in application memory or an environment variable. Production use needs an HSM (PKCS#11) or cloud KMS (AWS KMS, GCP Cloud KMS, Azure Key Vault).
-5. **Rate limiting and caching.** `/token`, `/credential` and `/nonce` need rate limiting; `/status/:id` should be served behind a CDN with suitable cache invalidation.
+5. **Rate limiting and caching.** `/token`, `/credential` and `/nonce` need rate limiting; `/status/:id` cache duration is configurable via `STATUS_LIST_TTL_SECONDS` (defaults to 300 seconds; set to 0 for no-cache) and should be served behind a CDN with suitable cache invalidation.
 6. **Scope.** Only the Pre-Authorized Code flow is supported, so wallets that need other flows will fail against this issuer. Not HAIP-conformant.
+7. **No automated inbound SIS webhook adapter.** The issuer currently accepts credential offer requests via direct REST (`POST /credential-offer`) and the interactive registrar portal. Automated webhook ingestion from enterprise Student Information Systems (e.g. Banner, PeopleSoft, SAP Campus) is not yet implemented.
 
 Production deployment would additionally require a persistent session/nonce/status store (PostgreSQL or Redis), institutional SSO (SAML 2.0 / OIDC) with RBAC, and a security review.
