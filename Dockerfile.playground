@@ -1,0 +1,22 @@
+FROM oven/bun:1.2-slim AS base
+WORKDIR /app
+
+# Copy root manifests for dependency layer caching
+COPY package.json bun.lock tsconfig.json ./
+COPY packages/core/package.json ./packages/core/
+COPY apps/issuer/package.json ./apps/issuer/
+COPY apps/playground/package.json ./apps/playground/
+
+# Install workspace dependencies
+RUN bun install --frozen-lockfile
+
+# Copy application and schema source files
+COPY packages/core ./packages/core
+COPY apps/playground ./apps/playground
+COPY schemas ./schemas
+
+ENV PORTAL_PORT=3001
+ENV WALTID_BASE=http://waltid-verifier:7004
+EXPOSE 3001
+
+ENTRYPOINT ["sh", "-c", "WAITED=0; while [ ! -f /shared/tunnel.env ] && [ $WAITED -lt 30 ]; do sleep 1; WAITED=$((WAITED + 1)); done; if [ -f /shared/tunnel.env ]; then . /shared/tunnel.env; echo '[Playground] Successfully loaded tunnel environment: '$PUBLIC_URL; else echo '[Playground] Warning: Tunnel env not found after 30s timeout, using defaults'; export ISSUER_BASE_URL=http://issuer:3000; export VERIFIER_PUBLIC_URL=http://localhost:8080/verifier; fi; exec bun run apps/playground/src/server.ts"]
