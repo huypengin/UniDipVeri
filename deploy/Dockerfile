@@ -9,17 +9,24 @@ FROM docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76e
 # Stage 2: Caddy Web Server Binary
 FROM docker.io/caddy:2.8-alpine AS caddy-src
 
-# Stage 3: Unified Production Runtime (Debian + Bun 1.x)
+# Stage 3: Official Eclipse Temurin OpenJDK 21 JRE (glibc runtime)
+FROM docker.io/eclipse-temurin:21-jre AS java-runtime
+
+# Stage 4: Unified Production Runtime (Debian + Bun 1.x)
 FROM oven/bun:1.2-slim AS final
 
-# Install OpenJDK 21 headless (required by Walt.id Kotlin/JVM app), curl, ca-certificates, and bash
+# Install curl, ca-certificates, and bash (standard packages in Debian 12)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        openjdk-21-jre-headless \
         curl \
         ca-certificates \
         bash && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Eclipse Temurin Java 21 JRE runtime from multi-stage builder
+ENV JAVA_HOME=/opt/java/openjdk
+COPY --from=java-runtime ${JAVA_HOME} ${JAVA_HOME}
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Install Caddy reverse proxy gateway binary into system PATH
 COPY --from=caddy-src /usr/bin/caddy /usr/local/bin/caddy
