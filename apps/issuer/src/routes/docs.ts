@@ -485,7 +485,11 @@ export function generateOpenApiSpec(
 /**
  * Serves the Swagger UI HTML interface.
  */
-export function renderSwaggerHtml(title: string): string {
+export function renderSwaggerHtml(title: string, config?: IssuerConfig): string {
+  const basePath = config?.baseUrl ? config.baseUrl.replace(/\/+$/, "") : "";
+  const portalUrl = basePath ? `${basePath}/` : "/";
+  const openApiUrl = `${basePath}/docs/openapi.json`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -542,8 +546,8 @@ export function renderSwaggerHtml(title: string): string {
       <small style="color: #94a3b8;">OID4VCI 1.0 Final &bull; SD-JWT VC (draft-19) &bull; Token Status List</small>
     </div>
     <div style="display: flex; gap: 12px;">
-      <a href="/">&larr; Registrar Portal</a>
-      <a href="/docs/openapi.json" target="_blank">OpenAPI JSON</a>
+      <a href="${portalUrl}">&larr; Registrar Portal</a>
+      <a href="${openApiUrl}" target="_blank">OpenAPI JSON</a>
     </div>
   </div>
   <div id="swagger-ui"></div>
@@ -552,7 +556,7 @@ export function renderSwaggerHtml(title: string): string {
   <script>
     window.onload = function() {
       SwaggerUIBundle({
-        url: "/docs/openapi.json",
+        url: "${openApiUrl}",
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
@@ -594,7 +598,7 @@ export function handleDocsRequest(
   }
 
   if (pathname === "/docs" || pathname === "/swagger") {
-    const html = renderSwaggerHtml(schemaConfig.name);
+    const html = renderSwaggerHtml(schemaConfig.name, config);
     return new Response(html, {
       status: 200,
       headers: {
