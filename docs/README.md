@@ -25,7 +25,8 @@ docs/
     ├── 0003-adopt-dcql-query-model.md
     ├── 0004-delegate-verification-to-external-verifier.md
     ├── 0005-use-token-status-list-revocation.md
-    └── 0006-support-signing-algorithm-agility.md
+    ├── 0006-support-signing-algorithm-agility.md
+    └── 0007-single-hostname-reverse-proxy-gateway.md
 ```
 
 ---
@@ -52,6 +53,7 @@ We document technical decisions using the Markdown Any Decision Records (MADR) f
 - [**ADR-0004: Delegate Verification to Off-the-Shelf Standard Verifier**](adr/0004-delegate-verification-to-external-verifier.md)
 - [**ADR-0005: Use IETF Token Status List for Credential Revocation**](adr/0005-use-token-status-list-revocation.md)
 - [**ADR-0006: Support Signing Algorithm Agility across ES256, EdDSA, and ES384**](adr/0006-support-signing-algorithm-agility.md)
+- [**ADR-0007: Single-Hostname Reverse Proxy Architecture (1 Hostname Gateway)**](adr/0007-single-hostname-reverse-proxy-gateway.md)
 
 ---
 
