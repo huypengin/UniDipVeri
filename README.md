@@ -134,11 +134,15 @@ unidipveri/
 ├── docs/                # Architecture specifications, ADRs, and documentation index
 │   ├── README.md        # Documentation index & paper reference tables
 │   ├── architecture/    # Threat model, standards profiles, system dataflow, schema model, governance
-│   └── adr/             # Architecture Decision Records (MADR format, 0001-0006)
+│   └── adr/             # Architecture Decision Records (MADR format, 0001-0007)
 ├── schemas/             # YAML credential schemas (graduation-record.v1.yaml is the default)
 ├── scripts/             # Benchmark runner (benchmark.ts), key generator (generate-key.ts), and third-party interop suite
+├── Caddyfile            # Single-hostname reverse proxy gateway configuration
+├── Dockerfile.issuer    # Standalone Bun container for OID4VCI Issuer
+├── Dockerfile.playground # Standalone Bun container for Verifier Playground
+├── Dockerfile.tunnel    # Pinned Cloudflare Quick Tunnel container
 ├── devenv.nix           # Nix-based dev environment (provisions all services)
-├── docker-compose.yml   # walt.id verifier container
+├── docker-compose.yml   # Full containerized demonstration stack
 ├── package.json         # Bun workspaces: ["packages/*", "apps/*"]
 └── tsconfig.json        # Shared: ESNext, Bundler resolution, strict
 ```
@@ -183,48 +187,91 @@ A verifier demonstration showcase that proxies [walt.id](https://walt.id)'s off-
 
 | Dependency | Required for | Install |
 | :--- | :--- | :--- |
-| **[devenv](https://devenv.sh/) / Nix** | Recommended path — provisions Bun, Cloudflare tunnels, and all services | [devenv.sh/getting-started](https://devenv.sh/getting-started/) |
-| **[Bun](https://bun.sh/)** (≥ 1.1) | Manual path — running the issuer and playground directly | [bun.sh](https://bun.sh/) |
-| **Docker or Podman** | Manual path — running the walt.id verifier container | [docker.com](https://docs.docker.com/get-docker/) or [podman.io](https://podman.io/getting-started/installation) |
+| **[devenv](https://devenv.sh/) / Nix** | Recommended path — provisions Bun, Caddy, Cloudflare tunnel, and services | [devenv.sh/getting-started](https://devenv.sh/getting-started/) |
+| **Docker or Podman** | Container path — running the complete stack via Docker Compose (no Nix needed) | [docker.com](https://docs.docker.com/get-docker/) or [podman.io](https://podman.io/getting-started/installation) |
+| **[Bun](https://bun.sh/)** (≥ 1.1) | Manual path — running the issuer and playground directly on host | [bun.sh](https://bun.sh/) |
 
-### Clone and Install
+### Option A: `devenv up` (Nix-based Local Development)
 
-```bash
-git clone https://github.com/huypengin/unidipveri.git
-cd unidipveri
-bun install --frozen-lockfile
-```
-
-### Option A: `devenv up` (Recommended)
-
-One command provisions everything: the issuer with a Cloudflare tunnel, the walt.id verifier container, and the playground showcase. Mobile wallets can reach the issuer over HTTPS immediately.
+One command provisions everything: Caddy reverse proxy, the issuer, the playground showcase, the walt.id verifier container, and a single public Cloudflare tunnel. Mobile wallets can reach the issuer over HTTPS immediately.
 
 ```bash
 devenv up
 ```
 
-`devenv up` starts five coordinated processes:
+`devenv up` starts coordinated services managed behind an internal Caddy gateway:
 
-| Service | Local address | What it does |
+| Service | Local address | Path / Description |
 | :--- | :--- | :--- |
-| **Issuer** | `http://localhost:3000` | OID4VCI issuer, registrar portal, Swagger UI |
-| **Issuer tunnel** | `https://<random>.trycloudflare.com` | Public HTTPS for mobile wallets |
-| **walt.id verifier** | `http://localhost:7004` | Off-the-shelf OID4VP verifier (container) |
-| **Verifier tunnel** | `https://<random>.trycloudflare.com` | Public HTTPS for cross-device presentation |
-| **Playground** | `http://localhost:3001` | Verifier demonstration showcase UI |
+| **Gateway** | `http://localhost:8080` | Caddy reverse proxy (redirects `/` to `/playground/`) |
+| **Public Gateway Tunnel** | `https://<random>.trycloudflare.com` | Single public HTTPS domain for mobile wallet testing |
+| **Registrar Portal** | `http://localhost:8080/issuer/` | OID4VCI issuer, student portal, Swagger UI (`/issuer/docs`) |
+| **Playground Showcase** | `http://localhost:8080/playground/` | Verifier demonstration showcase UI |
+| **walt.id verifier** | `http://localhost:7004` | Off-the-shelf OID4VP verifier (containerized) |
 
-Environment variables (`ISSUER_BASE_URL`, `ISSUER_DID`, `VCT_BASE_URL`, `VERIFIER_PUBLIC_URL`) are auto-configured from the tunnel URLs. No manual setup needed.
+Environment variables (`ISSUER_BASE_URL`, `ISSUER_DID`, `VCT_BASE_URL`, `VERIFIER_PUBLIC_URL`) are automatically resolved from the published tunnel URL.
 
 **Quick workflow after `devenv up`:**
 
-1. Open the **Registrar Portal** at `http://localhost:3000` — fill in student data and generate a credential offer QR code.
-2. Scan the QR with a compatible wallet (Paradym, Sphereon, or Lissi) to receive the SD-JWT VC.
-3. Open the **Playground** at `http://localhost:3001` — scan the verification QR with the same wallet to present the credential.
-4. View the disclosed claims, policy results, and audit trail in the Playground UI.
+1. Open the **Registrar Portal** at `http://localhost:8080/issuer/` (or via public tunnel) — generate a credential offer QR code.
+2. Scan the QR code with a compatible wallet (Paradym, Sphereon, or Lissi) to receive the SD-JWT VC.
+3. Open the **Playground Showcase** at `http://localhost:8080/playground/` — scan the verification QR with the same wallet to present the credential.
+4. View the verified claims, policy evaluation, and audit trail in the Playground UI.
 
-### Option B: Manual (Bun + Container)
+---
 
-Use this if you cannot or prefer not to install Nix/devenv.
+### Option B: Docker Compose (No Nix or Local Bun Required)
+
+If you prefer not to install Nix or local development runtimes, run the entire UniDipVeri demonstration stack inside containers with Docker or Podman:
+
+#### 1. Boot the Complete Stack
+
+```bash
+docker compose --profile containers up --build
+```
+
+*(Or detached mode: `docker compose --profile containers up -d --build`)*
+
+This builds and launches:
+- **`caddy`**: Reverse proxy gateway listening on port `8080`.
+- **`tunnel`**: Pinned Cloudflare Quick Tunnel container syncing public HTTPS to the gateway.
+- **`issuer`**: UniDipVeri OID4VCI Issuer container (port `3000`).
+- **`playground`**: Verifier demonstration showcase container (port `3001`).
+- **`waltid-verifier`**: Off-the-shelf Walt.id Verifier 2 container (port `7004`).
+
+#### 2. Discover the Public Tunnel URL
+
+To test with mobile wallets on your phone, inspect the tunnel logs to retrieve the assigned public URL:
+
+```bash
+docker compose logs -f tunnel
+```
+
+Look for the published line:
+```
+✓ Quick Tunnel ready and published: https://<assigned-hostname>.trycloudflare.com
+```
+
+The issuer and playground containers automatically synchronize with this tunnel URL through a shared volume.
+
+#### 3. Access Services
+
+- **Showcase UI**: `http://localhost:8080/` or `https://<assigned-hostname>.trycloudflare.com/` (redirects to `/playground/`)
+- **Registrar Portal**: `http://localhost:8080/issuer/` or `https://<assigned-hostname>.trycloudflare.com/issuer/`
+- **Swagger API Explorer**: `http://localhost:8080/issuer/docs`
+- **Walt.id Direct API**: `http://localhost:7004`
+
+#### 4. Stop and Clean Up
+
+```bash
+docker compose --profile containers down -v
+```
+
+---
+
+### Option C: Manual Native Bun Processes
+
+Use this if you want to run Bun processes directly on your host without Nix or full containerization:
 
 #### 1. Start the Issuer
 
@@ -242,10 +289,10 @@ bun run dev:issuer
 #### 2. Start the walt.id Verifier
 
 ```bash
-docker compose up        # or: podman-compose up
+docker compose --profile verifier up waltid-verifier   # or: podman-compose --profile verifier up waltid-verifier
 ```
 
-This starts the walt.id verifier API on `http://localhost:7004` using the pinned image in [`docker-compose.yml`](docker-compose.yml).
+This starts only the walt.id verifier API container on `http://localhost:7004` using the `verifier` profile in [`docker-compose.yml`](docker-compose.yml) without launching the other containerized services.
 
 #### 3. Start the Playground
 

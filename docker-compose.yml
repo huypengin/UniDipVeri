@@ -3,7 +3,7 @@ services:
     image: docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76ee7fee4bb5ee68369e2ea1864733039e9a
     ports:
       - "7004:7004"
-    profiles: ["verifier"]
+    profiles: ["verifier", "containers"]
 
   caddy:
     image: docker.io/caddy:2.8-alpine
@@ -19,6 +19,7 @@ services:
       - issuer
       - playground
       - waltid-verifier
+    profiles: ["containers"]
 
   tunnel:
     build:
@@ -29,6 +30,7 @@ services:
     depends_on:
       - caddy
     restart: unless-stopped
+    profiles: ["containers"]
 
   issuer:
     build:
@@ -40,6 +42,7 @@ services:
       - tunnel_data:/shared
     depends_on:
       - waltid-verifier
+    profiles: ["containers"]
 
   playground:
     build:
@@ -52,6 +55,7 @@ services:
     depends_on:
       - issuer
       - waltid-verifier
+    profiles: ["containers"]
 
 volumes:
   tunnel_data:
