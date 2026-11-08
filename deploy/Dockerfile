@@ -15,15 +15,18 @@ FROM docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76e
 
 USER root
 
-# Install curl and ca-certificates for health polling
+# Install curl, ca-certificates, and libcap2-bin (for removing setcap from Caddy on Render)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        ca-certificates && \
+        ca-certificates \
+        libcap2-bin && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Caddy reverse proxy gateway binary into system PATH
+# Install Caddy reverse proxy gateway binary into system PATH and strip setcap file capabilities
+# (Render security sandbox forbids executing binaries with setcap file capabilities, throwing EPERM)
 COPY --from=caddy-src /usr/bin/caddy /usr/local/bin/caddy
+RUN chmod 755 /usr/local/bin/caddy && setcap -r /usr/local/bin/caddy
 
 # Install Bun runtime binary into system PATH
 COPY --from=bun-src /usr/local/bin/bun /usr/local/bin/bun

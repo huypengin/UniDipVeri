@@ -128,12 +128,28 @@ export async function initializeKeyManager(
   let rawPublicKeyJwk: jose.JWK;
 
   if (privateKeyJwkJson && privateKeyJwkJson.trim().length > 0) {
+    let jsonStr = privateKeyJwkJson.trim();
+    // Strip accidental outer quotes if the environment string was quoted literally
+    if (
+      (jsonStr.startsWith("'") && jsonStr.endsWith("'")) ||
+      (jsonStr.startsWith('"') && jsonStr.endsWith('"') && jsonStr.includes('{"'))
+    ) {
+      jsonStr = jsonStr.slice(1, -1).trim();
+    }
+
     try {
-      rawPrivateKeyJwk = JSON.parse(privateKeyJwkJson) as jose.JWK;
-    } catch (err) {
-      throw new Error(
-        `Failed to parse ISSUER_PRIVATE_KEY_JWK as JSON: ${err instanceof Error ? err.message : String(err)}`
-      );
+      rawPrivateKeyJwk = JSON.parse(jsonStr) as jose.JWK;
+    } catch {
+      // If direct parse fails (e.g. terminal copy-paste wrapping long base64url values across lines),
+      // strip raw newlines and carriage returns and retry
+      try {
+        jsonStr = jsonStr.replace(/\r?\n|\r/g, "");
+        rawPrivateKeyJwk = JSON.parse(jsonStr) as jose.JWK;
+      } catch (err) {
+        throw new Error(
+          `Failed to parse ISSUER_PRIVATE_KEY_JWK as JSON: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
     }
 
     if (
