@@ -11,13 +11,61 @@
     pkgs.curl
   ];
 
+  enterShell = ''
+    rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
+  '';
+
+  services.caddy = {
+    enable = true;
+    config = builtins.readFile ./Caddyfile;
+  };
+
   processes = {
-    issuer-tunnel = {
+    tunnel = {
       exec = ''
         mkdir -p .devenv
-        rm -f .devenv/issuer-tunnel.log
-        echo "Starting Cloudflare Quick Tunnel on port 3000..."
-        cloudflared tunnel --url http://localhost:3000 2>&1 | tee .devenv/issuer-tunnel.log
+        touch .devenv/tunnel.pending
+        rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/*tunnel*.log
+
+        cleanup() {
+          echo "Stopping tunnel and wiping tunnel artifacts..."
+          kill $TUNNEL_PID 2>/dev/null || true
+          rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
+          exit 0
+        }
+        trap cleanup EXIT INT TERM
+
+        # Wait for Caddy to be listening on port 8080
+        echo "Waiting for Caddy on port 8080..."
+        for i in {1..30}; do
+          if curl -s http://localhost:8080/health >/dev/null 2>&1; then
+            echo "✓ Caddy is ready on port 8080"
+            break
+          fi
+          sleep 1
+        done
+
+        # Launch cloudflared with native logfile (eliminates pipe block buffering)
+        echo "Starting Cloudflare Quick Tunnel on Caddy port 8080..."
+        cloudflared tunnel --no-autoupdate --logfile .devenv/tunnel.log --url http://localhost:8080 &
+        TUNNEL_PID=$!
+
+        # Detect, validate, and atomically publish URL to .devenv/tunnel.url
+        for i in {1..60}; do
+          if [ -f .devenv/tunnel.log ]; then
+            URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' .devenv/tunnel.log | head -n 1 || true)
+            if [ -n "$URL" ] && echo "$URL" | grep -qE '^https://[a-zA-Z0-9-]+\.trycloudflare\.com$'; then
+              echo "$URL" > .devenv/tunnel.url.tmp
+              mv .devenv/tunnel.url.tmp .devenv/tunnel.url
+              rm -f .devenv/tunnel.pending
+              echo "✓ Quick Tunnel ready and published: $URL"
+              break
+            fi
+          fi
+          sleep 1
+        done
+
+        wait $TUNNEL_PID
       '';
     };
 
@@ -29,29 +77,34 @@
         export LOG_FILE="''${LOG_FILE:-$LOGS_DIR/issuer.log}"
         mkdir -p "''$LOGS_DIR"
 
+        cleanup() {
+          rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
+        }
+        trap cleanup EXIT INT TERM
+
         if [ -n "''${ISSUER_BASE_URL:-}" ]; then
           echo "Using preconfigured ISSUER_BASE_URL: ''$ISSUER_BASE_URL"
         else
-          echo "Waiting for Issuer Cloudflare Tunnel public URL to be assigned..."
-          for i in {1..30}; do
-            if [ -f .devenv/issuer-tunnel.log ] && grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log >/dev/null 2>&1; then
-              TUNNEL_URL=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' .devenv/issuer-tunnel.log | head -n 1)
+          echo "Waiting for Cloudflare Tunnel URL to be published..."
+          for i in {1..60}; do
+            if [ ! -f .devenv/tunnel.pending ] && [ -s .devenv/tunnel.url ]; then
+              TUNNEL_URL=$(cat .devenv/tunnel.url | tr -d '[:space:]')
               break
             fi
             sleep 1
           done
 
           if [ -z "''${TUNNEL_URL:-}" ]; then
-            echo "Warning: Cloudflare tunnel URL not detected after 30s. Falling back to http://localhost:3000."
-            TUNNEL_URL="http://localhost:3000"
-            DOMAIN="localhost%3A3000"
+            echo "Warning: Cloudflare tunnel URL not detected after 30s. Falling back to http://localhost:8080."
+            TUNNEL_URL="http://localhost:8080"
+            DOMAIN="localhost%3A8080"
           else
             DOMAIN=$(echo "''$TUNNEL_URL" | sed -e 's|^https://||' -e 's|/.*$||')
           fi
 
-          export ISSUER_BASE_URL="''$TUNNEL_URL"
-          export VCT_BASE_URL="''$TUNNEL_URL"
-          export ISSUER_DID="did:web:''$DOMAIN"
+          export ISSUER_BASE_URL="''$TUNNEL_URL/issuer"
+          export VCT_BASE_URL="''$TUNNEL_URL/issuer"
+          export ISSUER_DID="did:web:''$DOMAIN:issuer"
         fi
 
         export SCHEMA_PATH="''${SCHEMA_PATH:-$DEVENV_ROOT/schemas/graduation-record.v1.yaml}"
@@ -81,27 +134,20 @@
 
         cleanup() {
           echo "Stopping Walt.id verifier container via compose..."
-          ''$COMPOSE_CLI down -v --remove-orphans >/dev/null 2>&1 || true
+          ''$COMPOSE_CLI --profile verifier down -v --remove-orphans >/dev/null 2>&1 || true
           podman rm -f $(podman ps -aq --filter "name=waltid-verifier") >/dev/null 2>&1 || true
           docker rm -f $(docker ps -aq --filter "name=waltid-verifier") >/dev/null 2>&1 || true
+          rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
         }
         trap cleanup EXIT INT TERM
 
         # Pre-flight cleanup: remove any stale containers from previous runs or crashes
-        ''$COMPOSE_CLI down -v --remove-orphans >/dev/null 2>&1 || true
+        ''$COMPOSE_CLI --profile verifier down -v --remove-orphans >/dev/null 2>&1 || true
         podman rm -f $(podman ps -aq --filter "name=waltid-verifier") >/dev/null 2>&1 || true
         docker rm -f $(docker ps -aq --filter "name=waltid-verifier") >/dev/null 2>&1 || true
+        rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
 
-        ''$COMPOSE_CLI up --force-recreate
-      '';
-    };
-
-    verifier-tunnel = {
-      exec = ''
-        mkdir -p .devenv
-        rm -f .devenv/verifier-tunnel.log
-        echo "Starting Cloudflare Quick Tunnel for Walt.id Verifier on port 7004..."
-        cloudflared tunnel --url http://localhost:7004 2>&1 | tee .devenv/verifier-tunnel.log
+        ''$COMPOSE_CLI --profile verifier up --force-recreate waltid-verifier
       '';
     };
 
@@ -112,25 +158,27 @@
         export LOG_DIR="''$LOGS_DIR"
         mkdir -p "''$LOGS_DIR"
 
-        # Resolves service public URL (prefers env var, then Cloudflare tunnel URL, fallback to local URL)
+        cleanup() {
+          rm -f .devenv/tunnel.url .devenv/tunnel.url.tmp .devenv/tunnel.log .devenv/tunnel.pending .devenv/*tunnel*.log
+        }
+        trap cleanup EXIT INT TERM
+
         resolve_url() {
-          local name="''$1"
-          local log_file="''$2"
-          local fallback="''$3"
-          local explicit="''${4:-}"
+          local fallback="''$1"
+          local explicit="''${2:-}"
 
           if [ -n "''$explicit" ]; then
             echo "''$explicit"
             return 0
           fi
 
-          echo "Waiting for ''$name Cloudflare Tunnel public URL to be assigned..." >&2
-          for i in {1..40}; do
-            if [ -f "''$log_file" ]; then
+          echo "Waiting for Cloudflare Tunnel URL to be published..." >&2
+          for i in {1..60}; do
+            if [ ! -f .devenv/tunnel.pending ] && [ -s .devenv/tunnel.url ]; then
               local url
-              url=$(grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' "''$log_file" 2>/dev/null | head -n 1)
+              url=$(cat .devenv/tunnel.url | tr -d '[:space:]')
               if [ -n "''$url" ]; then
-                echo "✓ ''$name Tunnel URL detected: ''$url" >&2
+                echo "✓ Tunnel URL detected: ''$url" >&2
                 echo "''$url"
                 return 0
               fi
@@ -138,12 +186,10 @@
             sleep 1
           done
 
-          echo "Notice: ''$name tunnel not detected, falling back to ''$fallback" >&2
+          echo "Notice: Tunnel not detected, falling back to ''$fallback" >&2
           echo "''$fallback"
         }
 
-        # Waits for service readiness (accepts HTTP 200 or 302)
-        # Checks primary URL first (good result: Cloudflare), falls back to checking local URL
         wait_for_readiness() {
           local name="''$1"
           local primary_url="''$2"
@@ -177,23 +223,25 @@
           return 1
         }
 
-        export ISSUER_BASE_URL="$(resolve_url "Issuer" ".devenv/issuer-tunnel.log" "http://localhost:3000" "''${ISSUER_BASE_URL:-}")"
-        export VERIFIER_PUBLIC_URL="$(resolve_url "Verifier" ".devenv/verifier-tunnel.log" "http://localhost:7004" "''${VERIFIER_PUBLIC_URL:-}")"
+        TUNNEL_URL="$(resolve_url "http://localhost:8080" "''${PUBLIC_URL:-}")"
+        export ISSUER_BASE_URL="''$TUNNEL_URL/issuer"
+        export VERIFIER_PUBLIC_URL="''$TUNNEL_URL/verifier"
+        export WALTID_BASE="http://localhost:7004"
 
         wait_for_readiness "Issuer" "''$ISSUER_BASE_URL" "http://localhost:3000" 40
         wait_for_readiness "Walt.id Verifier" "''$VERIFIER_PUBLIC_URL" "http://localhost:7004" 40
 
-        export PORT="''${PORT:-3001}"
         export VCT_TYPE="''${VCT_TYPE:-graduation-record}"
         export VCT_VERSION="''${VCT_VERSION:-v1}"
 
         echo "=========================================================="
         echo " UniDipVeri Playground Showcase running"
-        echo " UI:                        http://localhost:''$PORT"
+        echo " UI:                        ''$TUNNEL_URL/playground"
         echo " VCT Type:                  ''$VCT_TYPE"
         echo " VCT Version:               ''$VCT_VERSION"
         echo " Issuer Public:             ''$ISSUER_BASE_URL"
         echo " Verifier Engine Public:    ''$VERIFIER_PUBLIC_URL"
+        echo " Gateway Public:            ''$TUNNEL_URL"
         echo " Logs Dir:                  ''$LOGS_DIR"
         echo "=========================================================="
 
