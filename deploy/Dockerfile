@@ -55,9 +55,9 @@ RUN chmod +x /unidipveri/deploy/entrypoint.sh
 
 # Production environment defaults
 ENV NODE_ENV=production
-ENV PORT=8080
+ENV PORT=10000
 
-# Expose ports: 8080 (Gateway / Render public), 3000 (Issuer), 3001 (Playground), 7004 (Walt.id)
-EXPOSE 8080 3000 3001 7004
+# Expose only the primary public gateway port (Render default port)
+EXPOSE 10000
 
 ENTRYPOINT ["/unidipveri/deploy/entrypoint.sh"]

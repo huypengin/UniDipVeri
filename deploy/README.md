@@ -12,7 +12,7 @@ To host the full ecosystem (Issuer, Verifier Showcase, and off-the-shelf Walt.id
 
 ```mermaid
 flowchart TD
-    Client["Client / Mobile Wallet"] -->|"HTTPS (Single Public Domain)"| Gateway["Caddy Reverse Proxy (:{$PORT:8080})"]
+    Client["Client / Mobile Wallet"] -->|"HTTPS (Single Public Domain)"| Gateway["Caddy Reverse Proxy (:{$PORT:10000})"]
 
     Gateway -->|"GET / (HTTP 302 Redirect)"| Playground["Playground Showcase (Port 3001)"]
     Gateway -->|"/playground/*"| Playground
@@ -25,7 +25,7 @@ flowchart TD
 
 | Component | Internal Port | Description |
 | :--- | :--- | :--- |
-| **Caddy Gateway** | `:{$PORT:8080}` | Reverse proxy managing path routing, well-known rewrites, and health checks |
+| **Caddy Gateway** | `:{$PORT:10000}` | Reverse proxy managing path routing, well-known rewrites, and health checks |
 | **UniDipVeri Issuer** | `127.0.0.1:3000` | OID4VCI credential issuer, registrar portal, and DID document |
 | **UniDipVeri Playground** | `127.0.0.1:3001` | Interactive verifier demonstration showcase UI |
 | **Walt.id Verifier 2** | `127.0.0.1:7004` | Off-the-shelf OID4VP verifier engine (JVM runtime) |

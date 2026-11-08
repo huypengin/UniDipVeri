@@ -2325,6 +2325,7 @@ export function startPlaygroundServer(config: PlaygroundConfig = loadPlaygroundC
   const app = createPlaygroundApp(config);
 
   const server = Bun.serve({
+    hostname: process.env.BIND_HOST || "127.0.0.1",
     port: config.port,
     fetch: app,
   });

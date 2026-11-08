@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 1. Determine Public Hostname and URLs
-GATEWAY_PORT="${PORT:-8080}"
+GATEWAY_PORT="${PORT:-10000}"
 PUBLIC_URL="${PUBLIC_URL:-${RENDER_EXTERNAL_URL:-http://localhost:${GATEWAY_PORT}}}"
 PUBLIC_URL="${PUBLIC_URL%/}"
 DOMAIN=$(echo "$PUBLIC_URL" | sed -e 's|^https://||' -e 's|^http://||' -e 's|/.*$||')
@@ -23,7 +23,8 @@ else
   echo "✓ Loaded persistent demo signing key from environment settings."
 fi
 
-# 3. Microservice Configuration
+# 3. Microservice Configuration (Internal services bind strictly to 127.0.0.1)
+export BIND_HOST="127.0.0.1"
 export ISSUER_BASE_URL="${PUBLIC_URL}/issuer"
 export VCT_BASE_URL="${PUBLIC_URL}/issuer"
 export ISSUER_DID="did:web:${DOMAIN}:issuer"
@@ -36,27 +37,42 @@ export VERIFIER_PUBLIC_URL="${PUBLIC_URL}/verifier"
 # 4. Graceful Cleanup Trap
 cleanup() {
   echo "Terminating internal background microservices..."
-  kill "${WALTID_PID:-}" "${ISSUER_PID:-}" "${PLAYGROUND_PID:-}" 2>/dev/null || true
+  kill "${CADDY_PID:-}" "${WALTID_PID:-}" "${ISSUER_PID:-}" "${PLAYGROUND_PID:-}" 2>/dev/null || true
   exit 0
 }
 trap cleanup EXIT INT TERM
 
-# 5. Launch Walt.id Verifier 2 via native Jib classpath
+# 5. Launch Caddy Gateway FIRST on $GATEWAY_PORT
+# Starting Caddy immediately ensures Render detects the public gateway port ($PORT/10000)
+# from second 0 and does not attempt to bind external traffic to internal microservice ports.
+echo "=========================================================="
+echo " UniDipVeri Production Demo Gateway starting on port ${GATEWAY_PORT}"
+echo " Public Gateway:    ${PUBLIC_URL}"
+echo " Showcase UI:       ${PUBLIC_URL}/playground"
+echo " Registrar Portal:  ${PUBLIC_URL}/issuer"
+echo " OID4VCI Metadata:  ${PUBLIC_URL}/issuer/.well-known/openid-credential-issuer"
+echo " DID Document:      ${PUBLIC_URL}/issuer/did.json"
+echo " Health Probe:      ${PUBLIC_URL}/health"
+echo "=========================================================="
+PORT="${GATEWAY_PORT}" caddy run --config /unidipveri/deploy/Caddyfile --adapter caddyfile &
+CADDY_PID=$!
+
+# 6. Launch Walt.id Verifier 2 via native Jib classpath
 echo "Starting Walt.id Verifier 2 on internal port 7004..."
 (cd /waltid-verifier-api2 && java -cp "@/app/jib-classpath-file" id.walt.verifier2.MainKt) &
 WALTID_PID=$!
 
-# 6. Launch UniDipVeri Issuer
+# 7. Launch UniDipVeri Issuer (binds to 127.0.0.1:3000)
 echo "Starting UniDipVeri Issuer on internal port 3000..."
 PORT=3000 bun run /unidipveri/apps/issuer/src/server.ts &
 ISSUER_PID=$!
 
-# 7. Launch UniDipVeri Playground Showcase
+# 8. Launch UniDipVeri Playground Showcase (binds to 127.0.0.1:3001)
 echo "Starting UniDipVeri Playground Showcase on internal port 3001..."
 PORTAL_PORT=3001 PORT=3001 bun run /unidipveri/apps/playground/src/server.ts &
 PLAYGROUND_PID=$!
 
-# 8. Readiness Verification Loop (up to 90s for Walt.id JVM warm-up on cold starts)
+# 9. Readiness Verification Loop (up to 90s for Walt.id JVM warm-up on cold starts)
 echo "Verifying readiness of internal services..."
 ALL_READY=false
 for i in {1..90}; do
@@ -84,15 +100,6 @@ if [ "$ALL_READY" != "true" ]; then
   exit 1
 fi
 
-# 9. Launch Caddy Gateway in Foreground
-echo "=========================================================="
-echo " UniDipVeri Production Demo Gateway starting on port ${GATEWAY_PORT}"
-echo " Public Gateway:    ${PUBLIC_URL}"
-echo " Showcase UI:       ${PUBLIC_URL}/playground"
-echo " Registrar Portal:  ${PUBLIC_URL}/issuer"
-echo " OID4VCI Metadata:  ${PUBLIC_URL}/issuer/.well-known/openid-credential-issuer"
-echo " DID Document:      ${PUBLIC_URL}/issuer/did.json"
-echo " Health Probe:      ${PUBLIC_URL}/health"
-echo "=========================================================="
-
-PORT="${GATEWAY_PORT}" exec caddy run --config /unidipveri/deploy/Caddyfile --adapter caddyfile
+echo "✓ Production Gateway and all microservices are operational."
+# Wait on supervised microservices; if any process exits unexpectedly, trigger cleanup
+wait -n "${CADDY_PID}" "${WALTID_PID}" "${ISSUER_PID}" "${PLAYGROUND_PID}"
