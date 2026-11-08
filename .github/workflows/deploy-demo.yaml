@@ -47,9 +47,15 @@ jobs:
             echo "⚠️ RENDER_DEPLOY_HOOK_URL secret is not configured; skipping automatic Render deployment hook."
             exit 0
           fi
-          echo "Triggering Render deployment via webhook..."
-          curl -f -sS -X POST "$RENDER_DEPLOY_HOOK_URL"
-          echo "✓ Render deploy hook successfully triggered."
+          HOOK_URL="$RENDER_DEPLOY_HOOK_URL"
+          if [[ "$HOOK_URL" == *"?"* ]]; then
+            HOOK_URL="${HOOK_URL}&ref=${{ github.sha }}"
+          else
+            HOOK_URL="${HOOK_URL}?ref=${{ github.sha }}"
+          fi
+          echo "Triggering Render deployment for release commit ${{ github.sha }} via webhook..."
+          curl -f -sS -X POST "$HOOK_URL"
+          echo "✓ Render deploy hook successfully triggered for commit ${{ github.sha }}."
 
       - name: Verify Live Service Health
         env:

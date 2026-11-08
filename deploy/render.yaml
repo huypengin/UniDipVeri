@@ -8,6 +8,8 @@ services:
     name: unidipveri-demo
     runtime: docker
     plan: free
+    autoDeployTrigger: 'off'
+    autoDeploy: false
     dockerContext: .
     dockerfilePath: deploy/Dockerfile
     envVars:
