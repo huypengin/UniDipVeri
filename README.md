@@ -133,7 +133,7 @@ unidipveri/
 │       └── tests/
 ├── docs/                # Architecture specifications, ADRs, and documentation index
 │   ├── README.md        # Documentation index & paper reference tables
-│   ├── architecture/    # Threat model, standards profiles, system dataflow, schema model
+│   ├── architecture/    # Threat model, standards profiles, system dataflow, schema model, governance
 │   └── adr/             # Architecture Decision Records (MADR format, 0001-0006)
 ├── schemas/             # YAML credential schemas (graduation-record.v1.yaml is the default)
 ├── scripts/             # Benchmark runner (benchmark.ts), key generator (generate-key.ts), and third-party interop suite

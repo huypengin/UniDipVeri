@@ -16,7 +16,8 @@ docs/
 │   ├── 01-problem-and-threat-model.md
 │   ├── 02-standards-profile.md
 │   ├── 03-system-architecture.md
-│   └── 04-schema-and-data-model.md
+│   ├── 04-schema-and-data-model.md
+│   └── 05-operations-and-governance.md
 │
 └── adr/                    # Architecture Decision Records (MADR format)
     ├── 0001-isolate-schema-contract.md
@@ -37,6 +38,7 @@ These documents formalize the technical architecture, problem statement, threat 
 2. [**Standards Profile**](architecture/02-standards-profile.md): Normative profile constraints across RFC 9901, `draft-ietf-oauth-sd-jwt-vc-19` (`typ: dc+sd-jwt`), OpenID4VCI 1.0 Final, OpenID4VP 1.0 Final (DCQL), and Token Status List `draft-ietf-oauth-status-list-21` (with explicit HAIP non-conformance boundaries).
 3. [**System Architecture**](architecture/03-system-architecture.md): End-to-end dataflow, sequence diagrams, key management, session lifecycle, and security boundaries across Issuer (`apps/issuer`), mobile wallets, and external Relying Party verification (delegated to walt.id verifier with `apps/playground` showcase).
 4. [**Schema and Data Model**](architecture/04-schema-and-data-model.md): Declarative YAML schema design, Zod boundary validations, selective disclosure policies, and recursive claim masking mechanics.
+5. [**Operations and Governance**](architecture/05-operations-and-governance.md): Enterprise solution deployment topology, OpenID4VCI mass issuance architecture and holder-binding solutions, reference prototype (`apps/issuer`) vs. enterprise target gap analysis, dual-layer staff workflow, Principal degree conferral authority mapping, FIPS 140-2 Level 3 key custody, and verifier trust anchor boundaries.
 
 ---
 
