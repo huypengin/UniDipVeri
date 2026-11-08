@@ -7,6 +7,11 @@ PUBLIC_URL="${PUBLIC_URL:-${RENDER_EXTERNAL_URL:-http://localhost:${GATEWAY_PORT
 PUBLIC_URL="${PUBLIC_URL%/}"
 DOMAIN=$(echo "$PUBLIC_URL" | sed -e 's|^https://||' -e 's|^http://||' -e 's|/.*$||')
 
+# Allow local loopback testing if URL is localhost / 127.0.0.1
+if [[ "$PUBLIC_URL" =~ ^http://(localhost|127\.0\.0\.1) ]]; then
+  export NODE_ENV=development
+fi
+
 # 2. Key Custody and Persistent Identity
 if [ -z "${ISSUER_PRIVATE_KEY_JWK:-}" ]; then
   echo "⚠️ WARNING: ISSUER_PRIVATE_KEY_JWK is not configured in environment settings."
@@ -60,7 +65,7 @@ for i in {1..30}; do
 
   if curl -s http://127.0.0.1:3000/health >/dev/null 2>&1; then ISSUER_OK=true; fi
   if curl -s http://127.0.0.1:3001/api/status >/dev/null 2>&1 || curl -s http://127.0.0.1:3001/ >/dev/null 2>&1; then PLAYGROUND_OK=true; fi
-  if curl -s http://127.0.0.1:7004/health >/dev/null 2>&1 || curl -s http://127.0.0.1:7004/ >/dev/null 2>&1; then VERIFIER_OK=true; fi
+  if curl -s http://127.0.0.1:7004/livez >/dev/null 2>&1 || curl -s http://127.0.0.1:7004/health >/dev/null 2>&1; then VERIFIER_OK=true; fi
 
   if [ "$ISSUER_OK" = "true" ] && [ "$PLAYGROUND_OK" = "true" ] && [ "$VERIFIER_OK" = "true" ]; then
     echo "✓ All internal services are healthy and responsive."

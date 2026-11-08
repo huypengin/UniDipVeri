@@ -7,8 +7,8 @@
 # Stage 1: Caddy Static Binary
 FROM docker.io/caddy:2.8-alpine AS caddy-src
 
-# Stage 2: Bun Static Binary
-FROM oven/bun:1.2-slim AS bun-src
+# Stage 2: Bun Static Binary (Bun 1.x matching lockfile v2)
+FROM docker.io/oven/bun:1 AS bun-src
 
 # Stage 3: Unified Production Runtime (Walt.id Verifier 2 Base)
 FROM docker.io/waltid/verifier-api2:1.2.0@sha256:2e8581019531c2efa17a2c086b9c76ee7fee4bb5ee68369e2ea1864733039e9a AS final
