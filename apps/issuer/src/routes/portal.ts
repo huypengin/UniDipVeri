@@ -828,6 +828,8 @@ export function renderPortalHtml(
       </div>
     </div>
     <nav class="nav-links">
+      <a href="${config.baseUrl}/interactive-issue" class="active">Interactive Issue</a>
+      <a href="${config.baseUrl}/batch-issue">Batch Issuance</a>
       <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
       <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>

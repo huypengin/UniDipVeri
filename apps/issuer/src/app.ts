@@ -17,8 +17,11 @@ import {
   handleStatusListRequest,
   handleAdminRevokeRequest,
   handleAdminStatusQuery,
+  handleAdminStudentStatusQuery,
+  handleAdminRegistryQuery,
 } from "./routes/status.js";
 import { handlePortalRequest } from "./routes/portal.js";
+import { handleBatchRequest } from "./routes/batch.js";
 import { handleDocsRequest } from "./routes/docs.js";
 
 /**
@@ -97,9 +100,29 @@ export function createApp(
         return withCors(response);
       };
 
-      // Route: GET / or GET /issue (Interactive Registrar Portal)
-      if ((method === "GET" || method === "HEAD") && (pathname === "/" || pathname === "/issue")) {
+      // Route: Redirect root / to /interactive-issue
+      if ((method === "GET" || method === "HEAD") && pathname === "/") {
+        return respond(
+          Response.redirect(`${config.baseUrl.replace(/\/+$/, "")}/interactive-issue`, 302)
+        );
+      }
+
+      // Route: GET /interactive-issue (Interactive Registrar Portal)
+      if ((method === "GET" || method === "HEAD") && pathname === "/interactive-issue") {
         return respond(handlePortalRequest(req, config, schemaConfig));
+      }
+
+      // Route: GET /batch-issue and POST /batch-issue (Batch Credential Issuance Pipeline)
+      if (pathname === "/batch-issue") {
+        return respond(
+          handleBatchRequest(req, {
+            config,
+            keyContext,
+            schemaConfig,
+            sessionManager,
+            statusListService,
+          })
+        );
       }
 
       // Route: GET /docs, GET /swagger, GET /docs/openapi.json
@@ -220,6 +243,30 @@ export function createApp(
       // Route: POST /admin/revoke
       if (pathname === "/admin/revoke") {
         return respond(handleAdminRevokeRequest(req, statusListService));
+      }
+
+      // Route: GET /admin/registry
+      if (pathname === "/admin/registry") {
+        return respond(handleAdminRegistryQuery(statusListService));
+      }
+
+      // Route: GET /admin/status/student/:studentId
+      if (pathname.startsWith("/admin/status/student/")) {
+        const studentId = pathname.slice("/admin/status/student/".length);
+        return respond(
+          handleAdminStudentStatusQuery(decodeURIComponent(studentId), statusListService)
+        );
+      }
+
+      // Route: GET /admin/status?studentId=...
+      if (pathname === "/admin/status") {
+        const studentId =
+          url.searchParams.get("studentId") ?? url.searchParams.get("student_id");
+        if (studentId) {
+          return respond(
+            handleAdminStudentStatusQuery(studentId, statusListService)
+          );
+        }
       }
 
       // Route: GET /admin/status/:idx
