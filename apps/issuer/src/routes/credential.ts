@@ -399,10 +399,16 @@ export async function handleCredentialRequest(
     rawClaims = studentRecordsService.getStudentRecord(activeSession.studentId);
   }
 
-  // 8. Allocate Status List Revocation Index
+  // 8. Allocate Status List Revocation Index (Tracked for Interactive Issuance)
   let revocationIndex: number;
   try {
-    revocationIndex = statusListService.allocateIndex();
+    const studentId =
+      activeSession.studentId ||
+      (typeof rawClaims.studentId === "string" ? rawClaims.studentId : undefined);
+    revocationIndex = statusListService.allocateIndex(studentId, {
+      credentialConfigurationId: activeSession.credentialConfigurationId,
+      fullName: typeof rawClaims.fullName === "string" ? rawClaims.fullName : undefined,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(

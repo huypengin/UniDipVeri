@@ -314,6 +314,31 @@ describe("OID4VCI Credential Issuance & Revocation End-to-End Suite", () => {
     const foundCourseGrade = disclosures.find((d) => d.key === "grade");
     expect(foundCourseGrade).toBeDefined();
     expect(foundCourseGrade?.value).toBe(4.0);
+
+    // Verify interactive issuance tracking: registered by studentId
+    const statusQueryRes = await app(
+      new Request("https://issuer.university.edu/admin/status/student/STU-AI-01")
+    );
+    expect(statusQueryRes.status).toBe(200);
+    const statusQueryData = (await statusQueryRes.json()) as {
+      studentId: string;
+      credentials: Array<{ index: number; revoked: boolean }>;
+    };
+    expect(statusQueryData.studentId).toBe("STU-AI-01");
+    expect(statusQueryData.credentials.length).toBe(1);
+    const assignedIndex = statusQueryData.credentials[0].index;
+    expect(statusListService.isRevoked(assignedIndex)).toBe(false);
+
+    // Revoke interactively issued credential by studentId
+    const revokeByStudentRes = await app(
+      new Request("https://issuer.university.edu/admin/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: "STU-AI-01" }),
+      })
+    );
+    expect(revokeByStudentRes.status).toBe(200);
+    expect(statusListService.isRevoked(assignedIndex)).toBe(true);
   });
 
   it("rejects credential request without Bearer token with HTTP 401", async () => {

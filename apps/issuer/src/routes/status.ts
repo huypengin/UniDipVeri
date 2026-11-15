@@ -119,7 +119,9 @@ export async function handleStatusListRequest(
 /**
  * Handles administrative revocation requests: POST /admin/revoke
  *
- * Body format: { "idx": number } or { "index": number }
+ * Accepts either:
+ * - Direct index: { "idx": number } or { "index": number }
+ * - Student ID: { "studentId": string } or { "student_id": string }
  *
  * @param req Incoming Request
  * @param statusListService Status list revocation engine
@@ -161,12 +163,45 @@ export async function handleAdminRevokeRequest(
     );
   }
 
+  // Check if studentId is provided for subject-level revocation
+  const rawStudentId = body.studentId ?? body.student_id;
+  if (typeof rawStudentId === "string" && rawStudentId.trim().length > 0) {
+    try {
+      const revokedIndices = statusListService.revokeByStudentId(rawStudentId);
+      return Response.json(
+        {
+          status: "revoked",
+          studentId: rawStudentId.trim(),
+          indices: revokedIndices,
+          revoked: true,
+        },
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        }
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return Response.json(
+        {
+          error: "not_found",
+          error_description: message,
+        },
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        }
+      );
+    }
+  }
+
+  // Fallback to index-based revocation
   const rawIdx = body.idx ?? body.index;
   if (typeof rawIdx !== "number" || !Number.isInteger(rawIdx) || rawIdx < 0) {
     return Response.json(
       {
         error: "invalid_request",
-        error_description: "Parameter 'idx' must be a non-negative integer",
+        error_description: "Parameter 'idx' (integer) or 'studentId' (string) must be provided",
       },
       {
         status: 400,
@@ -177,10 +212,12 @@ export async function handleAdminRevokeRequest(
 
   try {
     statusListService.revoke(rawIdx);
+    const entry = statusListService.getEntryByIndex(rawIdx);
     return Response.json(
       {
         status: "revoked",
         idx: rawIdx,
+        ...(entry?.studentId ? { studentId: entry.studentId } : {}),
         revoked: true,
       },
       {
@@ -204,7 +241,7 @@ export async function handleAdminRevokeRequest(
 }
 
 /**
- * Handles administrative status inspection: GET /admin/status/:idx
+ * Handles administrative status inspection by index: GET /admin/status/:idx
  */
 export function handleAdminStatusQuery(
   idx: number,
@@ -212,11 +249,20 @@ export function handleAdminStatusQuery(
 ): Response {
   try {
     const revoked = statusListService.isRevoked(idx);
+    const entry = statusListService.getEntryByIndex(idx);
     return Response.json(
       {
         idx,
         revoked,
         status: revoked ? "revoked" : "active",
+        ...(entry?.studentId
+          ? {
+              studentId: entry.studentId,
+              allocatedAt: entry.allocatedAt,
+              revokedAt: entry.revokedAt,
+              metadata: entry.metadata,
+            }
+          : {}),
       },
       {
         status: 200,
@@ -236,4 +282,74 @@ export function handleAdminStatusQuery(
       }
     );
   }
+}
+
+/**
+ * Handles administrative status query by student ID: GET /admin/status/student/:studentId
+ */
+export function handleAdminStudentStatusQuery(
+  studentId: string,
+  statusListService: StatusListService
+): Response {
+  const cleanId = studentId.trim();
+  const entries = statusListService.getEntriesByStudentId(cleanId);
+  if (entries.length === 0) {
+    return Response.json(
+      {
+        error: "not_found",
+        error_description: `No credential status records found for student ID '${cleanId}'`,
+      },
+      {
+        status: 404,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      }
+    );
+  }
+
+  return Response.json(
+    {
+      studentId: cleanId,
+      totalCredentials: entries.length,
+      credentials: entries.map((entry) => ({
+        index: entry.index,
+        revoked: statusListService.isRevoked(entry.index),
+        status: statusListService.isRevoked(entry.index) ? "revoked" : "active",
+        allocatedAt: entry.allocatedAt,
+        revokedAt: entry.revokedAt,
+        metadata: entry.metadata,
+      })),
+    },
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }
+  );
+}
+
+/**
+ * Handles administrative registry catalog query: GET /admin/registry
+ */
+export function handleAdminRegistryQuery(
+  statusListService: StatusListService
+): Response {
+  const entries = statusListService.getAllEntries();
+  return Response.json(
+    {
+      totalAllocated: statusListService.allocatedCount,
+      totalTracked: entries.length,
+      entries: entries.map((e) => ({
+        index: e.index,
+        studentId: e.studentId,
+        revoked: statusListService.isRevoked(e.index),
+        status: statusListService.isRevoked(e.index) ? "revoked" : "active",
+        allocatedAt: e.allocatedAt,
+        revokedAt: e.revokedAt,
+        metadata: e.metadata,
+      })),
+    },
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }
+  );
 }
