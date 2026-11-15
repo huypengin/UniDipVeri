@@ -3,6 +3,7 @@ export * from "./schema/types.js";
 export * from "./schema/validator.js";
 export * from "./schema/loader.js";
 export * from "./schema/vct.js";
+export * from "./schema/csv-parser.js";
 
 // Configuration module
 export * from "./config/config.js";
