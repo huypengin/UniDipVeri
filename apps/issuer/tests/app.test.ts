@@ -342,6 +342,23 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resInteractive.headers.get("Content-Type")).toContain("text/html");
       const html = await resInteractive.text();
       expect(html).toContain("UniDipVeri Registrar Portal");
+      expect(html).toContain('href="https://issuer.university.edu/style.css"');
+
+      // Verify that unmounted /portal returns 404
+      const resPortal = await app(
+        new Request("https://issuer.university.edu/portal", { method: "GET" })
+      );
+      expect(resPortal.status).toBe(404);
+
+      // Verify GET /style.css stylesheet route
+      const resCss = await app(
+        new Request("https://issuer.university.edu/style.css", { method: "GET" })
+      );
+      expect(resCss.status).toBe(200);
+      expect(resCss.headers.get("Content-Type")).toContain("text/css");
+      const css = await resCss.text();
+      expect(css).toContain(":root");
+      expect(css).toContain("--primary");
     });
 
     it("serves Swagger UI and OpenAPI 3.0 specification", async () => {

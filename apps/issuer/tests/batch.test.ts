@@ -57,6 +57,7 @@ describe("Batch Issuance Engine & Route Endpoints", () => {
       expect(html).toContain("OID4VCI Bulk Distribution Architecture");
       expect(html).toContain("sample_graduation_batch.csv");
       expect(html).toContain("/batch-issue");
+      expect(html).toContain('href="https://issuer.university.edu/style.css"');
     });
 
     it("serves a ready-to-use sample CSV template on GET /batch-issue?sample=csv", async () => {

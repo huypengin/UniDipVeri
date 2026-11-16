@@ -20,7 +20,7 @@ import {
   handleAdminStudentStatusQuery,
   handleAdminRegistryQuery,
 } from "./routes/status.js";
-import { handlePortalRequest } from "./routes/portal.js";
+import { handleInteractiveRequest, handleStyleCssRequest } from "./routes/interactive.js";
 import { handleBatchRequest } from "./routes/batch.js";
 import { handleDocsRequest } from "./routes/docs.js";
 
@@ -107,9 +107,17 @@ export function createApp(
         );
       }
 
-      // Route: GET /interactive-issue (Interactive Registrar Portal)
+      // Route: GET /interactive-issue (Interactive Registrar Form)
       if ((method === "GET" || method === "HEAD") && pathname === "/interactive-issue") {
-        return respond(handlePortalRequest(req, config, schemaConfig));
+        return respond(handleInteractiveRequest(req, config, schemaConfig));
+      }
+
+      // Route: GET /style.css and GET /styles/style.css (Dedicated Shared Stylesheet)
+      if (
+        (method === "GET" || method === "HEAD") &&
+        (pathname === "/style.css" || pathname === "/styles/style.css")
+      ) {
+        return respond(handleStyleCssRequest(req));
       }
 
       // Route: GET /batch-issue and POST /batch-issue (Batch Credential Issuance Pipeline)

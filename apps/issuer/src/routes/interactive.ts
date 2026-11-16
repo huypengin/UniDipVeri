@@ -1,7 +1,57 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { CredentialTypeConfig, ClaimDef, SdPolicy } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
 import { PRELOADED_STUDENT_RECORDS } from "../services/student-records.js";
 import { deriveCredentialConfigurationId } from "../services/claims-metadata.js";
+
+const STYLE_CSS_PATH = join(import.meta.dir, "../styles/style.css");
+let cachedStyleCss: string | null = null;
+
+/**
+ * Reads and caches the dedicated shared CSS stylesheet.
+ */
+export function getStyleCss(): string {
+  if (!cachedStyleCss) {
+    cachedStyleCss = readFileSync(STYLE_CSS_PATH, "utf-8");
+  }
+  return cachedStyleCss;
+}
+
+/**
+ * Handles HTTP requests for the shared stylesheet: GET /style.css.
+ */
+export function handleStyleCssRequest(req: Request): Response {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return Response.json(
+      {
+        error: "invalid_request",
+        error_description: `Method ${req.method} not allowed on /style.css`,
+      },
+      { status: 405, headers: { Allow: "GET, HEAD" } }
+    );
+  }
+
+  const css = getStyleCss();
+
+  if (req.method === "HEAD") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/css; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  }
+
+  return new Response(css, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/css; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+}
 
 /**
  * Escapes characters for safe HTML inclusion.
@@ -245,7 +295,7 @@ export function renderSchemaFormFields(
 /**
  * Generates the HTML for the Interactive Registrar Portal with dynamically schema-driven fields.
  */
-export function renderPortalHtml(
+export function renderInteractiveHtml(
   config: IssuerConfig,
   schemaConfig: CredentialTypeConfig
 ): string {
@@ -265,558 +315,7 @@ export function renderPortalHtml(
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary: #4f46e5;
-      --primary-hover: #4338ca;
-      --primary-light: #eef2ff;
-      --bg-dark: #0f172a;
-      --card-bg: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --success: #10b981;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: var(--font-sans);
-      background-color: #f8fafc;
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Navbar */
-    .navbar {
-      background: var(--bg-dark);
-      color: #fff;
-      padding: 16px 32px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .nav-brand svg {
-      width: 32px;
-      height: 32px;
-      fill: none;
-      stroke: #818cf8;
-      stroke-width: 2;
-    }
-    .brand-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .brand-sub {
-      font-size: 0.75rem;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .nav-links {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-    .nav-links a {
-      color: #cbd5e1;
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 500;
-      transition: color 0.15s;
-    }
-    .nav-links a:hover {
-      color: #fff;
-    }
-    .nav-badge {
-      background: rgba(79, 70, 229, 0.2);
-      color: #a5b4fc;
-      border: 1px solid rgba(129, 140, 248, 0.3);
-      padding: 4px 10px;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
-    }
-
-    /* Main Container */
-    .container {
-      max-width: 1240px;
-      margin: 32px auto;
-      padding: 0 24px;
-      flex: 1;
-      width: 100%;
-    }
-
-    .hero-banner {
-      margin-bottom: 24px;
-    }
-    .hero-banner h1 {
-      font-size: 1.85rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      color: #1e293b;
-    }
-    .hero-banner p {
-      color: var(--text-muted);
-      margin-top: 4px;
-      font-size: 0.95rem;
-    }
-
-    /* Preset Toolbar */
-    .preset-bar {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 20px;
-      margin-bottom: 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-      flex-wrap: wrap;
-    }
-    .preset-label {
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: #475569;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .preset-btn {
-      background: var(--primary-light);
-      color: var(--primary);
-      border: 1px solid rgba(79, 70, 229, 0.2);
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 0.825rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .preset-btn:hover {
-      background: var(--primary);
-      color: #fff;
-    }
-    .preset-btn-clear {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-    }
-    .preset-btn-clear:hover {
-      background: #e2e8f0;
-      color: #1e293b;
-    }
-
-    /* Grid Layout */
-    .portal-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-      gap: 28px;
-      align-items: start;
-    }
-    @media (max-width: 960px) {
-      .portal-grid { grid-template-columns: 1fr; }
-    }
-
-    /* Form Card */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-      min-width: 0;
-    }
-
-    /* Sticky Offer Card */
-    .offer-card {
-      position: sticky;
-      top: 24px;
-      max-height: calc(100vh - 48px);
-      overflow-y: auto;
-    }
-    @media (max-width: 960px) {
-      .offer-card {
-        position: static;
-        max-height: none;
-      }
-    }
-    .card-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      color: #1e293b;
-    }
-
-    /* Schema Driven Hierarchy */
-    .schema-card {
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-      margin-top: 14px;
-    }
-    .schema-card-header {
-      margin-bottom: 12px;
-    }
-    .schema-card-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #1e293b;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .schema-fields-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-    @media (max-width: 640px) {
-      .schema-fields-grid { grid-template-columns: 1fr; }
-    }
-    .full-width {
-      grid-column: 1 / -1;
-    }
-
-    .form-group {
-      margin-bottom: 4px;
-    }
-    .field-label-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-      gap: 8px;
-    }
-    .field-desc {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .req-star {
-      color: #ef4444;
-      font-weight: bold;
-    }
-
-    label {
-      font-size: 0.825rem;
-      font-weight: 600;
-      color: #334155;
-    }
-    .form-input, select {
-      width: 100%;
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-family: inherit;
-      color: #0f172a;
-      background: #fdfdfd;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .form-input:focus, select:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
-      background: #fff;
-    }
-
-    /* Badges */
-    .badge-sd {
-      background: #f5f3ff;
-      color: #6d28d9;
-      border: 1px solid #ddd6fe;
-      padding: 2px 7px;
-      border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .badge-plain {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
-      padding: 2px 7px;
-      border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    /* Dynamic Array Tables */
-    .table-responsive {
-      overflow-x: auto;
-      margin-top: 8px;
-    }
-    .dynamic-array-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      background: #fff;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-    .dynamic-array-table th {
-      text-align: left;
-      padding: 8px 10px;
-      background: #f1f5f9;
-      color: #475569;
-      font-weight: 600;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.75rem;
-    }
-    .dynamic-array-table td {
-      padding: 6px 6px;
-      vertical-align: middle;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .dynamic-array-table input {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 0.8rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: inherit;
-    }
-    .dynamic-array-table input:focus {
-      outline: none;
-      border-color: var(--primary);
-    }
-    .btn-remove-row {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      width: 28px;
-      height: 28px;
-      font-size: 1.1rem;
-      line-height: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-weight: 700;
-      transition: background 0.15s;
-    }
-    .btn-remove-row:hover {
-      background: #fca5a5;
-    }
-    .btn-add-item {
-      background: var(--primary-light);
-      color: var(--primary);
-      border: 1px solid rgba(79, 70, 229, 0.3);
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 0.775rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.15s;
-    }
-    .btn-add-item:hover {
-      background: var(--primary);
-      color: #fff;
-    }
-
-    .form-section-title {
-      font-size: 0.85rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #64748b;
-      margin: 20px 0 12px 0;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #f1f5f9;
-    }
-
-    .btn-submit {
-      width: 100%;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: background 0.15s, transform 0.05s;
-    }
-    .btn-submit:hover {
-      background: var(--primary-hover);
-    }
-    .btn-submit:active {
-      transform: scale(0.99);
-    }
-
-    /* Output Card */
-    .qr-container {
-      background: #f8fafc;
-      border: 1px dashed #cbd5e1;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 220px;
-    }
-    #qrcode {
-      background: #fff;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      margin-bottom: 14px;
-    }
-    #qrcode img, #qrcode canvas {
-      display: block;
-      margin: 0 auto;
-    }
-    .uri-wrapper {
-      position: relative;
-      width: 100%;
-      margin-top: 14px;
-    }
-    .uri-box {
-      width: 100%;
-      background: #f8fafc;
-      color: #475569;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      padding: 12px 14px;
-      border-radius: 8px;
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      max-height: 110px;
-      overflow-y: auto;
-      text-align: left;
-      border: 1px solid #334155;
-    }
-    .copy-btn {
-      position: absolute;
-      top: 8px;
-      right: 20px;
-      z-index: 10;
-      background: #4f46e5;
-      color: #ffffff;
-      border: 1px solid #6366f1;
-      padding: 5px 11px;
-      border-radius: 6px;
-      font-size: 0.725rem;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: var(--font-sans);
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-      transition: background 0.15s, border-color 0.15s, transform 0.05s;
-    }
-    .copy-btn:hover {
-      background: #4338ca;
-      border-color: #818cf8;
-    }
-    .copy-btn:active {
-      transform: scale(0.96);
-    }
-    .pin-badge {
-      display: inline-block;
-      background: #fef3c7;
-      color: #92400e;
-      border: 1px solid #fde68a;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      margin-top: 10px;
-    }
-    .open-wallet-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #059669;
-      color: #fff;
-      text-decoration: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      margin-top: 12px;
-      transition: background 0.15s;
-    }
-    .open-wallet-btn:hover {
-      background: #047857;
-    }
-    .json-details {
-      margin-top: 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      background: #f8fafc;
-    }
-    .json-summary {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #475569;
-      padding: 8px 12px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f1f5f9;
-      user-select: none;
-    }
-    .json-summary:hover {
-      background: #e2e8f0;
-    }
-    .json-preview {
-      background: #f8fafc;
-      color: #475569;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      padding: 12px;
-      max-height: 220px;
-      overflow-y: auto;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-      margin: 0;
-      text-align: left;
-    }
-
-    footer {
-      text-align: center;
-      padding: 24px;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      border-top: 1px solid var(--border);
-      background: #fff;
-    }
-  </style>
+  <link rel="stylesheet" href="${config.baseUrl}/style.css">
 </head>
 <body>
   <header class="navbar">
@@ -828,7 +327,7 @@ export function renderPortalHtml(
       </div>
     </div>
     <nav class="nav-links">
-      <a href="${config.baseUrl}/interactive-issue" class="active">Interactive Issue</a>
+      <a href="${config.baseUrl}/interactive-issue" class="active">Interactive Issuance</a>
       <a href="${config.baseUrl}/batch-issue">Batch Issuance</a>
       <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
@@ -1315,9 +814,9 @@ export function renderPortalHtml(
 }
 
 /**
- * Handles incoming Interactive Registrar Portal requests: GET / and GET /issue.
+ * Handles incoming Interactive Registrar requests: GET /interactive-issue.
  */
-export function handlePortalRequest(
+export function handleInteractiveRequest(
   req: Request,
   config: IssuerConfig,
   schemaConfig: CredentialTypeConfig
@@ -1326,13 +825,13 @@ export function handlePortalRequest(
     return Response.json(
       {
         error: "invalid_request",
-        error_description: `Method ${req.method} not allowed on portal route`,
+        error_description: `Method ${req.method} not allowed on /interactive-issue`,
       },
       { status: 405, headers: { Allow: "GET, HEAD" } }
     );
   }
 
-  const html = renderPortalHtml(config, schemaConfig);
+  const html = renderInteractiveHtml(config, schemaConfig);
 
   if (req.method === "HEAD") {
     return new Response(null, {
