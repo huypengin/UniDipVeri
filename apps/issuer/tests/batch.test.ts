@@ -8,6 +8,7 @@ import { SessionManager } from "../src/services/session-manager.js";
 import { StatusListService } from "../src/services/status-list.js";
 import { createApp } from "../src/app.js";
 import { unzipArchive } from "../src/services/zip-archive.js";
+import { MAX_BATCH_REQUEST_SIZE_BYTES } from "../src/routes/batch.js";
 
 const schemaPath = join(
   import.meta.dir,
@@ -240,6 +241,100 @@ describe("Batch Issuance Engine & Route Endpoints", () => {
       const err = (await res.json()) as { error: string; error_description: string };
       expect(err.error).toBe("invalid_request");
       expect(err.error_description).toContain("Missing CSV payload");
+    });
+
+    describe("Batch Request Size Limits and Stream Protection", () => {
+      it("rejects request immediately when declared Content-Length exceeds maximum limit", async () => {
+        const { app } = createTestApp();
+        const res = await app(
+          new Request("https://issuer.university.edu/batch-issue", {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/csv",
+              "Content-Length": String(MAX_BATCH_REQUEST_SIZE_BYTES + 1024),
+            },
+            body: "studentId\nITIU1",
+          })
+        );
+
+        expect(res.status).toBe(400);
+        const err = (await res.json()) as { error: string; error_description: string };
+        expect(err.error).toBe("invalid_request");
+        expect(err.error_description).toContain("exceeds maximum allowed size");
+        expect(err.error_description).toContain(String(MAX_BATCH_REQUEST_SIZE_BYTES));
+      });
+
+      it("rejects request when Content-Length header is malformed non-numeric", async () => {
+        const { app } = createTestApp();
+        const res = await app(
+          new Request("https://issuer.university.edu/batch-issue", {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/csv",
+              "Content-Length": "not-a-number",
+            },
+            body: "studentId\nITIU1",
+          })
+        );
+
+        expect(res.status).toBe(400);
+        const err = (await res.json()) as { error: string; error_description: string };
+        expect(err.error).toBe("invalid_request");
+        expect(err.error_description).toContain("exceeds maximum allowed size");
+      });
+
+      it("stream-limits raw body and rejects when Content-Length is missing but stream exceeds limit", async () => {
+        const { app } = createTestApp();
+        // Yield two 6MB chunks to exceed 10MB without buffering excessive memory
+        const chunkSize = 6 * 1024 * 1024;
+        let chunkCount = 0;
+        const oversizedStream = new ReadableStream({
+          pull(controller) {
+            if (chunkCount >= 2) {
+              controller.close();
+              return;
+            }
+            chunkCount++;
+            controller.enqueue(new Uint8Array(chunkSize));
+          },
+        });
+
+        const res = await app(
+          new Request("https://issuer.university.edu/batch-issue", {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/csv",
+            },
+            body: oversizedStream,
+            duplex: "half",
+          })
+        );
+
+        expect(res.status).toBe(400);
+        const err = (await res.json()) as { error: string; error_description: string };
+        expect(err.error).toBe("invalid_request");
+        expect(err.error_description).toContain("exceeds maximum allowed size");
+      });
+
+      it("processes valid request within limit with explicit Content-Length header", async () => {
+        const { app } = createTestApp();
+        const payload = JSON.stringify({ csvText: sampleCsvRows });
+        const res = await app(
+          new Request("https://issuer.university.edu/batch-issue?format=json", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Length": String(Buffer.byteLength(payload, "utf-8")),
+            },
+            body: payload,
+          })
+        );
+
+        expect(res.status).toBe(200);
+        const data = (await res.json()) as { success: boolean; totalRows: number };
+        expect(data.success).toBe(true);
+        expect(data.totalRows).toBe(2);
+      });
     });
 
     it("enables standard OID4VCI token redemption for batch-generated pre-authorized codes", async () => {

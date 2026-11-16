@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import type { CredentialTypeConfig } from "@unidipveri/core";
 import type { IssuerConfig } from "../config.js";
 import type { KeyContext } from "../services/key-manager.js";
@@ -255,6 +256,75 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
 }
 
 /**
+ * Maximum allowed request body size for batch issuance: 10 MB (10 * 1024 * 1024 bytes).
+ * Accommodates tens of thousands of student CSV rows while preventing memory exhaustion attacks.
+ */
+export const MAX_BATCH_REQUEST_SIZE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Safely reads the request body up to maxBytes, validating declared Content-Length
+ * and stream-limiting the ReadableStream when Content-Length is missing or chunked.
+ */
+async function readLimitedRequestBody(
+  req: Request,
+  maxBytes: number
+): Promise<{ buffer?: Buffer; text?: string; error?: string }> {
+  // If Content-Length header is provided and exceeds limit, reject immediately
+  const contentLengthHeader = req.headers.get("content-length");
+  if (contentLengthHeader !== null) {
+    const declaredLength = parseInt(contentLengthHeader, 10);
+    if (isNaN(declaredLength) || declaredLength > maxBytes) {
+      return {
+        error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+      };
+    }
+  }
+
+  // Stream-limit reading via ReadableStream if available
+  if (req.body && typeof req.body.getReader === "function") {
+    const reader = req.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          totalBytes += value.byteLength;
+          if (totalBytes > maxBytes) {
+            await reader.cancel("Request body size limit exceeded");
+            return {
+              error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+            };
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const concatenated = Buffer.concat(chunks);
+    return { buffer: concatenated, text: concatenated.toString("utf-8") };
+  }
+
+  // Fallback to arrayBuffer()
+  try {
+    const arrayBuf = await req.arrayBuffer();
+    if (arrayBuf.byteLength > maxBytes) {
+      return {
+        error: `Request body exceeds maximum allowed size of ${maxBytes} bytes`,
+      };
+    }
+    const buf = Buffer.from(arrayBuf);
+    return { buffer: buf, text: buf.toString("utf-8") };
+  } catch {
+    return { error: "Request body could not be read" };
+  }
+}
+
+/**
  * Handles GET and POST requests for /batch-issue.
  *
  * Provides:
@@ -301,12 +371,34 @@ export async function handleBatchRequest(
 
   // 2. Handle POST requests
   if (req.method === "POST") {
+    const readResult = await readLimitedRequestBody(req, MAX_BATCH_REQUEST_SIZE_BYTES);
+    if (readResult.error) {
+      return Response.json(
+        {
+          error: "invalid_request",
+          error_description: readResult.error,
+        },
+        { status: 400 }
+      );
+    }
+
+    const rawBuffer = readResult.buffer ?? Buffer.alloc(0);
+    if (rawBuffer.length === 0) {
+      return Response.json(
+        {
+          error: "invalid_request",
+          error_description: "Missing CSV payload in request body",
+        },
+        { status: 400 }
+      );
+    }
+
     let csvText = "";
     const contentType = req.headers.get("content-type") || "";
 
     if (contentType.includes("application/json")) {
       try {
-        const body = (await req.json()) as Record<string, unknown>;
+        const body = JSON.parse(readResult.text ?? rawBuffer.toString("utf-8")) as Record<string, unknown>;
         if (typeof body.csvText === "string") {
           csvText = body.csvText;
         } else if (typeof body.csv === "string") {
@@ -323,7 +415,12 @@ export async function handleBatchRequest(
       }
     } else if (contentType.includes("multipart/form-data")) {
       try {
-        const formData = await req.formData();
+        const limitedReq = new Request(req.url, {
+          method: "POST",
+          headers: { "content-type": contentType },
+          body: rawBuffer,
+        });
+        const formData = await limitedReq.formData();
         const fileEntry = formData.get("file") || formData.get("csv");
         if (fileEntry instanceof File) {
           csvText = await fileEntry.text();
@@ -339,10 +436,8 @@ export async function handleBatchRequest(
           { status: 400 }
         );
       }
-    } else if (contentType.includes("text/csv")) {
-      csvText = await req.text();
     } else {
-      csvText = await req.text();
+      csvText = readResult.text ?? rawBuffer.toString("utf-8");
     }
 
     if (!csvText || csvText.trim().length === 0) {
