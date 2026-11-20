@@ -31,7 +31,8 @@ packages/core/src/
 │   ├── types.ts         # CredentialTypeConfig, ClaimDef, SdPolicy
 │   ├── validator.ts     # Zod validation of credential configurations
 │   ├── loader.ts        # YAML parsing and explicit file loading
-│   └── vct.ts           # VCT resolution
+│   ├── vct.ts           # VCT resolution
+│   └── csv-parser.ts    # CSV batch ingestion and schema validation
 ├── sd-jwt/
 │   ├── salt.ts          # CSPRNG salt generation (>= 128 bits)
 │   ├── disclosure.ts    # Disclosure encoding and decoding

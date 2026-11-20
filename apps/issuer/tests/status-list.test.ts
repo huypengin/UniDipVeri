@@ -475,4 +475,118 @@ describe("Token Status List Revocation Engine (draft-ietf-oauth-status-list-21)"
       expect(res.headers.get("Allow")).toBe("GET, HEAD");
     });
   });
+
+  describe("Student Subject Credential Status Tracking & Revocation", () => {
+    it("registers studentId and metadata upon index allocation", () => {
+      const service = new StatusListService(64);
+      const idx = service.allocateIndex("ITIU22001001", {
+        degree: "B.S. CS",
+        fullName: "Nguyen Van A",
+      });
+
+      expect(idx).toBe(0);
+      const entry = service.getEntryByIndex(idx);
+      expect(entry).toBeDefined();
+      expect(entry?.studentId).toBe("ITIU22001001");
+      expect(entry?.revoked).toBe(false);
+      expect(entry?.metadata?.degree).toBe("B.S. CS");
+
+      const studentEntries = service.getEntriesByStudentId("ITIU22001001");
+      expect(studentEntries.length).toBe(1);
+      expect(studentEntries[0].index).toBe(0);
+    });
+
+    it("tracks multiple credentials issued to the same student", () => {
+      const service = new StatusListService(64);
+      const idxDiploma = service.allocateIndex("ITIU22001001", { type: "diploma" });
+      const idxTranscript = service.allocateIndex("ITIU22001001", { type: "transcript" });
+      const idxOther = service.allocateIndex("EEIU22001002", { type: "diploma" });
+
+      expect(idxDiploma).toBe(0);
+      expect(idxTranscript).toBe(1);
+      expect(idxOther).toBe(2);
+
+      const student1Entries = service.getEntriesByStudentId("ITIU22001001");
+      expect(student1Entries.length).toBe(2);
+      expect(student1Entries.map((e) => e.index)).toEqual([0, 1]);
+
+      const allEntries = service.getAllEntries();
+      expect(allEntries.length).toBe(3);
+    });
+
+    it("revokes all credentials belonging to a student by studentId", () => {
+      const service = new StatusListService(64);
+      service.allocateIndex("ITIU22001001", { type: "diploma" });
+      service.allocateIndex("ITIU22001001", { type: "transcript" });
+      service.allocateIndex("EEIU22001002", { type: "diploma" });
+
+      expect(service.isRevoked(0)).toBe(false);
+      expect(service.isRevoked(1)).toBe(false);
+      expect(service.isRevoked(2)).toBe(false);
+
+      const revokedIndices = service.revokeByStudentId("ITIU22001001");
+      expect(revokedIndices).toEqual([0, 1]);
+
+      expect(service.isRevoked(0)).toBe(true);
+      expect(service.isRevoked(1)).toBe(true);
+      expect(service.isRevoked(2)).toBe(false);
+
+      const entry0 = service.getEntryByIndex(0);
+      expect(entry0?.revoked).toBe(true);
+      expect(entry0?.revokedAt).toBeDefined();
+
+      // Reactivate by studentId
+      service.reactivateByStudentId("ITIU22001001");
+      expect(service.isRevoked(0)).toBe(false);
+      expect(service.isRevoked(1)).toBe(false);
+      expect(service.getEntryByIndex(0)?.revoked).toBe(false);
+    });
+
+    it("throws when revoking by a non-existent student ID", () => {
+      const service = new StatusListService(64);
+      service.allocateIndex("ITIU22001001");
+
+      expect(() => service.revokeByStudentId("NON-EXISTENT-STUDENT")).toThrow(
+        "No credentials found for student ID 'NON-EXISTENT-STUDENT'"
+      );
+    });
+
+    it("persists studentId mapping to disk and reloads on startup", () => {
+      const testDir = join(
+        tmpdir(),
+        `unidipveri-tracking-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      );
+      const storagePath = join(testDir, "status-list.json");
+
+      // Instance 1: allocate and revoke
+      const service1 = new StatusListService(64, storagePath);
+      service1.allocateIndex("STU-PERSIST-1", { major: "CS" });
+      service1.allocateIndex("STU-PERSIST-2", { major: "EE" });
+      service1.revoke(0);
+
+      // Verify file content includes entries
+      const fileContent = JSON.parse(fs.readFileSync(storagePath, "utf-8"));
+      expect(fileContent.entries).toBeDefined();
+      expect(fileContent.entries.length).toBe(2);
+      expect(fileContent.entries[0].studentId).toBe("STU-PERSIST-1");
+      expect(fileContent.entries[0].revoked).toBe(true);
+
+      // Instance 2: reload from disk
+      const service2 = new StatusListService(64, storagePath);
+      expect(service2.allocatedCount).toBe(2);
+      expect(service2.isRevoked(0)).toBe(true);
+      expect(service2.isRevoked(1)).toBe(false);
+
+      const entry1 = service2.getEntryByIndex(0);
+      expect(entry1?.studentId).toBe("STU-PERSIST-1");
+      expect(entry1?.revoked).toBe(true);
+
+      const stu2Entries = service2.getEntriesByStudentId("STU-PERSIST-2");
+      expect(stu2Entries.length).toBe(1);
+      expect(stu2Entries[0].metadata?.major).toBe("EE");
+
+      // Cleanup
+      fs.rmSync(testDir, { recursive: true, force: true });
+    });
+  });
 });

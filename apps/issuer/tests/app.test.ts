@@ -326,20 +326,39 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resCredential.status).toBe(401);
     });
 
-    it("serves interactive registrar portal HTML on GET / and GET /issue", async () => {
+    it("redirects GET / to /interactive-issue and serves portal HTML", async () => {
       const resRoot = await app(
         new Request("https://issuer.university.edu/", { method: "GET" })
       );
-      expect(resRoot.status).toBe(200);
-      expect(resRoot.headers.get("Content-Type")).toContain("text/html");
-      const rootHtml = await resRoot.text();
-      expect(rootHtml).toContain("UniDipVeri Registrar Portal");
-
-      const resIssue = await app(
-        new Request("https://issuer.university.edu/issue", { method: "GET" })
+      expect(resRoot.status).toBe(302);
+      expect(resRoot.headers.get("Location")).toBe(
+        "https://issuer.university.edu/interactive-issue"
       );
-      expect(resIssue.status).toBe(200);
-      expect(resIssue.headers.get("Content-Type")).toContain("text/html");
+
+      const resInteractive = await app(
+        new Request("https://issuer.university.edu/interactive-issue", { method: "GET" })
+      );
+      expect(resInteractive.status).toBe(200);
+      expect(resInteractive.headers.get("Content-Type")).toContain("text/html");
+      const html = await resInteractive.text();
+      expect(html).toContain("UniDipVeri Registrar Portal");
+      expect(html).toContain('href="https://issuer.university.edu/style.css"');
+
+      // Verify that unmounted /portal returns 404
+      const resPortal = await app(
+        new Request("https://issuer.university.edu/portal", { method: "GET" })
+      );
+      expect(resPortal.status).toBe(404);
+
+      // Verify GET /style.css stylesheet route
+      const resCss = await app(
+        new Request("https://issuer.university.edu/style.css", { method: "GET" })
+      );
+      expect(resCss.status).toBe(200);
+      expect(resCss.headers.get("Content-Type")).toContain("text/css");
+      const css = await resCss.text();
+      expect(css).toContain(":root");
+      expect(css).toContain("--primary");
     });
 
     it("serves Swagger UI and OpenAPI 3.0 specification", async () => {
@@ -401,6 +420,73 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resCheck.status).toBe(200);
       const checkBody = (await resCheck.json()) as { idx: number; revoked: boolean; status: string };
       expect(checkBody.revoked).toBe(true);
+    });
+
+    it("processes admin revocation and inspection by student ID", async () => {
+      const idx1 = statusListService.allocateIndex("ITIU22001999", { degree: "B.S. CS" });
+      const idx2 = statusListService.allocateIndex("ITIU22001999", { degree: "Transcript" });
+
+      // Inspect via /admin/status/student/:studentId
+      const resQuery1 = await app(
+        new Request("https://issuer.university.edu/admin/status/student/ITIU22001999", {
+          method: "GET",
+        })
+      );
+      expect(resQuery1.status).toBe(200);
+      const queryBody1 = (await resQuery1.json()) as {
+        studentId: string;
+        totalCredentials: number;
+        credentials: Array<{ index: number; revoked: boolean; status: string }>;
+      };
+      expect(queryBody1.studentId).toBe("ITIU22001999");
+      expect(queryBody1.totalCredentials).toBe(2);
+      expect(queryBody1.credentials[0].revoked).toBe(false);
+
+      // Inspect via query param /admin/status?studentId=...
+      const resQueryParam = await app(
+        new Request("https://issuer.university.edu/admin/status?studentId=ITIU22001999", {
+          method: "GET",
+        })
+      );
+      expect(resQueryParam.status).toBe(200);
+
+      // Revoke by student ID
+      const resRevoke = await app(
+        new Request("https://issuer.university.edu/admin/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ studentId: "ITIU22001999" }),
+        })
+      );
+      expect(resRevoke.status).toBe(200);
+      const revokeBody = (await resRevoke.json()) as {
+        status: string;
+        studentId: string;
+        indices: number[];
+        revoked: boolean;
+      };
+      expect(revokeBody.status).toBe("revoked");
+      expect(revokeBody.studentId).toBe("ITIU22001999");
+      expect(revokeBody.indices).toEqual([idx1, idx2]);
+      expect(revokeBody.revoked).toBe(true);
+
+      expect(statusListService.isRevoked(idx1)).toBe(true);
+      expect(statusListService.isRevoked(idx2)).toBe(true);
+
+      // Inspect catalog via /admin/registry
+      const resRegistry = await app(
+        new Request("https://issuer.university.edu/admin/registry", {
+          method: "GET",
+        })
+      );
+      expect(resRegistry.status).toBe(200);
+      const regBody = (await resRegistry.json()) as {
+        totalAllocated: number;
+        totalTracked: number;
+        entries: Array<{ studentId: string; index: number }>;
+      };
+      expect(regBody.totalTracked).toBeGreaterThanOrEqual(2);
+      expect(regBody.entries.some((e) => e.studentId === "ITIU22001999")).toBe(true);
     });
   });
 

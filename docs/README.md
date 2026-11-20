@@ -26,7 +26,8 @@ docs/
     ├── 0004-delegate-verification-to-external-verifier.md
     ├── 0005-use-token-status-list-revocation.md
     ├── 0006-support-signing-algorithm-agility.md
-    └── 0007-single-hostname-reverse-proxy-gateway.md
+    ├── 0007-single-hostname-reverse-proxy-gateway.md
+    └── 0008-adopt-jit-status-list-allocation-and-oid4vci-batch-distribution.md
 ```
 
 ---
@@ -54,6 +55,7 @@ We document technical decisions using the Markdown Any Decision Records (MADR) f
 - [**ADR-0005: Use IETF Token Status List for Credential Revocation**](adr/0005-use-token-status-list-revocation.md)
 - [**ADR-0006: Support Signing Algorithm Agility across ES256, EdDSA, and ES384**](adr/0006-support-signing-algorithm-agility.md)
 - [**ADR-0007: Single-Hostname Reverse Proxy Architecture (1 Hostname Gateway)**](adr/0007-single-hostname-reverse-proxy-gateway.md)
+- [**ADR-0008: Adopt Just-In-Time (JIT) Status List Allocation and OID4VCI Batch Distribution**](adr/0008-adopt-jit-status-list-allocation-and-oid4vci-batch-distribution.md)
 
 ---
 

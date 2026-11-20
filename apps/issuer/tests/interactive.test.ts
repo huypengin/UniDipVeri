@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { loadIssuerConfig } from "../src/config.js";
 import {
   formatClaimLabel,
-  handlePortalRequest,
-  renderPortalHtml,
+  getStyleCss,
+  handleInteractiveRequest,
+  handleStyleCssRequest,
+  renderInteractiveHtml,
   renderSchemaFormFields,
-} from "../src/routes/portal.js";
+} from "../src/routes/interactive.js";
 
 const SCHEMA_PATH = join(
   import.meta.dir,
@@ -24,7 +26,7 @@ const testConfig = loadIssuerConfig({
 
 describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
   it("renders dynamic form controls for all root and nested claims in the schema", () => {
-    const html = renderPortalHtml(testConfig, graduationSchema);
+    const html = renderInteractiveHtml(testConfig, graduationSchema);
 
     // Root scalar claims
     expect(html).toContain('data-claim-path="studentId"');
@@ -62,7 +64,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
   });
 
   it("renders accurate selective disclosure policy badges for each claim", () => {
-    const html = renderPortalHtml(testConfig, graduationSchema);
+    const html = renderInteractiveHtml(testConfig, graduationSchema);
 
     // Verify presence of both badge types
     expect(html).toContain('class="badge-sd"');
@@ -128,7 +130,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
       },
     };
 
-    const html = renderPortalHtml(testConfig, customEmploymentSchema);
+    const html = renderInteractiveHtml(testConfig, customEmploymentSchema);
 
     // Verifies custom schema properties are rendered dynamically
     expect(html).toContain("Employment Credential");
@@ -167,7 +169,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     const reqGet = new Request("https://issuer.university.edu/", {
       method: "GET",
     });
-    const resGet = handlePortalRequest(reqGet, testConfig, graduationSchema);
+    const resGet = handleInteractiveRequest(reqGet, testConfig, graduationSchema);
     expect(resGet.status).toBe(200);
     expect(resGet.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     const body = await resGet.text();
@@ -176,7 +178,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     const reqHead = new Request("https://issuer.university.edu/issue", {
       method: "HEAD",
     });
-    const resHead = handlePortalRequest(reqHead, testConfig, graduationSchema);
+    const resHead = handleInteractiveRequest(reqHead, testConfig, graduationSchema);
     expect(resHead.status).toBe(200);
     expect(resHead.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     const headBody = await resHead.text();
@@ -187,7 +189,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     const reqPost = new Request("https://issuer.university.edu/", {
       method: "POST",
     });
-    const resPost = handlePortalRequest(reqPost, testConfig, graduationSchema);
+    const resPost = handleInteractiveRequest(reqPost, testConfig, graduationSchema);
     expect(resPost.status).toBe(405);
     expect(resPost.headers.get("Allow")).toBe("GET, HEAD");
     const data = (await resPost.json()) as { error: string };
@@ -203,5 +205,48 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     expect(formatClaimLabel("iso3166Code")).toBe("Iso 3166 Code");
     expect(formatClaimLabel("studentId")).toBe("Student ID");
     expect(formatClaimLabel("cumulativeGPA")).toBe("Cumulative GPA");
+  });
+
+  describe("Shared Stylesheet Serving", () => {
+    it("reads and caches the dedicated shared CSS stylesheet", () => {
+      const css = getStyleCss();
+      expect(css).toContain(":root");
+      expect(css).toContain("--primary: #4f46e5;");
+      expect(css).toContain(".navbar");
+      expect(css).toContain(".dropzone");
+      expect(css).toContain(".csv-editor");
+    });
+
+    it("serves GET /style.css with Content-Type text/css", async () => {
+      const req = new Request("https://issuer.university.edu/style.css", {
+        method: "GET",
+      });
+      const res = handleStyleCssRequest(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("text/css; charset=utf-8");
+      expect(res.headers.get("Cache-Control")).toContain("public");
+      const body = await res.text();
+      expect(body).toContain("--primary: #4f46e5;");
+    });
+
+    it("serves HEAD /style.css with empty body and matching headers", async () => {
+      const req = new Request("https://issuer.university.edu/style.css", {
+        method: "HEAD",
+      });
+      const res = handleStyleCssRequest(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("text/css; charset=utf-8");
+      const body = await res.text();
+      expect(body).toBe("");
+    });
+
+    it("rejects non-GET/HEAD methods with 405 Method Not Allowed", async () => {
+      const req = new Request("https://issuer.university.edu/style.css", {
+        method: "POST",
+      });
+      const res = handleStyleCssRequest(req);
+      expect(res.status).toBe(405);
+      expect(res.headers.get("Allow")).toBe("GET, HEAD");
+    });
   });
 });

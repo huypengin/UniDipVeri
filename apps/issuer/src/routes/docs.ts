@@ -414,8 +414,8 @@ export function generateOpenApiSpec(
       "/admin/revoke": {
         post: {
           tags: ["Revocation & Status"],
-          summary: "Revoke Credential by Status Index",
-          description: "Administrative endpoint that toggles the status bit at index idx to 1 (revoked).",
+          summary: "Revoke Credential by Status Index or Student ID",
+          description: "Administrative endpoint that revokes credentials by status index or by student ID.",
           requestBody: {
             required: true,
             content: {
@@ -423,9 +423,9 @@ export function generateOpenApiSpec(
                 schema: {
                   type: "object",
                   properties: {
-                    idx: { type: "integer", minimum: 0, example: 0 },
+                    idx: { type: "integer", minimum: 0, example: 0, description: "Direct bit index to revoke" },
+                    studentId: { type: "string", example: "ITIU22001001", description: "Student ID whose credentials should be revoked" },
                   },
-                  required: ["idx"],
                 },
               },
             },
@@ -435,11 +435,12 @@ export function generateOpenApiSpec(
               description: "Revocation status updated",
               content: {
                 "application/json": {
-                  example: { status: "revoked", idx: 0, revoked: true },
+                  example: { status: "revoked", idx: 0, studentId: "ITIU22001001", revoked: true },
                 },
               },
             },
-            "400": { description: "Invalid index or out of bounds" },
+            "400": { description: "Invalid request or index out of bounds" },
+            "404": { description: "Student ID not found" },
           },
         },
       },
@@ -447,7 +448,7 @@ export function generateOpenApiSpec(
         get: {
           tags: ["Revocation & Status"],
           summary: "Inspect Revocation Status by Index",
-          description: "Queries the active revocation status bit at index idx.",
+          description: "Queries the active revocation status bit and tracked student mapping at index idx.",
           parameters: [
             {
               name: "idx",
@@ -461,10 +462,110 @@ export function generateOpenApiSpec(
               description: "Revocation status of index",
               content: {
                 "application/json": {
-                  example: { idx: 0, revoked: false, status: "active" },
+                  example: { idx: 0, revoked: false, status: "active", studentId: "ITIU22001001" },
                 },
               },
             },
+          },
+        },
+      },
+      "/admin/status/student/{studentId}": {
+        get: {
+          tags: ["Revocation & Status"],
+          summary: "Inspect Credential Status by Student ID",
+          description: "Queries all credential indices and revocation statuses associated with a specific student ID.",
+          parameters: [
+            {
+              name: "studentId",
+              in: "path",
+              required: true,
+              schema: { type: "string", example: "ITIU22001001" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Status entries for student ID",
+              content: {
+                "application/json": {},
+              },
+            },
+            "404": { description: "No credentials found for student ID" },
+          },
+        },
+      },
+      "/admin/registry": {
+        get: {
+          tags: ["Revocation & Status"],
+          summary: "Catalog of All Tracked Status List Allocations",
+          description: "Returns summary of all allocated credential indices and student ID associations.",
+          responses: {
+            "200": {
+              description: "Full registry catalog",
+              content: {
+                "application/json": {},
+              },
+            },
+          },
+        },
+      },
+      "/batch-issue": {
+        get: {
+          tags: ["Batch Issuance"],
+          summary: "Registrar Batch Issuance Portal & Template",
+          description: "Renders the interactive Batch Issuance Web UI, or returns sample CSV template when '?sample=csv' is passed.",
+          parameters: [
+            {
+              name: "sample",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["csv"] },
+              description: "Optional flag to download sample CSV template instead of Web UI",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Batch Issuance HTML portal page or CSV template",
+            },
+          },
+        },
+        post: {
+          tags: ["Batch Issuance"],
+          summary: "Bulk Credential Batch Issuance",
+          description: "Ingests university CSV records matching credential schema and produces an OID4VCI bulk distribution ZIP package containing wallet offers (QR codes), an offers roster (offers.csv), and manifest.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["csvText"],
+                  properties: {
+                    csvText: { type: "string", description: "RFC 4180 CSV content" },
+                  },
+                },
+              },
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    file: { type: "string", format: "binary" },
+                  },
+                },
+              },
+              "text/csv": {
+                schema: { type: "string" },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Downloadable ZIP archive or JSON telemetry summary with base64 ZIP",
+              content: {
+                "application/zip": {},
+                "application/json": {},
+              },
+            },
+            "400": { description: "Invalid CSV payload or request" },
           },
         },
       },
@@ -487,7 +588,7 @@ export function generateOpenApiSpec(
  */
 export function renderSwaggerHtml(title: string, config?: IssuerConfig): string {
   const basePath = config?.baseUrl ? config.baseUrl.replace(/\/+$/, "") : "";
-  const portalUrl = basePath ? `${basePath}/` : "/";
+  const portalUrl = basePath ? `${basePath}/interactive-issue` : "/interactive-issue";
   const openApiUrl = `${basePath}/docs/openapi.json`;
 
   return `<!DOCTYPE html>

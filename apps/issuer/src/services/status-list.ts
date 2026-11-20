@@ -64,6 +64,20 @@ export function decompressAndGetBit(lst: string, index: number, bits = 1): numbe
 }
 
 /**
+ * Zod validation schema for an individual tracked credential entry in the status list.
+ */
+export const StatusListEntrySchema = z.object({
+  index: z.number().int().nonnegative(),
+  studentId: z.string().min(1),
+  allocatedAt: z.string().datetime(),
+  revoked: z.boolean(),
+  revokedAt: z.string().datetime().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type StatusListEntry = z.infer<typeof StatusListEntrySchema>;
+
+/**
  * Zod validation schema for persisted status list file.
  */
 export const StatusListFileSchema = z.object({
@@ -72,6 +86,7 @@ export const StatusListFileSchema = z.object({
   allocatedCount: z.number().int().nonnegative(),
   bitArray: z.string().min(1),
   updatedAt: z.string().datetime(),
+  entries: z.array(StatusListEntrySchema).optional(),
 });
 
 export type StatusListFile = z.infer<typeof StatusListFileSchema>;
@@ -80,6 +95,7 @@ export type StatusListFile = z.infer<typeof StatusListFileSchema>;
  * Token Status List Revocation Engine conforming to draft-ietf-oauth-status-list-21.
  *
  * Manages an in-memory bitstring with 1-bit allocation per credential (0 = active, 1 = revoked).
+ * Tracks subject mapping (studentId -> index) for administrative lookups and batch auditing.
  * Optionally persists state to disk via structured JSON with atomic writes on every mutation.
  * Produces zlib-compressed base64url-encoded bitstrings and signed Status List Tokens (typ: "statuslist+jwt").
  */
@@ -88,6 +104,8 @@ export class StatusListService {
   readonly storagePath?: string;
   private readonly bitArray: Uint8Array;
   private nextIndex = 0;
+  private readonly entriesByIndex = new Map<number, StatusListEntry>();
+  private readonly indicesByStudentId = new Map<string, number[]>();
 
   constructor(capacity = DEFAULT_STATUS_LIST_CAPACITY, storagePath?: string) {
     if (capacity <= 0 || capacity % 8 !== 0) {
@@ -111,18 +129,104 @@ export class StatusListService {
 
   /**
    * Allocates the next available credential status index.
+   * Optionally registers the credential subject (studentId) and metadata for revocation tracking.
    *
+   * @param studentId Optional unique student identifier (e.g. "ITIU22001001")
+   * @param metadata Optional arbitrary institutional metadata (e.g. credentialConfigurationId, fullName)
    * @returns Non-negative integer index
    * @throws Error if the status list capacity is exhausted
    */
-  allocateIndex(): number {
+  allocateIndex(studentId?: string, metadata?: Record<string, unknown>): number {
     if (this.nextIndex >= this.capacity) {
       throw new Error(`Status list capacity of ${this.capacity} entries has been exhausted`);
     }
     const allocated = this.nextIndex;
     this.nextIndex += 1;
+
+    if (studentId && studentId.trim().length > 0) {
+      const cleanStudentId = studentId.trim();
+      const entry: StatusListEntry = {
+        index: allocated,
+        studentId: cleanStudentId,
+        allocatedAt: new Date().toISOString(),
+        revoked: false,
+        metadata,
+      };
+      this.entriesByIndex.set(allocated, entry);
+      const existing = this.indicesByStudentId.get(cleanStudentId) ?? [];
+      existing.push(allocated);
+      this.indicesByStudentId.set(cleanStudentId, existing);
+    }
+
     this.persistToDisk();
     return allocated;
+  }
+
+  /**
+   * Retrieves the credential status entry associated with a specific index, if tracked.
+   *
+   * @param index Status list bit position
+   */
+  getEntryByIndex(index: number): StatusListEntry | undefined {
+    return this.entriesByIndex.get(index);
+  }
+
+  /**
+   * Retrieves all credential status entries allocated to a given student ID.
+   *
+   * @param studentId Unique student identifier
+   */
+  getEntriesByStudentId(studentId: string): StatusListEntry[] {
+    const cleanId = studentId.trim();
+    const indices = this.indicesByStudentId.get(cleanId) ?? [];
+    return indices
+      .map((idx) => this.entriesByIndex.get(idx))
+      .filter((entry): entry is StatusListEntry => entry !== undefined);
+  }
+
+  /**
+   * Returns all tracked status list entries.
+   */
+  getAllEntries(): StatusListEntry[] {
+    return Array.from(this.entriesByIndex.values());
+  }
+
+  /**
+   * Revokes all credentials issued to the specified student ID.
+   *
+   * @param studentId Unique student identifier
+   * @returns Array of revoked indices
+   * @throws Error if no credentials exist for the student
+   */
+  revokeByStudentId(studentId: string): number[] {
+    const cleanId = studentId.trim();
+    const indices = this.indicesByStudentId.get(cleanId);
+    if (!indices || indices.length === 0) {
+      throw new Error(`No credentials found for student ID '${cleanId}'`);
+    }
+    for (const idx of indices) {
+      this.revoke(idx);
+    }
+    return [...indices];
+  }
+
+  /**
+   * Reactivates all credentials issued to the specified student ID.
+   *
+   * @param studentId Unique student identifier
+   * @returns Array of reactivated indices
+   * @throws Error if no credentials exist for the student
+   */
+  reactivateByStudentId(studentId: string): number[] {
+    const cleanId = studentId.trim();
+    const indices = this.indicesByStudentId.get(cleanId);
+    if (!indices || indices.length === 0) {
+      throw new Error(`No credentials found for student ID '${cleanId}'`);
+    }
+    for (const idx of indices) {
+      this.reactivate(idx);
+    }
+    return [...indices];
   }
 
   /**
@@ -135,6 +239,13 @@ export class StatusListService {
     const byteIndex = Math.floor(index / 8);
     const bitShift = index % 8;
     this.bitArray[byteIndex] |= (1 << bitShift);
+
+    const entry = this.entriesByIndex.get(index);
+    if (entry) {
+      entry.revoked = true;
+      entry.revokedAt = new Date().toISOString();
+    }
+
     this.persistToDisk();
   }
 
@@ -148,6 +259,13 @@ export class StatusListService {
     const byteIndex = Math.floor(index / 8);
     const bitShift = index % 8;
     this.bitArray[byteIndex] &= ~(1 << bitShift);
+
+    const entry = this.entriesByIndex.get(index);
+    if (entry) {
+      entry.revoked = false;
+      delete entry.revokedAt;
+    }
+
     this.persistToDisk();
   }
 
@@ -213,6 +331,17 @@ export class StatusListService {
 
     this.bitArray.set(decodedBuffer);
     this.nextIndex = allocatedCount;
+
+    if (parseResult.data.entries) {
+      this.entriesByIndex.clear();
+      this.indicesByStudentId.clear();
+      for (const entry of parseResult.data.entries) {
+        this.entriesByIndex.set(entry.index, entry);
+        const existing = this.indicesByStudentId.get(entry.studentId) ?? [];
+        existing.push(entry.index);
+        this.indicesByStudentId.set(entry.studentId, existing);
+      }
+    }
   }
 
   /**
@@ -227,6 +356,7 @@ export class StatusListService {
       allocatedCount: this.nextIndex,
       bitArray: Buffer.from(this.bitArray).toString("base64"),
       updatedAt: new Date().toISOString(),
+      entries: Array.from(this.entriesByIndex.values()),
     };
 
     const serialized = JSON.stringify(data, null, 2) + "\n";
