@@ -588,7 +588,7 @@ export function generateOpenApiSpec(
  */
 export function renderSwaggerHtml(title: string, config?: IssuerConfig): string {
   const basePath = config?.baseUrl ? config.baseUrl.replace(/\/+$/, "") : "";
-  const portalUrl = basePath ? `${basePath}/interactive-issue` : "/interactive-issue";
+  const portalUrl = basePath ? `${basePath}/single-issue` : "/single-issue";
   const openApiUrl = `${basePath}/docs/openapi.json`;
 
   return `<!DOCTYPE html>

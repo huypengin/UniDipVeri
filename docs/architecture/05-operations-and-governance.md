@@ -85,9 +85,9 @@ A common misconception is that operating a credential issuer requires staff to u
 
 ### 3.1 Layer 1: the turnkey Registrar Portal (prototype)
 
-The registrar web UI provides dedicated interfaces for interactive single-credential issuance (`/interactive-issue`) and bulk cohort batch issuance (`/batch-issue`):
+The registrar web UI provides dedicated interfaces for interactive single-credential issuance (`/single-issue`) and bulk cohort batch issuance (`/batch-issue`):
 
-1. **Interactive Single Issuance (`/interactive-issue`):**
+1. **Interactive Single Issuance (`/single-issue`):**
    - **Schema adaptation:** When a schema such as `schemas/graduation-record.v1.yaml` is loaded, the portal reads the claim definitions and generates form controls (text fields, date pickers, numeric inputs, dynamic course tables).
    - **Privacy badges:** Each field is badged **Always Disclosed** (in the clear) or **Selectively Disclosable** (salted and hidden behind `_sd` digests), so staff can see the privacy policy at a glance.
    - **One-click offer:** The clerk selects a pre-seeded student record or enters custom claims, reviews the summary, and clicks **Issue Credential Offer**.
@@ -313,7 +313,7 @@ Suppose a developer runs a private copy of the issuer, mints an SD-JWT VC with f
 | Threat or challenge | Solution | Enforcing mechanism |
 | :-- | :-- | :-- |
 | Mass cohort (5,000+ students) without manual QR scanning | Two-phase issuance: batch offer ingestion, then multi-channel distribution | SIS sends the approved cohort to the batch endpoint; wallets redeem asynchronously through deep links |
-| Non-technical staff issuing credentials | Turnkey Registrar Portal, or headless SIS integration | Schema-driven form (`interactive.ts`) and `POST /credential-offer` |
+| Non-technical staff issuing credentials | Turnkey Registrar Portal, or headless SIS integration | Schema-driven form (`single.ts`) and `POST /credential-offer` |
 | Rector must authorize conferral | Decree sign-off in the SIS, embedded in the claims | SSO and MFA approval; decree number inside the signed payload |
 | Registrar tries to mint an unapproved degree | Maker-Authorizer control | Read-only binding to `CONFERRED` students; `403 Forbidden` without a valid decree ID |
 | Developer signs a fraudulent degree with a test key | `did:web` domain binding and trust registry validation | Verifier resolves the key from the official domain and rejects unaccredited issuers |

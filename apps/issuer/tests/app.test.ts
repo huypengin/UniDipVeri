@@ -326,21 +326,21 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resCredential.status).toBe(401);
     });
 
-    it("redirects GET / to /interactive-issue and serves portal HTML", async () => {
+    it("redirects GET / to /single-issue and serves portal HTML", async () => {
       const resRoot = await app(
         new Request("https://issuer.university.edu/", { method: "GET" })
       );
       expect(resRoot.status).toBe(302);
       expect(resRoot.headers.get("Location")).toBe(
-        "https://issuer.university.edu/interactive-issue"
+        "https://issuer.university.edu/single-issue"
       );
 
-      const resInteractive = await app(
-        new Request("https://issuer.university.edu/interactive-issue", { method: "GET" })
+      const resSingle = await app(
+        new Request("https://issuer.university.edu/single-issue", { method: "GET" })
       );
-      expect(resInteractive.status).toBe(200);
-      expect(resInteractive.headers.get("Content-Type")).toContain("text/html");
-      const html = await resInteractive.text();
+      expect(resSingle.status).toBe(200);
+      expect(resSingle.headers.get("Content-Type")).toContain("text/html");
+      const html = await resSingle.text();
       expect(html).toContain("UniDipVeri Registrar Portal");
       expect(html).toContain('href="https://issuer.university.edu/style.css"');
 

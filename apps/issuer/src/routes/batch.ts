@@ -54,7 +54,7 @@ function generateSampleCsv(schemaConfig: CredentialTypeConfig): string {
 
 /**
  * Renders the University Registrar Batch Issuance HTML page.
- * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Portal.
+ * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Single Portal.
  */
 function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfig): string {
   const sampleCsvEscaped = escapeHtml(generateSampleCsv(schemaConfig));
@@ -80,8 +80,8 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
       </div>
     </div>
     <nav class="nav-links">
-      <a href="${config.baseUrl}/interactive-issue">Interactive Issuance</a>
-      <a href="${config.baseUrl}/batch-issue" class="active">Batch Issuance</a>
+      <a href="${config.baseUrl}/single-issue">Single Issue</a>
+      <a href="${config.baseUrl}/batch-issue" class="active">Batch Issue</a>
       <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
       <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>

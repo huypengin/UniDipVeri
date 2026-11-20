@@ -31,7 +31,7 @@ flowchart TD
 
 ## 2. Issuance Architecture and Dataflow
 
-### 2.1 Interactive Issuance Protocol (OpenID4VCI 1.0 Final)
+### 2.1 Single Issuance Protocol (OpenID4VCI 1.0 Final)
 
 Credential issuance follows the Pre-Authorized Code Flow:
 

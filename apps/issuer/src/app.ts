@@ -20,7 +20,7 @@ import {
   handleAdminStudentStatusQuery,
   handleAdminRegistryQuery,
 } from "./routes/status.js";
-import { handleInteractiveRequest, handleStyleCssRequest } from "./routes/interactive.js";
+import { handleSingleRequest, handleStyleCssRequest } from "./routes/single.js";
 import { handleBatchRequest } from "./routes/batch.js";
 import { handleDocsRequest } from "./routes/docs.js";
 
@@ -100,16 +100,16 @@ export function createApp(
         return withCors(response);
       };
 
-      // Route: Redirect root / to /interactive-issue
+      // Route: Redirect root / to /single-issue
       if ((method === "GET" || method === "HEAD") && pathname === "/") {
         return respond(
-          Response.redirect(`${config.baseUrl.replace(/\/+$/, "")}/interactive-issue`, 302)
+          Response.redirect(`${config.baseUrl.replace(/\/+$/, "")}/single-issue`, 302)
         );
       }
 
-      // Route: GET /interactive-issue (Interactive Registrar Form)
-      if ((method === "GET" || method === "HEAD") && pathname === "/interactive-issue") {
-        return respond(handleInteractiveRequest(req, config, schemaConfig));
+      // Route: GET /single-issue (Interactive Single Registrar Form)
+      if ((method === "GET" || method === "HEAD") && pathname === "/single-issue") {
+        return respond(handleSingleRequest(req, config, schemaConfig));
       }
 
       // Route: GET /style.css and GET /styles/style.css (Dedicated Shared Stylesheet)

@@ -399,7 +399,7 @@ export async function handleCredentialRequest(
     rawClaims = studentRecordsService.getStudentRecord(activeSession.studentId);
   }
 
-  // 8. Allocate Status List Revocation Index (Tracked for Interactive Issuance)
+  // 8. Allocate Status List Revocation Index (Tracked for Single Issuance)
   let revocationIndex: number;
   try {
     const studentId =

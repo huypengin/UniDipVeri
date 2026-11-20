@@ -27,7 +27,7 @@
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
 - **Batch cohort issuance & ZIP distribution**: Batch CSV ingestion (`parseStudentBatchCsv`) pre-validates records against schemas and generates pre-authorized credential offers packaged into an in-memory ZIP archive (`batch-<id>.zip`) containing QR codes, manifest, and deep links.
 - **Just-In-Time (JIT) revocation allocation**: Revocation indices in the Token Status List are allocated dynamically upon wallet redemption, avoiding orphaned bits for unclaimed offers, and mapped to Student IDs for administrative revocation.
-- **Issuer portal**: A schema-driven web portal supporting interactive single-credential issuance (`/interactive-issue`) and bulk cohort batch upload (`/batch-issue`). Requires a schema to be configured via `SCHEMA_PATH`.
+- **Issuer portal**: A schema-driven web portal supporting interactive single-credential issuance (`/single-issue`) and bulk cohort batch upload (`/batch-issue`). Requires a schema to be configured via `SCHEMA_PATH`.
 - **Playground showcase**: A verifier demonstration portal backed by [walt.id](https://walt.id) that lets holders present credentials from a mobile wallet and displays verified disclosures.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
 - **Third-party verifier interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
@@ -168,7 +168,7 @@ The issuance service:
 - **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`, `/.well-known/jwt-vc-issuer`.
 - **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, key binding into `cnf.jwk`, and batch ZIP package generation.
 - **Revocation**: Token Status List endpoint (`draft-ietf-oauth-status-list-21`) with JIT allocation upon wallet redemption and administrative revocation by bit index or Student ID.
-- **Registrar portal**: Schema-driven interactive issuance (`/interactive-issue`), cohort CSV batch upload (`/batch-issue`), and disclosure policy badges.
+- **Registrar portal**: Schema-driven interactive single issuance (`/single-issue`), cohort CSV batch upload (`/batch-issue`), and disclosure policy badges.
 - **Docs**: Swagger UI at `/docs`.
 
 [Issuer documentation](apps/issuer/README.md)

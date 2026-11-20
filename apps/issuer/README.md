@@ -72,7 +72,7 @@ sequenceDiagram
 ### Interface and Documentation
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `GET` | `/interactive-issue` | Schema-driven interactive single credential form and QR generation. |
+| `GET` | `/single-issue` | Schema-driven interactive single credential form and QR generation. |
 | `GET`/`POST` | `/batch-issue` | Cohort CSV batch upload (10 MB request limit), schema pre-validation, and ZIP distribution package generator. |
 | `GET` | `/style.css` | Dedicated shared stylesheet for registrar web interfaces. |
 | `GET` | `/docs` or `/swagger` | Swagger UI. |
@@ -85,7 +85,7 @@ sequenceDiagram
 
 Configured dynamically by `SCHEMA_PATH`:
 
-### 1. Single Credential Form (`/interactive-issue`)
+### 1. Single Credential Form (`/single-issue`)
 - **Schema-driven inputs**: Form dynamically renders appropriate controls (`string`, `number`, `boolean`, `date`, `object`, dynamic `array` tables) based on the YAML schema.
 - **Readable labels**: CamelCase property names become formatted labels (`gradeIn4.0` → `Grade In 4.0`).
 - **Disclosure badges**: Visual indicators showing `Always Disclosed` (in clear) or `Selectively Disclosable` (salted `_sd` digest).
