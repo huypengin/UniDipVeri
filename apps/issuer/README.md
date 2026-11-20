@@ -33,6 +33,7 @@ sequenceDiagram
     Holder->>Issuer: POST /nonce
     Issuer-->>Holder: c_nonce
     Holder->>Issuer: POST /credential (bearer token + proof JWT carrying the holder key and c_nonce)
+    Issuer->>Issuer: Verify proof, bind cnf.jwk, and allocate Token Status List index Just-In-Time (JIT)
     Issuer-->>Holder: SD-JWT VC (dc+sd-jwt, with cnf.jwk bound to the holder key)
 ```
 
@@ -54,21 +55,26 @@ sequenceDiagram
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
 | `GET`/`POST` | `/credential-offer` | **None** | Creates a credential offer tied to a pre-authorized code session, with optional `tx_code` and custom claim values. |
+| `POST` | `/batch/offers` | **None** | Ingests CSV or JSON batch records, validates against YAML schema, creates pre-authorized sessions, and returns batch metadata with ZIP download link. |
+| `GET` | `/batch/download/:batchId` | None | Downloads the in-memory ZIP package containing `manifest.json`, `offers.csv`, and pre-rendered QR code PNGs. |
 | `POST` | `/token` | Pre-authorized code (+ `tx_code`) | Exchanges `urn:ietf:params:oauth:grant-type:pre-authorized_code` for an access token. |
 | `POST` | `/nonce` | None | Returns a fresh `c_nonce` for the holder proof. |
-| `POST` | `/credential` | Bearer token | Verifies the holder proof JWT and nonce, then issues the SD-JWT VC. |
+| `POST` | `/credential` | Bearer token | Verifies holder proof JWT and nonce, binds `cnf.jwk`, allocates status index JIT, and issues the SD-JWT VC. |
 
 ### Revocation (Token Status List)
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/status/:id` | None | Signed Token Status List JWT (`application/statuslist+jwt`) containing an RFC 1950 ZLIB-compressed bitstring. |
-| `POST` | `/admin/revoke` | **None** | Marks a credential index as revoked. |
+| `POST` | `/status/revoke` or `/admin/revoke` | **None** | Marks a credential as revoked, targeting either numeric `index` or institutional `subjectId` / `studentId`. |
 | `GET` | `/admin/status/:idx` | **None** | Returns the revocation state for an index. |
+| `GET` | `/status/subject/:subjectId` | **None** | Returns the allocated index and revocation state for a student ID. |
 
 ### Interface and Documentation
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` or `/issue` | Registrar portal (claim entry, schema inspection, QR generation). **Unauthenticated.** |
+| `GET` | `/interactive-issue` | Schema-driven interactive single credential form and QR generation. |
+| `GET`/`POST` | `/batch-issue` | Cohort CSV batch upload (10 MB request limit), schema pre-validation, and ZIP distribution package generator. |
+| `GET` | `/style.css` | Dedicated shared stylesheet for registrar web interfaces. |
 | `GET` | `/docs` or `/swagger` | Swagger UI. |
 | `GET` | `/docs/openapi.json` | OpenAPI 3.0 document. |
 | `GET` | `/health` | Health status and uptime. |
@@ -77,11 +83,23 @@ sequenceDiagram
 
 ## Registrar Portal
 
-Available at `/`, configured by the schema in `SCHEMA_PATH`:
-- **Schema-driven form**: Inputs adapt to the loaded YAML schema (`string`, `number`, `boolean`, `date`, `object`, and dynamic `array` tables).
-- **Readable labels**: CamelCase and alphanumeric property names become labels (for example `gradeIn4.0` → `Grade In 4.0`).
-- **Disclosure policy badges**: `Always Disclosed` for claims in the clear, `Selectively Disclosable` for claims behind an `_sd` digest.
-- **QR code issuance**: Encodes the credential offer as an `openid-credential-offer://` URI (the scheme defined by the OpenID4VCI specification) for wallets to scan.
+Configured dynamically by `SCHEMA_PATH`:
+
+### 1. Single Credential Form (`/interactive-issue`)
+- **Schema-driven inputs**: Form dynamically renders appropriate controls (`string`, `number`, `boolean`, `date`, `object`, dynamic `array` tables) based on the YAML schema.
+- **Readable labels**: CamelCase property names become formatted labels (`gradeIn4.0` → `Grade In 4.0`).
+- **Disclosure badges**: Visual indicators showing `Always Disclosed` (in clear) or `Selectively Disclosable` (salted `_sd` digest).
+- **Instant QR**: Generates scannable `openid-credential-offer://` QR codes for in-person testing.
+
+### 2. Cohort Batch Portal (`/batch-issue`)
+- **CSV Ingestion**: Upload tabular spreadsheets with column headers matching schema paths (e.g. `studentId`, `papers.diploma.degreeName`), enforced with a 10 MB request size limit (`MAX_BATCH_REQUEST_SIZE_BYTES`) and stream-limiting protection against memory exhaustion.
+- **Pre-Validation**: Highlights schema discrepancies and type errors before session generation.
+- **ZIP Download**: Assembles an in-memory ZIP package (`batch-<id>.zip`) containing:
+  - `manifest.json`: Full batch metadata and deep links.
+  - `offers.csv`: Tabular student-to-offer mapping for registrar distribution.
+  - `qr-codes/<studentId>_offer.png`: Pre-rendered high-resolution QR codes.
+- **JIT Allocation Assurance**: Status list bits are not consumed until students claim their credentials, preventing orphaned bit allocations.
+- **Student ID Revocation**: Registrars can revoke degrees by Student ID directly via the portal or API.
 
 ---
 

@@ -85,12 +85,18 @@ A common misconception is that operating a credential issuer requires staff to u
 
 ### 3.1 Layer 1: the turnkey Registrar Portal (prototype)
 
-The portal (`apps/issuer/src/routes/portal.ts`) is served at `/` and `/issue`:
+The registrar web UI provides dedicated interfaces for interactive single-credential issuance (`/interactive-issue`) and bulk cohort batch issuance (`/batch-issue`):
 
-1. **Schema adaptation.** When a schema such as `schemas/graduation-record.v1.yaml` is loaded, the portal reads the claim definitions and generates form controls (text fields, date pickers, numeric inputs, dynamic course tables).
-2. **Privacy badges.** Each field is badged **Always Disclosed** (in the clear) or **Selectively Disclosable** (salted and hidden behind `_sd` digests), so staff can see the privacy policy at a glance.
-3. **One-click offer.** The clerk selects a pre-seeded student record, reviews the summary, and clicks **Issue Credential Offer**.
-4. **QR generation.** The portal renders an `openid-credential-offer://` URI as a QR code for in-person scanning, or the offer can be sent through authenticated student email.
+1. **Interactive Single Issuance (`/interactive-issue`):**
+   - **Schema adaptation:** When a schema such as `schemas/graduation-record.v1.yaml` is loaded, the portal reads the claim definitions and generates form controls (text fields, date pickers, numeric inputs, dynamic course tables).
+   - **Privacy badges:** Each field is badged **Always Disclosed** (in the clear) or **Selectively Disclosable** (salted and hidden behind `_sd` digests), so staff can see the privacy policy at a glance.
+   - **One-click offer:** The clerk selects a pre-seeded student record or enters custom claims, reviews the summary, and clicks **Issue Credential Offer**.
+   - **QR generation:** The portal renders an `openid-credential-offer://` URI as a QR code for in-person scanning, or provides an offer link to be delivered via authenticated student email.
+2. **Cohort Batch Issuance (`/batch-issue`):**
+   - **CSV Ingestion:** Clerks upload a CSV spreadsheet containing graduation records for an entire cohort.
+   - **Schema Validation:** Ingested tabular rows are validated against the active YAML schema via `packages/core/src/schema/csv-parser.ts`, reporting parsing errors before session creation.
+   - **ZIP Archive Generation:** The issuer generates pre-authorized code offers and high-resolution QR codes, packaged as an in-memory ZIP archive (`batch-<id>.zip`) containing `manifest.json`, `offers.csv`, and `qr-codes/<studentId>_offer.png` for streamlined, friction-free cohort claiming.
+   - **Just-In-Time Revocation Readiness:** Status list bit positions are not consumed during batch generation; indices are allocated Just-In-Time (JIT) when students redeem their credentials. Staff can revoke credentials post-issuance directly by `studentId` without tracking numeric bit positions.
 
 Clerks never write code, run curl commands or handle keys.
 
@@ -124,7 +130,7 @@ Because scheduled graduation and day-to-day credential lifecycle are different w
 | :-- | :-- | :-- |
 | Standard graduation cohort | Headless: SIS to issuer after decree approval | Rector's conferral decree |
 | Wallet loss or device replacement | Registrar Portal: verify identity, retrieve archived conferral record, issue a fresh offer. Revoke the old credential's status entry so the lost device's copy stops verifying. | No new decree needed (degree already conferred); identity check recorded |
-| Revocation (misconduct, administrative error) | Registrar Portal executes `/admin/revoke` | Decided by the Rector or the designated disciplinary body; case reference required. The Registrar executes but does not decide. |
+| Revocation (misconduct, administrative error) | Registrar Portal or API executes `/status/revoke` or `/admin/revoke` targeting by Student ID (`studentId`) or status list bit index (`idx`) | Decided by the Rector or the designated disciplinary body; case reference required. The Registrar executes but does not decide. |
 | Interim credentials (transcripts, GPA certificates, enrollment verification) | Registrar Portal, with read-only binding to current SIS records | Institutional records policy; no graduation decree applies |
 | Campuses without integration-ready systems (legacy ERPs, SQL databases) | Turnkey portal as the zero-integration path | Local policy, plus the controls above where configured |
 
@@ -178,7 +184,7 @@ flowchart TD
 
 1. **Cohort ingestion and offer generation.** After the Rector signs the decree, the SIS sends the approved cohort to `POST /admin/batch-offers`. The issuer creates one pre-authorized session per student, each holding a CSPRNG `pre-authorized_code`, an optional transaction PIN (`tx_code`) for out-of-band verification, and pre-computed salted claim disclosures. It returns a manifest mapping each `studentId` to its `credential_offer_uri`.
 2. **Out-of-band distribution.** Thousands of students do not scan one screen. Offers go out through the campus app (push notification and universal link), the SSO-protected student portal (an **Add Diploma to Digital Wallet** button), or personalized institutional email with a one-time QR code and link.
-3. **Distributed redemption.** Over days or weeks, each wallet calls `POST /token` with its `pre-authorized_code`, then `POST /credential` with its holder key and proof of possession. Because disclosures were pre-computed, the issuer only performs the final outer JWS signature.
+3. **Distributed redemption & JIT status list allocation.** Over days or weeks, each wallet calls `POST /token` with its `pre-authorized_code`, then `POST /credential` with its holder key and proof of possession. Because disclosures were pre-computed, the issuer verifies proof-of-possession, binds `cnf.jwk`, allocates the Token Status List bit index Just-In-Time (JIT), maps `studentId -> index`, and signs the final outer JWS. Unclaimed offers consume zero bit positions, preventing status list bloat.
 4. **Bundling and deferred flows.** A wallet receiving several documents at once (diploma, transcript, honours certificate) uses `POST /batch_credential` to get them in one round trip. If the HSM or KMS enforces tight rate limits, the issuer returns `202 Accepted` with a `transaction_id` through the deferred flow and the wallet polls `POST /deferred_credential`.
 
 **Performance note.** In the prototype's benchmarks, with a software key, outer JWS signing takes about 0.5 ms (roughly 1,930 operations per second for EdDSA and 1,460 for ES256). Throughput with an HSM or Cloud KMS depends on the provider and its quotas, which is why the deferred flow exists.
@@ -307,7 +313,7 @@ Suppose a developer runs a private copy of the issuer, mints an SD-JWT VC with f
 | Threat or challenge | Solution | Enforcing mechanism |
 | :-- | :-- | :-- |
 | Mass cohort (5,000+ students) without manual QR scanning | Two-phase issuance: batch offer ingestion, then multi-channel distribution | SIS sends the approved cohort to the batch endpoint; wallets redeem asynchronously through deep links |
-| Non-technical staff issuing credentials | Turnkey Registrar Portal, or headless SIS integration | Schema-driven form (`portal.ts`) and `POST /credential-offer` |
+| Non-technical staff issuing credentials | Turnkey Registrar Portal, or headless SIS integration | Schema-driven form (`interactive.ts`) and `POST /credential-offer` |
 | Rector must authorize conferral | Decree sign-off in the SIS, embedded in the claims | SSO and MFA approval; decree number inside the signed payload |
 | Registrar tries to mint an unapproved degree | Maker-Authorizer control | Read-only binding to `CONFERRED` students; `403 Forbidden` without a valid decree ID |
 | Developer signs a fraudulent degree with a test key | `did:web` domain binding and trust registry validation | Verifier resolves the key from the official domain and rejects unaccredited issuers |

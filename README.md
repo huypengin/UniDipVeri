@@ -25,7 +25,9 @@
 - **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**: Credential offers, optional transaction code (`tx_code`), token endpoint, nonce endpoint, and holder proof-of-possession verification. The Authorization Code flow is **not** implemented.
 - **Revocation via Token Status List**: An RFC 1950 ZLIB-compressed bitstring served as a signed JWT (`application/statuslist+jwt`).
 - **`did:web` issuer identifier**: The issuer publishes a DID document and the core resolves `did:web` identifiers and dereferences verification keys.
-- **Issuer portal**: A schema-driven web form that shows each claim's disclosure policy and generates a QR code for wallets. Requires a schema to be configured via `SCHEMA_PATH`.
+- **Batch cohort issuance & ZIP distribution**: Batch CSV ingestion (`parseStudentBatchCsv`) pre-validates records against schemas and generates pre-authorized credential offers packaged into an in-memory ZIP archive (`batch-<id>.zip`) containing QR codes, manifest, and deep links.
+- **Just-In-Time (JIT) revocation allocation**: Revocation indices in the Token Status List are allocated dynamically upon wallet redemption, avoiding orphaned bits for unclaimed offers, and mapped to Student IDs for administrative revocation.
+- **Issuer portal**: A schema-driven web portal supporting interactive single-credential issuance (`/interactive-issue`) and bulk cohort batch upload (`/batch-issue`). Requires a schema to be configured via `SCHEMA_PATH`.
 - **Playground showcase**: A verifier demonstration portal backed by [walt.id](https://walt.id) that lets holders present credentials from a mobile wallet and displays verified disclosures.
 - **API documentation**: Swagger UI and an OpenAPI 3.0 document served by the issuer.
 - **Third-party verifier interoperability**: VCs issued by UniDipVeri are verified directly by independent, off-the-shelf third-party verifiers and standard libraries.
@@ -119,8 +121,8 @@ unidipveri/
 │   ├── issuer/          # OID4VCI issuer, status list, registrar portal (@unidipveri/issuer)
 │   │   ├── src/
 │   │   │   ├── config.ts      # Zod environment configuration
-│   │   │   ├── services/      # KeyManager, SessionManager, StudentRecords, StatusList
-│   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Portal, Docs
+│   │   │   ├── services/      # KeyManager, SessionManager, StudentRecords, StatusList, BatchIssuer, ZipArchive
+│   │   │   ├── routes/        # Discovery, DID doc, VCT metadata, Offer, Token, Credential, Batch, Portal, Docs
 │   │   │   ├── app.ts         # HTTP request dispatcher and CORS
 │   │   │   └── server.ts      # Bun.serve entrypoint
 │   │   └── tests/
@@ -129,12 +131,12 @@ unidipveri/
 │       └── tests/
 ├── packages/
 │   └── core/            # Schema-agnostic SD-JWT VC engine (@unidipveri/core)
-│       ├── src/         # schema/, sd-jwt/, signing/, did/, config/
+│       ├── src/         # schema/ (YAML, Zod, CSV parser), sd-jwt/, signing/, did/, config/
 │       └── tests/
 ├── docs/                # Architecture specifications, ADRs, and documentation index
 │   ├── README.md        # Documentation index & paper reference tables
 │   ├── architecture/    # Threat model, standards profiles, system dataflow, schema model, governance
-│   └── adr/             # Architecture Decision Records (MADR format, 0001-0007)
+│   └── adr/             # Architecture Decision Records (MADR format, 0001-0008)
 ├── schemas/             # YAML credential schemas (graduation-record.v1.yaml is the default)
 ├── scripts/             # Benchmark runner (benchmark.ts), key generator (generate-key.ts), and third-party interop suite
 ├── Caddyfile            # Single-hostname reverse proxy gateway configuration
@@ -155,6 +157,7 @@ unidipveri/
 The cryptographic and data-model engine. It keeps no global state and takes schemas, keys and configuration as arguments. Its only I/O is loading a schema file and `did:web` resolution over HTTP.
 - **Salting**: ≥ 128-bit CSPRNG salts via Web Crypto.
 - **Claim masking**: Turns nested JSON claims into masked payloads with sorted `_sd` arrays and `...` element markers, and reconstructs claims from presented disclosures.
+- **CSV batch parsing**: Parses student graduation spreadsheets, expands dot-notation properties, and validates rows against credential schemas.
 - **Signing**: Signs the outer JWS (`typ: "dc+sd-jwt"`) and verifies signatures.
 - **Resolver**: `did:web` resolution and verification-key dereferencing.
 
@@ -163,9 +166,9 @@ The cryptographic and data-model engine. It keeps no global state and takes sche
 ### `@unidipveri/issuer`
 The issuance service:
 - **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`, `/.well-known/jwt-vc-issuer`.
-- **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, and key binding into `cnf.jwk`.
-- **Revocation**: Token Status List endpoint plus **unauthenticated** admin endpoints to revoke.
-- **Registrar portal**: Schema-driven form and disclosure-policy badges.
+- **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, key binding into `cnf.jwk`, and batch ZIP package generation.
+- **Revocation**: Token Status List endpoint (`draft-ietf-oauth-status-list-21`) with JIT allocation upon wallet redemption and administrative revocation by bit index or Student ID.
+- **Registrar portal**: Schema-driven interactive issuance (`/interactive-issue`), cohort CSV batch upload (`/batch-issue`), and disclosure policy badges.
 - **Docs**: Swagger UI at `/docs`.
 
 [Issuer documentation](apps/issuer/README.md)

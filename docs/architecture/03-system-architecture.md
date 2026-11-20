@@ -29,7 +29,9 @@ flowchart TD
 
 ---
 
-## 2. End-to-End Issuance Protocol Flow (OpenID4VCI 1.0 Final)
+## 2. Issuance Architecture and Dataflow
+
+### 2.1 Interactive Issuance Protocol (OpenID4VCI 1.0 Final)
 
 Credential issuance follows the Pre-Authorized Code Flow:
 
@@ -58,12 +60,28 @@ sequenceDiagram
     Issuer-->>Holder: Return SD-JWT credential & disclosures
 ```
 
-### Key Security Invariants in Issuance
+#### Key Security Invariants
 
 1. **Atomic Code Burning:** Pre-authorized codes are stored with single-use atomic consumption semantics. A second presentation of the same authorization code immediately fails, preventing replay attacks.
 2. **Timing-Safe PIN Verification:** The student transaction PIN is checked using constant-time comparison (`crypto.timingSafeEqual`) to prevent timing side-channel attacks.
 3. **Holder Key Binding Extraction:** The holder's Proof-of-Possession JWT must be bound to the issuer's issued `c_nonce`. The extracted JWK is sanitized and embedded in the credential's `cnf.jwk` claim.
 4. **128-Bit CSPRNG Entropy:** Every selectively disclosable claim receives a uniquely generated salt with a minimum of 16 cryptographically random bytes.
+5. **Just-In-Time (JIT) Status List Allocation:** Status list bit positions are never pre-allocated during batch generation or offer creation. An index is assigned dynamically only when the student wallet presents its Proof-of-Possession at `POST /credential`. This prevents orphaned "ghost bits" from unclaimed offers and preserves RFC 1950 ZLIB compression efficiency.
+
+---
+
+### 2.2 Batch Issuance and Cohort Distribution Pipeline
+
+In contrast to legacy systems (such as IU-VC, which constructed browser Merkle trees, deployed `AnchorRegistryBatch` Ethereum smart contracts via MetaMask, and distributed offline pre-signed `vc.json` files), UniDipVeri provides an automated, standards-based batch credential issuance and distribution pipeline without blockchain dependencies:
+
+1. **Tabular Ingestion & Schema Validation:** The registrar uploads a CSV file of graduation records. The CSV engine (`packages/core/src/schema/csv-parser.ts`) maps flat headers (including dot-notation paths like `papers.diploma.degreeName`) into nested JSON claim trees and validates each row against the active credential schema (`schemas/graduation-record.v1.yaml`). Request payloads are bounded by a 10 MB limit (`MAX_BATCH_REQUEST_SIZE_BYTES`) with streaming protection against memory exhaustion.
+2. **Pre-Authorized Offer Orchestration:** The batch issuer (`apps/issuer/src/services/batch-issuer.ts`) generates distinct pre-authorized code authorization sessions for each valid student record, establishing standard `openid-credential-offer://` URIs for direct, friction-free wallet claiming (with `tx_code` transaction PIN protection supported on the interactive `/credential-offer` endpoint).
+3. **Zero-Dependency In-Memory ZIP Packaging:** Using standard Node.js DEFLATE compression (`apps/issuer/src/services/zip-archive.ts`), the issuer compiles an in-memory ZIP package (`batch-<id>.zip`) containing:
+   - `manifest.json`: Machine-readable batch metadata, timestamp, error reports, and status list endpoint URL.
+   - `offers.csv`: Mail-merge table mapping student IDs and names to offer URIs and pre-authorized codes for registrar distribution.
+   - `qr-codes/<studentId>_offer.png`: Pre-rendered QR code images for physical diplomas or graduation letters.
+4. **Wallet Redemption & JIT Index Mapping:** When students scan their individual QR code offers, their mobile wallets execute the standard OpenID4VCI exchange. At the credential endpoint (`POST /credential`), the issuer binds the student's public key (`cnf.jwk`), dynamically allocates the next sequential status list bit index, and stores the mapping in `subjectIndexMap[studentId]`.
+5. **Subject-Level Administrative Revocation:** Registrars can revoke a degree by issuing a request to `POST /status/revoke` or `POST /admin/revoke` specifying either the numeric status list bit index or the institutional `studentId` / `subjectId`.
 
 ---
 
