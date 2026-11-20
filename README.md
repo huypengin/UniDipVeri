@@ -52,7 +52,7 @@ Other wallets were either not tested or failed to receive the credential. Wallet
 
 - **In-memory state by default.** Authorization sessions and nonces are ephemeral and lost on restart. The revocation status list is also in-memory by default (causing revoked credentials to appear valid again after reboot) unless persisted to disk via `STATUS_LIST_PATH`.
 - **The default signing key is ephemeral.** If `ISSUER_PRIVATE_KEY_JWK` is not set, a new key is generated on every boot. The DID document changes, and credentials issued before the restart will no longer verify against it.
-- **No authentication on sensitive endpoints.** The registrar portal, `/credential-offer`, and `/admin/*` (including revocation) are open. Anyone who can reach the service can create offers with arbitrary claims or revoke credentials.
+- **No authentication on sensitive endpoints.** The issuer portal, `/credential-offer`, and `/admin/*` (including revocation) are open. Anyone who can reach the service can create offers with arbitrary claims or revoke credentials.
 - **Pre-Authorized Code flow only.** The Authorization Code flow is not implemented. Wallets requiring Authorization Code flow or HAIP profile features (for example PAR/PKCE, DPoP and wallet attestation) are not supported.
 - **Limited privacy.** SD-JWT hides undisclosed claims but does not provide unlinkability: the issuer signature, `cnf.jwk`, and the digests are the same in every presentation of a credential, so verifiers can correlate them. It also offers no predicate proofs (for example "over 18" without the birth date).
 - **DCQL query expressiveness.** DCQL queries rely on static path arrays and cannot perform relational/SQL-style filtering inside arrays of objects (for example, expressing `SELECT grade FROM courses WHERE code = "CS101"`), nor do they support regex pattern matching or substring filtering (such as matching `"Database"` against `"Database Systems"` in value constraints). To evaluate individual array elements or complex patterns, the containing array or element must be disclosed and filtered post-hoc by relying party application policy logic.
@@ -69,7 +69,7 @@ flowchart TD
     end
 
     subgraph Apps ["Applications"]
-        IssuerApp["@unidipveri/issuer<br/>(OID4VCI issuer, status list, registrar portal)"]
+        IssuerApp["@unidipveri/issuer<br/>(OID4VCI issuer, status list, issuer portal)"]
         PlaygroundApp["@unidipveri/playground<br/>(Verifier demonstration showcase)"]
     end
 
@@ -118,7 +118,7 @@ Not implemented: OpenID4VP (presentation protocol — delegated to walt.id), Aut
 ```
 unidipveri/
 ├── apps/
-│   ├── issuer/          # OID4VCI issuer, status list, registrar portal (@unidipveri/issuer)
+│   ├── issuer/          # OID4VCI issuer, status list, issuer portal (@unidipveri/issuer)
 │   │   ├── src/
 │   │   │   ├── config.ts      # Zod environment configuration
 │   │   │   ├── services/      # KeyManager, SessionManager, StudentRecords, StatusList, BatchIssuer, ZipArchive
@@ -168,7 +168,7 @@ The issuance service:
 - **Discovery**: `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server`, `/.well-known/did.json`, `/.well-known/jwt-vc-issuer`.
 - **OID4VCI issuance**: Pre-authorized code, optional `tx_code`, proof-of-possession verification, key binding into `cnf.jwk`, and batch ZIP package generation.
 - **Revocation**: Token Status List endpoint (`draft-ietf-oauth-status-list-21`) with JIT allocation upon wallet redemption and administrative revocation by bit index or Student ID.
-- **Registrar portal**: Schema-driven interactive single issuance (`/single-issue`), cohort CSV batch upload (`/batch-issue`), and disclosure policy badges.
+- **Issuer portal**: Schema-driven interactive single issuance (`/single-issue`), cohort CSV batch upload (`/batch-issue`), and disclosure policy badges.
 - **Docs**: Swagger UI at `/docs`.
 
 [Issuer documentation](apps/issuer/README.md)
@@ -208,7 +208,7 @@ devenv up
 | :--- | :--- | :--- |
 | **Gateway** | `http://localhost:8080` | Caddy reverse proxy (redirects `/` to `/playground/`) |
 | **Public Gateway Tunnel** | `https://<random>.trycloudflare.com` | Single public HTTPS domain for mobile wallet testing |
-| **Registrar Portal** | `http://localhost:8080/issuer/` | OID4VCI issuer, student portal, Swagger UI (`/issuer/docs`) |
+| **Issuer Portal** | `http://localhost:8080/issuer/` | OID4VCI issuer, student portal, Swagger UI (`/issuer/docs`) |
 | **Playground Showcase** | `http://localhost:8080/playground/` | Verifier demonstration showcase UI |
 | **walt.id verifier** | `http://localhost:7004` | Off-the-shelf OID4VP verifier (containerized) |
 
@@ -216,7 +216,7 @@ Environment variables (`ISSUER_BASE_URL`, `ISSUER_DID`, `VCT_BASE_URL`, `VERIFIE
 
 **Quick workflow after `devenv up`:**
 
-1. Open the **Registrar Portal** at `http://localhost:8080/issuer/` (or via public tunnel) — generate a credential offer QR code.
+1. Open the **Issuer Portal** at `http://localhost:8080/issuer/` (or via public tunnel) — generate a credential offer QR code.
 2. Scan the QR code with a compatible wallet (Paradym, Sphereon, or Lissi) to receive the SD-JWT VC.
 3. Open the **Playground Showcase** at `http://localhost:8080/playground/` — scan the verification QR with the same wallet to present the credential.
 4. View the verified claims, policy evaluation, and audit trail in the Playground UI.
@@ -260,7 +260,7 @@ The issuer and playground containers automatically synchronize with this tunnel 
 #### 3. Access Services
 
 - **Showcase UI**: `http://localhost:8080/` or `https://<assigned-hostname>.trycloudflare.com/` (redirects to `/playground/`)
-- **Registrar Portal**: `http://localhost:8080/issuer/` or `https://<assigned-hostname>.trycloudflare.com/issuer/`
+- **Issuer Portal**: `http://localhost:8080/issuer/` or `https://<assigned-hostname>.trycloudflare.com/issuer/`
 - **Swagger API Explorer**: `http://localhost:8080/issuer/docs`
 - **Walt.id Direct API**: `http://localhost:7004`
 

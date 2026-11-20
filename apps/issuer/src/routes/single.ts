@@ -293,7 +293,7 @@ export function renderSchemaFormFields(
 }
 
 /**
- * Generates the HTML for the Single Registrar Portal with dynamically schema-driven fields.
+ * Generates the HTML for the Single Issuer Portal with dynamically schema-driven fields.
  */
 export function renderSingleHtml(
   config: IssuerConfig,
@@ -310,7 +310,7 @@ export function renderSingleHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>UniDipVeri &mdash; ${escapeHtml(schemaConfig.name)} Registrar</title>
+  <title>UniDipVeri &mdash; ${escapeHtml(schemaConfig.name)} Issuer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -322,7 +322,7 @@ export function renderSingleHtml(
     <div class="nav-brand">
       <svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
       <div>
-        <div class="brand-title">UniDipVeri Registrar Portal</div>
+        <div class="brand-title">UniDipVeri Issuer Portal</div>
         <div class="brand-sub">${escapeHtml(schemaConfig.name)} &bull; OID4VCI 1.0 Final</div>
       </div>
     </div>
@@ -816,7 +816,7 @@ export function renderSingleHtml(
 }
 
 /**
- * Handles incoming Single Registrar requests: GET /single-issue.
+ * Handles incoming Single Issuer requests: GET /single-issue.
  */
 export function handleSingleRequest(
   req: Request,

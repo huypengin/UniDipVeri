@@ -62,7 +62,7 @@ if (import.meta.main) {
       console.log(`[UniDipVeri Issuer] Issuer DID: ${config.issuerDid} (${keyContext.alg}, kid: ${effectiveKid})`);
       console.log(`[UniDipVeri Issuer] Credential VCT: ${resolveVct(schemaConfig.vctPath, config.vctBaseUrl)}`);
       console.log(`[UniDipVeri Issuer] Available Endpoints:`);
-      console.log(`  - Registrar Portal:  ${config.baseUrl}/`);
+      console.log(`  - Issuer Portal:     ${config.baseUrl}/`);
       console.log(`  - Swagger UI & Docs: ${config.baseUrl}/docs`);
       console.log(`  - OID4VCI Metadata:  ${config.baseUrl}/.well-known/openid-credential-issuer`);
       console.log(`  - OAuth Metadata:    ${config.baseUrl}/.well-known/oauth-authorization-server`);

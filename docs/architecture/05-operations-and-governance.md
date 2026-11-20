@@ -4,14 +4,14 @@
 
 When a university evaluates a Verifiable Credential system, the cryptographic primitives (SD-JWT VC per RFC 9901, outer JWS signatures, Token Status Lists) are only one layer. Institutions also need answers to two governance questions:
 
-1. **Operational accessibility:** how non-technical staff (registrar clerks, academic affairs officers) operate the system without cryptographic or command-line skills.
+1. **Operational accessibility:** how non-technical staff (academic affairs officers and credential administrators) operate the system without cryptographic or command-line skills.
 2. **Authority and key custody:** how the system ensures credentials carry the legal authority of the university, and why credentials minted by internal developers or IT staff fail verification at external relying parties.
 
 ### Terminology used throughout
 
 - **Rector:** the head of the institution. Equivalent titles (Principal, Chancellor, Vice-Chancellor, President) all map to this role. The Rector, with the Academic Senate, is the **Authorizer**: they sign the conferral decree.
-- **Registrar:** the Registrar's Office is the **Maker**: it audits requirements, prepares the graduation roll, and issues credentials only for students covered by an approved decree.
-- **Key custodians:** the designated trustees (for example the CIO, the Registrar and Legal Counsel) who hold the quorum for key generation and rotation.
+- **Credential Administration:** the Academic Records Office is the **Maker**: it audits requirements, prepares the graduation roll, and issues credentials only for students covered by an approved decree.
+- **Key custodians:** the designated trustees (for example the CIO, the Credential Administrator and Legal Counsel) who hold the quorum for key generation and rotation.
 - **Prototype** means what is implemented in this repository today. **Production** means the target enterprise deployment.
 
 ### Scope: reference prototype vs. target production architecture
@@ -33,7 +33,7 @@ flowchart TD
     Rector[Rector and Senate decree approval]
     SIS[Student Information System]
     IdP[Institutional IdP with SSO and MFA]
-    Portal[Registrar Portal in apps/issuer]
+    Portal[Issuer Portal in apps/issuer]
   end
   subgraph Service[Protected service tier]
     Issuer[UniDipVeri Issuer Engine]
@@ -68,8 +68,8 @@ Production-only components: SIS, institutional IdP, decree approval, HSM/KMS and
 | Persona | Role in issuance | Interface | Signing-key access | Must not be able to |
 | :-- | :-- | :-- | :-- | :-- |
 | **Rector** | **Authorizer.** Signs the conferral decree for each graduating cohort. Is the legal authority behind the institutional identifier (`did:web`). | SIS decree approval (SSO + MFA) | None. Authority is exercised through the decree, not through key access. | Issue credentials directly, or access or export keys. |
-| **Registrar** | **Maker.** Prepares the graduation roll and issues credentials only for students covered by an approved decree. Also handles lifecycle cases: wallet re-issuance, interim transcripts, and executing revocations authorized under a documented case reference. | SIS and Registrar Portal | None | Create a degree without an approved decree, or edit degree claims in production. |
-| **Key custodians** (CIO, Registrar, Legal Counsel) | Hold the quorum for key generation and rotation ceremonies. | HSM / KMS ceremony | Quorum-controlled | Act alone, or export keys. |
+| **Credential Administration** | **Maker.** Prepares the graduation roll and issues credentials only for students covered by an approved decree. Also handles lifecycle cases: wallet re-issuance, interim transcripts, and executing revocations authorized under a documented case reference. | SIS and Issuer Portal | None | Create a degree without an approved decree, or edit degree claims in production. |
+| **Key custodians** (CIO, Credential Administrator, Legal Counsel) | Hold the quorum for key generation and rotation ceremonies. | HSM / KMS ceremony | Quorum-controlled | Act alone, or export keys. |
 | **DevOps / IT administration** | Operate the deployment: containers, networking, TLS certificates, backups. | Infrastructure as Code, deployment pipelines | None | Invoke the KMS `Sign` API or access production keys. |
 | **Software developers** | Build and test schemas, claim mappings and integrations. | Local environment, git repository | Development test keys only | Access production KMS or sign production credentials. |
 | **Student / graduate** | Receives the credential and chooses what to disclose. | Mobile wallet | Holder key (`cnf.jwk`) in the device's secure hardware | Alter issued claims. |
@@ -83,9 +83,9 @@ Production-only components: SIS, institutional IdP, decree approval, HSM/KMS and
 
 A common misconception is that operating a credential issuer requires staff to understand JSON Web Signatures, Base64URL encoding or hashes. UniDipVeri avoids this with two layers.
 
-### 3.1 Layer 1: the turnkey Registrar Portal (prototype)
+### 3.1 Layer 1: the turnkey Issuer Portal (prototype)
 
-The registrar web UI provides dedicated interfaces for interactive single-credential issuance (`/single-issue`) and bulk cohort batch issuance (`/batch-issue`):
+The issuer web UI provides dedicated interfaces for interactive single-credential issuance (`/single-issue`) and bulk cohort batch issuance (`/batch-issue`):
 
 1. **Interactive Single Issuance (`/single-issue`):**
    - **Schema adaptation:** When a schema such as `schemas/graduation-record.v1.yaml` is loaded, the portal reads the claim definitions and generates form controls (text fields, date pickers, numeric inputs, dynamic course tables).
@@ -100,38 +100,38 @@ The registrar web UI provides dedicated interfaces for interactive single-creden
 
 Clerks never write code, run curl commands or handle keys.
 
-### 3.2 Governance gate: why the Registrar cannot bypass the Rector
+### 3.2 Governance gate: why the Issuer Administrator cannot bypass the Rector
 
-> *If registrar staff can use the portal, and the portal creates offers that the issuer signs, can a clerk bypass the Rector's approval and mint degrees unilaterally?*
+> *If issuer administrators can use the portal, and the portal creates offers that the issuer signs, can a clerk bypass the Rector's approval and mint degrees unilaterally?*
 
 It depends on the deployment:
 
 1. **In the prototype, the portal is deliberately open.** Evaluators can edit claim fields to see how schemas render and how selective disclosure works. It omits role-based authorization because that would require an external university hierarchy.
 2. **In production, two safeguards enforce separation of duties:**
    - **No free-form degree claims.** The portal runs in read-only binding mode. Clerks can search and select only students whose status is `CONFERRED` under a signed decree in the SIS. They cannot type degree names, majors or grades.
-   - **Maker-Authorizer control.** The Registrar's Office (Maker) audits requirements and prepares the graduation roll. The Academic Senate and the Rector (Authorizer) sign the conferral decree. The issuer rejects any offer request without a valid, active decree identifier with `403 Forbidden`.
+   - **Maker-Authorizer control.** The Academic Records Office (Maker) audits requirements and prepares the graduation roll. The Academic Senate and the Rector (Authorizer) sign the conferral decree. The issuer rejects any offer request without a valid, active decree identifier with `403 Forbidden`.
 
 ### 3.3 Layer 2: headless SIS integration (production)
 
 Large universities should not have to retrain staff on a new interface. They already run an SIS such as Ellucian Banner, Oracle PeopleSoft Campus Solutions or Workday Student.
 
-1. **No retraining.** Registrar staff keep working in their familiar SIS screens.
+1. **No retraining.** University staff keep working in their familiar SIS screens.
 2. **Event-driven trigger.** When the Rector approves the conferral decree, the SIS marks the cohort `CONFERRED`.
 3. **Headless API call.** The SIS sends an authenticated REST request (`POST /credential-offer`, or `POST /admin/batch-offers` for a whole cohort) to the issuer, with the decree identifier and student records.
 4. **Dual-track delivery.** The SIS continues producing signed PDFs for legacy email workflows while the issuer dispatches SD-JWT credential offers to student wallets.
 
-### 3.4 Headless issuance vs. Registrar-managed lifecycle
+### 3.4 Headless issuance vs. issuer-managed lifecycle
 
-> *If the electronic decree can trigger issuance automatically, why does the university still need a Registrar portal?*
+> *If the electronic decree can trigger issuance automatically, why does the university still need an issuer portal?*
 
 Because scheduled graduation and day-to-day credential lifecycle are different workloads. In production, the headless path handles most graduation issuance, and the portal handles the cases below. Each action is authorized separately and written to the audit log.
 
 | Scenario | Path | Authorization |
 | :-- | :-- | :-- |
 | Standard graduation cohort | Headless: SIS to issuer after decree approval | Rector's conferral decree |
-| Wallet loss or device replacement | Registrar Portal: verify identity, retrieve archived conferral record, issue a fresh offer. Revoke the old credential's status entry so the lost device's copy stops verifying. | No new decree needed (degree already conferred); identity check recorded |
-| Revocation (misconduct, administrative error) | Registrar Portal or API executes `/status/revoke` or `/admin/revoke` targeting by Student ID (`studentId`) or status list bit index (`idx`) | Decided by the Rector or the designated disciplinary body; case reference required. The Registrar executes but does not decide. |
-| Interim credentials (transcripts, GPA certificates, enrollment verification) | Registrar Portal, with read-only binding to current SIS records | Institutional records policy; no graduation decree applies |
+| Wallet loss or device replacement | Issuer Portal: verify identity, retrieve archived conferral record, issue a fresh offer. Revoke the old credential's status entry so the lost device's copy stops verifying. | No new decree needed (degree already conferred); identity check recorded |
+| Revocation (misconduct, administrative error) | Issuer Portal or API executes `/status/revoke` or `/admin/revoke` targeting by Student ID (`studentId`) or status list bit index (`idx`) | Decided by the Rector or the designated disciplinary body; case reference required. The credential administrator executes but does not decide. |
+| Interim credentials (transcripts, GPA certificates, enrollment verification) | Issuer Portal, with read-only binding to current SIS records | Institutional records policy; no graduation decree applies |
 | Campuses without integration-ready systems (legacy ERPs, SQL databases) | Turnkey portal as the zero-integration path | Local policy, plus the controls above where configured |
 
 ---
@@ -197,12 +197,12 @@ flowchart TD
 
 ### 5.1 Issuance flow
 
-The Registrar verifies requirements first, then the Rector approves. The credential is signed only when the student's wallet redeems the offer (Section 4).
+The credential administration office verifies requirements first, then the Rector approves. The credential is signed only when the student's wallet redeems the offer (Section 4).
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor Registrar
+  actor IssuerAdmin
   actor Rector
   participant SIS
   participant Issuer
@@ -210,7 +210,7 @@ sequenceDiagram
   actor Student as Student wallet
   participant Verifier
   participant Registry as Trust registry
-  Registrar->>SIS: Verify requirements and prepare graduation roll
+  IssuerAdmin->>SIS: Verify requirements and prepare graduation roll
   Rector->>SIS: Approve roll and sign conferral decree (SSO and MFA)
   SIS->>Issuer: Authenticated issue request with decree ID
   Issuer-->>Student: Credential offer (QR or universal link)
@@ -263,7 +263,7 @@ In an enterprise deployment, software developers do not have direct access to pr
 
 1. **Non-exportable key storage.** Production private keys are generated inside FIPS 140-2 Level 3 HSMs or Cloud KMS (AWS KMS, Google Cloud KMS, Azure Key Vault). No engineer can download them as plaintext.
 2. **Least privilege.** Developers and DevOps can change repositories and deployment scripts but have no IAM permission to call the KMS `Sign` API.
-3. **Key custodian quorum.** Key generation and annual rotation require a multi-party ceremony with the key custodians (for example the CIO, the Registrar and Legal Counsel). No single person can act alone.
+3. **Key custodian quorum.** Key generation and annual rotation require a multi-party ceremony with the key custodians (for example the CIO, the Credential Administrator and Legal Counsel). No single person can act alone.
 4. **Tamper-evident audit logging.** Every signing call is logged (timestamp, calling service account, decree or authorization ID) to a SIEM or equivalent. Anomalous issuance triggers automated alerts.
 
 ---
@@ -286,7 +286,7 @@ Suppose a developer runs a private copy of the issuer, mints an SD-JWT VC with f
 | :-- | :-- | :-- | :-- |
 | **Issuance scale** | Single-student issuance through the portal and `POST /credential-offer`. | Cohort ingestion (`POST /admin/batch-offers`), multi-channel universal-link distribution, `POST /batch_credential`, deferred queue. | Credentials cannot be pre-signed without holder keys. Add a batch offer ingestion loop and rely on deep links for distributed redemption. |
 | **Key storage** | Software JWK via `KeyManager`, with a startup self-test. | FIPS 140-2 Level 3 HSM or Cloud KMS. | The `Signer` callback in `packages/core` accepts any signing function. Replace the local `jose.SignJWT` call with a KMS call; no protocol routes or SD-JWT code change. |
-| **Registrar interface** | Open, schema-driven portal where evaluators can edit test claims. | Existing SIS, or an SSO-protected portal in read-only binding mode against approved cohorts. | Disable free-form editing so the Registrar can issue only for students with an approved decree. |
+| **Issuer interface** | Open, schema-driven portal where evaluators can edit test claims. | Existing SIS, or an SSO-protected portal in read-only binding mode against approved cohorts. | Disable free-form editing so authorized issuer staff can issue only for students with an approved decree. |
 | **Authentication and access** | Pre-authorized code sessions with CSPRNG entropy, atomic single use and timing-safe PIN checks. | Institutional IdP (SAML 2.0 or OIDC) with MFA and RBAC. | Terminate staff login at an edge proxy or OAuth 2.0 middleware (Cloudflare Access, AWS ALB, NGINX) that injects identity headers. |
 | **Academic records** | In-memory repository (`student-records.ts`) seeded with CS and EE examples. | Production SIS database (Oracle, PostgreSQL) or institutional REST/GraphQL API. | Point the async `getStudentRecord(studentId)` boundary at the SIS; issuance routes are unchanged. |
 | **Conferral authority** | Schema fields in `schemas/graduation-record.v1.yaml` demonstrate masking and selective disclosure. | Electronic conferral decree approved by the Rector in the SIS, triggering both paper printing and digital issuance. | The Rector signs one decree, and the issuer embeds its number and authority in the claims. |
@@ -302,7 +302,7 @@ Suppose a developer runs a private copy of the issuer, mints an SD-JWT VC with f
 | **Conferral authority** | Rector's wet signature; decree filed in paper archives. | Rector's electronic decree sign-off in the SIS; decree number in the signed claims. | Wet signatures can be forged from high-resolution scans; claims are protected by the issuer signature. |
 | **Institutional authenticity** | Embossed seal, watermarked paper, microprinting. | Institutional digital seal via `did:web:university.edu`, backed by an HSM in production. | Physical seals can be copied; forging the signature without the private key is computationally infeasible. |
 | **Delivery** | Handed over at commencement or sent by registered post. | OpenID4VCI offer redeemed into the student's wallet. | Removes postal loss, damage and reprint administration. |
-| **Verification** | Phone or email inquiry to the Registrar; can take weeks. | Automated cryptographic verification through OID4VP. | Removes the manual burden for employers and universities. |
+| **Verification** | Phone or email inquiry to the university records office; can take weeks. | Automated cryptographic verification through OID4VP. | Removes the manual burden for employers and universities. |
 | **Privacy** | All or nothing: a photocopy reveals GPA, student ID and every grade. | RFC 9901 selective disclosure: the student can reveal only the degree name. | Prevents over-disclosure to employers and third parties. |
 | **Revocation** | Recall letters; the paper stays with the graduate. | Token Status List check against a published bitstring. | Revocation takes effect without the university seeing where the credential is presented. |
 
@@ -313,9 +313,9 @@ Suppose a developer runs a private copy of the issuer, mints an SD-JWT VC with f
 | Threat or challenge | Solution | Enforcing mechanism |
 | :-- | :-- | :-- |
 | Mass cohort (5,000+ students) without manual QR scanning | Two-phase issuance: batch offer ingestion, then multi-channel distribution | SIS sends the approved cohort to the batch endpoint; wallets redeem asynchronously through deep links |
-| Non-technical staff issuing credentials | Turnkey Registrar Portal, or headless SIS integration | Schema-driven form (`single.ts`) and `POST /credential-offer` |
+| Non-technical staff issuing credentials | Turnkey Issuer Portal, or headless SIS integration | Schema-driven form (`single.ts`) and `POST /credential-offer` |
 | Rector must authorize conferral | Decree sign-off in the SIS, embedded in the claims | SSO and MFA approval; decree number inside the signed payload |
-| Registrar tries to mint an unapproved degree | Maker-Authorizer control | Read-only binding to `CONFERRED` students; `403 Forbidden` without a valid decree ID |
+| Issuer administrator tries to mint an unapproved degree | Maker-Authorizer control | Read-only binding to `CONFERRED` students; `403 Forbidden` without a valid decree ID |
 | Developer signs a fraudulent degree with a test key | `did:web` domain binding and trust registry validation | Verifier resolves the key from the official domain and rejects unaccredited issuers |
 | Insider with production server access tries to forge | Non-exportable HSM or KMS keys, least privilege and quorum custody | No signing permission for developers or DevOps; every signing call is audited |
 | Fields disclosed that should stay private | Schema-enforced selective disclosure | Claims hashed into `_sd` digests; the holder controls disclosure in the wallet |

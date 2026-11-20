@@ -4,7 +4,7 @@
 [![OpenID4VCI: 1.0 Final](https://img.shields.io/badge/OpenID4VCI-1.0%20Final-green)](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 [![Revocation: Token Status List](https://img.shields.io/badge/Revocation-draft--status--list--21-blue)](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/)
 
-`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**, with an interactive registrar web portal and an **IETF Token Status List** revocation endpoint.
+`@unidipveri/issuer` is a reference **credential issuer** that implements the **OpenID4VCI Pre-Authorized Code flow (1.0 Final)**, with an interactive issuer web portal and an **IETF Token Status List** revocation endpoint.
 
 > **Prototype, not production software.** All state is held in memory, the default signing key is ephemeral, and the portal, `/credential-offer` and `/admin/*` endpoints have **no authentication**. See [Known Limitations](#known-limitations).
 
@@ -19,8 +19,8 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Admin as Registrar User
-    participant Portal as Registrar Portal
+    actor Admin as Issuer Administrator
+    participant Portal as Issuer Portal
     participant Issuer as OID4VCI Issuer
     actor Holder as Holder Wallet
 
@@ -74,14 +74,14 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | `GET` | `/single-issue` | Schema-driven interactive single credential form and QR generation. |
 | `GET`/`POST` | `/batch-issue` | Cohort CSV batch upload (10 MB request limit), schema pre-validation, and ZIP distribution package generator. |
-| `GET` | `/style.css` | Dedicated shared stylesheet for registrar web interfaces. |
+| `GET` | `/style.css` | Dedicated shared stylesheet for issuer web interfaces. |
 | `GET` | `/docs` or `/swagger` | Swagger UI. |
 | `GET` | `/docs/openapi.json` | OpenAPI 3.0 document. |
 | `GET` | `/health` | Health status and uptime. |
 
 ---
 
-## Registrar Portal
+## Issuer Portal
 
 Configured dynamically by `SCHEMA_PATH`:
 
@@ -96,10 +96,10 @@ Configured dynamically by `SCHEMA_PATH`:
 - **Pre-Validation**: Highlights schema discrepancies and type errors before session generation.
 - **ZIP Download**: Assembles an in-memory ZIP package (`batch-<id>.zip`) containing:
   - `manifest.json`: Full batch metadata and deep links.
-  - `offers.csv`: Tabular student-to-offer mapping for registrar distribution.
+  - `offers.csv`: Tabular student-to-offer mapping for university distribution.
   - `qr-codes/<studentId>_offer.png`: Pre-rendered high-resolution QR codes.
 - **JIT Allocation Assurance**: Status list bits are not consumed until students claim their credentials, preventing orphaned bit allocations.
-- **Student ID Revocation**: Registrars can revoke degrees by Student ID directly via the portal or API.
+- **Student ID Revocation**: Issuer administrators can revoke degrees by Student ID directly via the portal or API.
 
 ---
 
@@ -144,7 +144,7 @@ bun run dev
 bun test
 ```
 
-The test suite covers the OID4VCI protocol flow (credential offers, token exchange with pre-authorized codes, nonce lifecycle, holder proof-of-possession verification), credential issuance with selective disclosure and holder key binding, Token Status List revocation and status queries, issuer discovery and metadata endpoints (OpenID, DID document, JWT-VC issuer, VCT type metadata), the registrar portal UI and schema-driven form generation, OpenAPI specification and Swagger UI, application routing, CORS handling, error responses, and security edge cases (malformed inputs, replay protection, timing-safe comparisons).
+The test suite covers the OID4VCI protocol flow (credential offers, token exchange with pre-authorized codes, nonce lifecycle, holder proof-of-possession verification), credential issuance with selective disclosure and holder key binding, Token Status List revocation and status queries, issuer discovery and metadata endpoints (OpenID, DID document, JWT-VC issuer, VCT type metadata), the issuer portal UI and schema-driven form generation, OpenAPI specification and Swagger UI, application routing, CORS handling, error responses, and security edge cases (malformed inputs, replay protection, timing-safe comparisons).
 
 The tests exercise the implemented behavior. They are not an official OpenID conformance suite. The test suite includes an off-the-shelf library smoke check (`@sd-jwt/sd-jwt-vc` pinned in `devDependencies`) which serves strictly as a development regression test to verify wire output; it is **not** counted as independent third-party interoperability evidence.
 
@@ -154,10 +154,10 @@ The tests exercise the implemented behavior. They are not an official OpenID con
 
 1. **In-memory defaults.** By default, sessions and `c_nonce` values are held in memory. The Token Status List is also in-memory unless `STATUS_LIST_PATH` is configured to persist bitstring state across server restarts.
 2. **Ephemeral signing key by default.** See the warning in Configuration. Set `ISSUER_PRIVATE_KEY_JWK` to keep the same key across restarts.
-3. **No authentication** on the registrar portal, `/credential-offer` (which accepts custom claims, and also via `GET`) and `/admin/*`. Anyone who can reach the service can mint offers with arbitrary claims or revoke credentials.
+3. **No authentication** on the issuer portal, `/credential-offer` (which accepts custom claims, and also via `GET`) and `/admin/*`. Anyone who can reach the service can mint offers with arbitrary claims or revoke credentials.
 4. **Key storage.** Keys live in application memory or an environment variable. Production use needs an HSM (PKCS#11) or cloud KMS (AWS KMS, GCP Cloud KMS, Azure Key Vault).
 5. **Rate limiting and caching.** `/token`, `/credential` and `/nonce` need rate limiting; `/status/:id` cache duration is configurable via `STATUS_LIST_TTL_SECONDS` (defaults to 300 seconds; set to 0 for no-cache) and should be served behind a CDN with suitable cache invalidation.
 6. **Scope.** Only the Pre-Authorized Code flow is supported, so wallets that need other flows will fail against this issuer. Not HAIP-conformant.
-7. **No automated inbound SIS webhook adapter.** The issuer currently accepts credential offer requests via direct REST (`POST /credential-offer`) and the interactive registrar portal. Automated webhook ingestion from enterprise Student Information Systems (e.g. Banner, PeopleSoft, SAP Campus) is not yet implemented.
+7. **No automated inbound SIS webhook adapter.** The issuer currently accepts credential offer requests via direct REST (`POST /credential-offer`) and the interactive issuer portal. Automated webhook ingestion from enterprise Student Information Systems (e.g. Banner, PeopleSoft, SAP Campus) is not yet implemented.
 
 Production deployment would additionally require a persistent session/nonce/status store (PostgreSQL or Redis), institutional SSO (SAML 2.0 / OIDC) with RBAC, and a security review.

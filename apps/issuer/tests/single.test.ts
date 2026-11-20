@@ -24,7 +24,7 @@ const testConfig = loadIssuerConfig({
   ISSUER_DID: "did:web:issuer.university.edu",
 });
 
-describe("Single Registrar Portal Dynamic Schema Rendering", () => {
+describe("Single Issuer Portal Dynamic Schema Rendering", () => {
   it("renders dynamic form controls for all root and nested claims in the schema", () => {
     const html = renderSingleHtml(testConfig, graduationSchema);
 
@@ -173,7 +173,7 @@ describe("Single Registrar Portal Dynamic Schema Rendering", () => {
     expect(resGet.status).toBe(200);
     expect(resGet.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     const body = await resGet.text();
-    expect(body).toContain("UniDipVeri Registrar Portal");
+    expect(body).toContain("UniDipVeri Issuer Portal");
 
     const reqHead = new Request("https://issuer.university.edu/issue", {
       method: "HEAD",

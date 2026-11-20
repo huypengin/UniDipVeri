@@ -79,7 +79,7 @@ function escapeCsvCell(val: unknown): string {
 /**
  * Processes a batch CSV file of student academic records and produces an OID4VCI batch distribution ZIP archive:
  * 1. Wallet-bound OID4VCI Credential Offers with scannable QR code PNGs for student onboarding.
- * 2. An offers summary roster (offers.csv) for registrar mail merges and student record tracking.
+ * 2. An offers summary roster (offers.csv) for university mail merges and student record tracking.
  * 3. Batch manifest and telemetry log (manifest.json).
  *
  * @param options Batch issuance configuration and dependencies

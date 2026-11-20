@@ -27,7 +27,7 @@ describe("Issuer Configuration Loading & Validation", () => {
       PORT: "8080",
       ISSUER_BASE_URL: "https://issuer.university.edu/",
       ISSUER_DID: "did:web:issuer.university.edu",
-      KEY_ID: "registrar-key-1",
+      KEY_ID: "issuer-key-1",
       SIGNING_ALGORITHM: "EdDSA",
       SCHEMA_PATH: fixtureSchemaPath,
     });
@@ -36,7 +36,7 @@ describe("Issuer Configuration Loading & Validation", () => {
     expect(config.baseUrl).toBe("https://issuer.university.edu"); // Trailing slash stripped
     expect(config.vctBaseUrl).toBe("https://issuer.university.edu");
     expect(config.issuerDid).toBe("did:web:issuer.university.edu");
-    expect(config.keyId).toBe("registrar-key-1");
+    expect(config.keyId).toBe("issuer-key-1");
     expect(config.signingAlgorithm).toBe("EdDSA");
     expect(config.schemaPath).toBe(fixtureSchemaPath);
   });

@@ -53,7 +53,7 @@ function generateSampleCsv(schemaConfig: CredentialTypeConfig): string {
 }
 
 /**
- * Renders the University Registrar Batch Issuance HTML page.
+ * Renders the University Issuer Batch Issuance HTML page.
  * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Single Portal.
  */
 function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfig): string {
@@ -75,7 +75,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
     <div class="nav-brand">
       <svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
       <div>
-        <div class="brand-title">UniDipVeri Registrar Portal</div>
+        <div class="brand-title">UniDipVeri Issuer Portal</div>
         <div class="brand-sub">${escapeHtml(schemaConfig.name)} &bull; OID4VCI 1.0 Final</div>
       </div>
     </div>
@@ -100,7 +100,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
       <div>
         <div class="dual-output-title">OID4VCI Bulk Distribution Architecture</div>
         <div class="dual-output-desc">
-          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student digital wallets (Walt.id, Sphereon, Paradym), an <strong>offers roster (offers.csv)</strong> for registrar distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
+          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student digital wallets (Walt.id, Sphereon, Paradym), an <strong>offers roster (offers.csv)</strong> for university distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
         </div>
       </div>
     </div>
@@ -328,7 +328,7 @@ async function readLimitedRequestBody(
  * Handles GET and POST requests for /batch-issue.
  *
  * Provides:
- * - GET /batch-issue: Renders the interactive Registrar Batch Issuance HTML page.
+ * - GET /batch-issue: Renders the interactive Issuer Batch Issuance HTML page.
  * - GET /batch-issue?sample=csv: Returns a downloadable CSV template.
  * - POST /batch-issue: Ingests CSV records and returns either direct application/zip or JSON with base64 ZIP.
  *

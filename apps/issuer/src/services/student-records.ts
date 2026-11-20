@@ -193,7 +193,7 @@ export function generateStudentRecord(studentId: string): StudentAcademicRecord 
 }
 
 /**
- * Service managing student academic records for the university registrar.
+ * Service managing student academic records for the university academic records office.
  */
 export class StudentRecordService {
   private readonly records: Map<string, StudentAcademicRecord>;

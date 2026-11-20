@@ -341,7 +341,7 @@ describe("Issuer Application Dispatcher, Routing & Server", () => {
       expect(resSingle.status).toBe(200);
       expect(resSingle.headers.get("Content-Type")).toContain("text/html");
       const html = await resSingle.text();
-      expect(html).toContain("UniDipVeri Registrar Portal");
+      expect(html).toContain("UniDipVeri Issuer Portal");
       expect(html).toContain('href="https://issuer.university.edu/style.css"');
 
       // Verify that unmounted /portal returns 404

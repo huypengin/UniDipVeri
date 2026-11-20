@@ -44,7 +44,7 @@ const sampleCsvRows = [
 ].join("\n");
 
 describe("Batch Issuance Engine & Route Endpoints", () => {
-  describe("GET /batch-issue (Registrar Batch Portal UI)", () => {
+  describe("GET /batch-issue (Issuer Batch Portal UI)", () => {
     it("renders the interactive HTML upload interface with schema metadata", async () => {
       const { app } = createTestApp();
       const res = await app(new Request("https://issuer.university.edu/batch-issue"));

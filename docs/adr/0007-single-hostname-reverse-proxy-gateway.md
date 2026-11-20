@@ -15,7 +15,7 @@ While multi-tunnel setups keep routing simple (every service resides at `/`), de
 To support both a unified Render demo deployment and local containerized environments without modifying application business logic, UniDipVeri migrated to a single-hostname architecture powered by an internal Caddy reverse proxy on port 8080:
 - Root (`/`): Redirects to `/playground/`
 - Playground Showcase: Scoped under `/playground/*` and `/api/*`
-- Issuer Registrar Portal & Protocol: Scoped under `/issuer/*`
+- Issuer Portal & Protocol: Scoped under `/issuer/*`
 - Walt.id Verifier: Scoped under `/verifier/*` and `/verification-session/*`
 
 What are the architectural limits, invariants, and trade-offs introduced by migrating from multi-domain to a single-hostname reverse proxy?

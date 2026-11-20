@@ -107,7 +107,7 @@ export function createApp(
         );
       }
 
-      // Route: GET /single-issue (Interactive Single Registrar Form)
+      // Route: GET /single-issue (Interactive Single Issuer Form)
       if ((method === "GET" || method === "HEAD") && pathname === "/single-issue") {
         return respond(handleSingleRequest(req, config, schemaConfig));
       }

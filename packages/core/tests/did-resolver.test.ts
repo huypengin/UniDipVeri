@@ -27,8 +27,8 @@ describe("W3C did:web Resolver (packages/core)", () => {
       expect(didWebToUrl("did:web:localhost%3A3000")).toBe(
         "http://localhost:3000/.well-known/did.json"
       );
-      expect(didWebToUrl("did:web:localhost%3A8080:registrar")).toBe(
-        "http://localhost:8080/registrar/did.json"
+      expect(didWebToUrl("did:web:localhost%3A8080:issuer")).toBe(
+        "http://localhost:8080/issuer/did.json"
       );
     });
 

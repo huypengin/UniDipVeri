@@ -20,7 +20,7 @@ In academic credential verification, we analyze four distinct adversary roles:
 
 ```mermaid
 flowchart LR
-    Issuer["Issuer<br/>(Registrar)"] -->|Issuance| Holder["Holder / Student<br/>(Mobile Wallet)"]
+    Issuer["Issuer<br/>(Authorized University Staff)"] -->|Issuance| Holder["Holder / Student<br/>(Mobile Wallet)"]
     Holder -->|Presentation| Verifier["Relying Party /<br/>Verifier"]
 ```
 
@@ -71,7 +71,7 @@ flowchart LR
   2. **Temporal and Availability Coupling:** If the issuing university's webhook endpoint experiences downtime or high latency, independent relying parties worldwide cannot verify credentials.
   3. **Loss of Verifier Autonomy:** Relying parties cannot verify credentials using standard off-the-shelf software; they are forced to integrate proprietary, university-specific webhook listeners.
 - **UniDipVeri Invariant and Migration Assumption:** UniDipVeri assumes a **clean-slate, standards-native verifiable credential model**. Credentials are self-contained SD-JWT VCs (`dc+sd-jwt`) whose authenticity and revocation status can be verified autonomously by any standard OID4VP verifier (`walt.id`, Sphereon, etc.) without calling back into university servers.
-- **Institutional Integration Scope Boundary:** This project does not assume a forced "big-bang" migration of legacy student databases. While enterprise deployments would typically bridge existing Student Information Systems (SIS) to the issuer via message queues or webhooks, the current `apps/issuer` is a standalone reference implementation that exposes direct REST endpoints (`POST /credential-offer`) and an interactive registrar portal, without built-in inbound SIS webhook adapters. Legacy institutional workflows (such as verifying traditional signed PDFs) remain independent, parallel channels.
+- **Institutional Integration Scope Boundary:** This project does not assume a forced "big-bang" migration of legacy student databases. While enterprise deployments would typically bridge existing Student Information Systems (SIS) to the issuer via message queues or webhooks, the current `apps/issuer` is a standalone reference implementation that exposes direct REST endpoints (`POST /credential-offer`) and an interactive issuer portal, without built-in inbound SIS webhook adapters. Legacy institutional workflows (such as verifying traditional signed PDFs) remain independent, parallel channels.
 
 ---
 
