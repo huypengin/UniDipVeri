@@ -44,7 +44,7 @@ const sampleCsvRows = [
 ].join("\n");
 
 describe("Batch Issuance Engine & Route Endpoints", () => {
-  describe("GET /batch-issue (Registrar Batch Portal UI)", () => {
+  describe("GET /batch-issue (Issuer Batch Portal UI)", () => {
     it("renders the interactive HTML upload interface with schema metadata", async () => {
       const { app } = createTestApp();
       const res = await app(new Request("https://issuer.university.edu/batch-issue"));
@@ -59,6 +59,8 @@ describe("Batch Issuance Engine & Route Endpoints", () => {
       expect(html).toContain("sample_graduation_batch.csv");
       expect(html).toContain("/batch-issue");
       expect(html).toContain('href="https://issuer.university.edu/style.css"');
+      expect(html).toContain('const sampleCsvData = "studentId,fullName');
+      expect(html).not.toContain('&quot;[{');
     });
 
     it("serves a ready-to-use sample CSV template on GET /batch-issue?sample=csv", async () => {

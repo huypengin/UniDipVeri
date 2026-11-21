@@ -71,7 +71,7 @@ function extractBearerToken(req: Request): string | null {
  * 4. Credential configuration identifier validation.
  * 5. Cryptographic Holder Proof-of-Possession verification.
  * 6. Dynamic c_nonce rotation on the session.
- * 7. Claims resolution (prefers session-bound custom claims, falls back to registrar repository).
+ * 7. Claims resolution (prefers session-bound custom claims, falls back to the university records repository).
  * 8. Status list revocation bit allocation.
  * 9. Core SD-JWT VC issuance with cnf.jwk and status_list claim.
  *
@@ -399,7 +399,7 @@ export async function handleCredentialRequest(
     rawClaims = studentRecordsService.getStudentRecord(activeSession.studentId);
   }
 
-  // 8. Allocate Status List Revocation Index (Tracked for Interactive Issuance)
+  // 8. Allocate Status List Revocation Index (Tracked for Single Issuance)
   let revocationIndex: number;
   try {
     const studentId =

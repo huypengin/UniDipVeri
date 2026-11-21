@@ -301,7 +301,7 @@ def generate_generic_value(field_name: str, claim_def: dict, ctx: StudentAcademi
         return f"Val-{field_name.split('.')[-1]}"
 
     if claim_type == "number":
-        return round(random.uniform(3.0, 4.0), 2)
+        return random.randint(30, 100)
 
     if claim_type == "boolean":
         return True

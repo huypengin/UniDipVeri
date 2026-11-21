@@ -95,7 +95,7 @@ export function formatClaimLabel(name: string): string {
  */
 function renderSdBadge(sd?: SdPolicy): string {
   if (sd === "selectively_disclosable") {
-    return `<span class="badge-sd" title="Selectively Disclosable: Salted, hashed, and hidden behind an _sd digest. Holder chooses whether to disclose.">Selectively Disclosable</span>`;
+    return `<span class="badge-sd" title="Selectively Disclosable: Salted, hashed, and hidden behind an _sd digest. Holder chooses whether to disclose.">&#128274; Selectively Disclosable</span>`;
   }
   if (sd === "always_disclosed") {
     return `<span class="badge-plain" title="Always Disclosed: Publicly visible in the signed credential payload without salt.">Always Disclosed</span>`;
@@ -293,9 +293,9 @@ export function renderSchemaFormFields(
 }
 
 /**
- * Generates the HTML for the Interactive Registrar Portal with dynamically schema-driven fields.
+ * Generates the HTML for the Single Issuer Portal with dynamically schema-driven fields.
  */
-export function renderInteractiveHtml(
+export function renderSingleHtml(
   config: IssuerConfig,
   schemaConfig: CredentialTypeConfig
 ): string {
@@ -310,7 +310,7 @@ export function renderInteractiveHtml(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>UniDipVeri &mdash; ${escapeHtml(schemaConfig.name)} Registrar</title>
+  <title>UniDipVeri &mdash; ${escapeHtml(schemaConfig.name)} Issuer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -322,14 +322,15 @@ export function renderInteractiveHtml(
     <div class="nav-brand">
       <svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
       <div>
-        <div class="brand-title">UniDipVeri Registrar Portal</div>
+        <div class="brand-title">UniDipVeri Issuer Portal</div>
         <div class="brand-sub">${escapeHtml(schemaConfig.name)} &bull; OID4VCI 1.0 Final</div>
       </div>
     </div>
     <nav class="nav-links">
-      <a href="${config.baseUrl}/interactive-issue" class="active">Interactive Issuance</a>
-      <a href="${config.baseUrl}/batch-issue">Batch Issuance</a>
-      <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
+      <a href="${config.baseUrl}/single-issue" class="active">Single Issue</a>
+      <a href="${config.baseUrl}/batch-issue">Batch Issue</a>
+      <a href="${config.baseUrl}/revocation">Revocation</a>
+      <a href="${config.baseUrl}/docs" target="_blank">API Docs</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
       <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>
       <span class="nav-badge">dc+sd-jwt</span>
@@ -387,6 +388,7 @@ export function renderInteractiveHtml(
       <section class="card offer-card" id="offerCard">
         <h2 class="card-title">
           <span>Wallet QR Code &amp; Offer</span>
+          <span class="nav-badge" style="background: rgba(79, 70, 229, 0.1); color: var(--primary); border: 1px solid var(--border);">OID4VCI 1.0</span>
         </h2>
         <div class="qr-container" id="qrContainer">
           <div id="qrPlaceholder" style="color: #94a3b8; font-size: 0.9rem;">
@@ -409,7 +411,7 @@ export function renderInteractiveHtml(
         <details id="jsonPreviewContainer" class="json-details" style="display: none;">
           <summary class="json-summary">
             <span>OID4VCI Credential Offer JSON</span>
-            <span style="font-size: 0.7rem; font-weight: normal; color: #64748b;">(Click to view)</span>
+            <span style="font-size: 0.7rem; font-weight: normal; color: #a5b4fc;">(Click to view payload)</span>
           </summary>
           <pre class="json-preview" id="jsonPreview"></pre>
         </details>
@@ -733,8 +735,8 @@ export function renderInteractiveHtml(
         if (typeof QRCode !== 'undefined') {
           new QRCode(qrEl, {
             text: currentOfferUri,
-            width: 200,
-            height: 200,
+            width: 324,
+            height: 324,
             colorDark: '#0f172a',
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
@@ -814,9 +816,9 @@ export function renderInteractiveHtml(
 }
 
 /**
- * Handles incoming Interactive Registrar requests: GET /interactive-issue.
+ * Handles incoming Single Issuer requests: GET /single-issue.
  */
-export function handleInteractiveRequest(
+export function handleSingleRequest(
   req: Request,
   config: IssuerConfig,
   schemaConfig: CredentialTypeConfig
@@ -825,13 +827,13 @@ export function handleInteractiveRequest(
     return Response.json(
       {
         error: "invalid_request",
-        error_description: `Method ${req.method} not allowed on /interactive-issue`,
+        error_description: `Method ${req.method} not allowed on /single-issue`,
       },
       { status: 405, headers: { Allow: "GET, HEAD" } }
     );
   }
 
-  const html = renderInteractiveHtml(config, schemaConfig);
+  const html = renderSingleHtml(config, schemaConfig);
 
   if (req.method === "HEAD") {
     return new Response(null, {

@@ -14,7 +14,7 @@ Academic credential systems must support the mass issuance of degrees to entire 
 
 In practice, legacy IU-VC's on-chain architecture suffered from severe operational and security flaws:
 - **Block Latency & RPC Rate Limits:** Ethereum block confirmation times (12–15 seconds) and flaky public RPC nodes caused frequent verifier timeouts.
-- **Gas Costs & MetaMask Friction:** Registrars were forced to hold and manage cryptocurrency balances and sign browser transactions for routine administrative tasks.
+- **Gas Costs & MetaMask Friction:** University staff were forced to hold and manage cryptocurrency balances and sign browser transactions for routine administrative tasks.
 - **Public On-Chain Linkability:** Every revocation transaction was publicly broadcast and permanently indexed on block explorers (such as Etherscan), linking institutional activities to public Ethereum addresses.
 - **Bearer Credential Insecurity:** Distributing pre-signed `vc.json` files offline bypassed cryptographic holder key binding (`cnf.jwk`). If an offline file was intercepted in transit (e.g. over unencrypted student email), anyone could present it without proof-of-possession.
 
@@ -24,7 +24,7 @@ However, scaling revocation and issuance to cohort batch operations introduces a
 - If the issuer pre-signs credentials and pre-allocates status list bit indices at batch creation time (e.g., indices 0 to 4,999 for a 5,000-student cohort):
   - **Unclaimed Offers ("Ghost Bits"):** What happens when students fail to claim their credentials, defer graduation, or drop out? Their pre-allocated bit positions remain permanently occupied in the status list bitstring, resulting in "ghost bits" and unnecessary bitstring bloat.
   - **Loss of Holder Binding:** Pre-signing credentials offline before the student connects their wallet prevents binding the credential to the student's hardware-backed key (`cnf.jwk`).
-  - **Administrative Complexity:** Revoking a credential requires registrars to manually look up and track raw numeric bit indices rather than identifying students by their institutional Student ID.
+  - **Administrative Complexity:** Revoking a credential requires staff to manually look up and track raw numeric bit indices rather than identifying students by their institutional Student ID.
 
 How should UniDipVeri architect batch cohort issuance and revocation to guarantee cryptographic holder key binding, maintain a compact status list without orphaned bits, and provide intuitive administrative revocation by Student ID?
 
@@ -35,7 +35,7 @@ How should UniDipVeri architect batch cohort issuance and revocation to guarante
 * **Zero Blockchain Overhead:** Eliminate all dependency on Ethereum smart contracts, cryptocurrency gas fees, and browser wallet extensions (MetaMask).
 * **Cryptographic Holder Key Binding (`cnf.jwk`):** Guarantee that every issued credential is bound to the student's hardware-backed wallet key via OpenID4VCI Proof-of-Possession.
 * **Status List Compactness & Hygiene:** Prevent orphaned or "ghost" bit allocations for unredeemed credential offers, maintaining high ZLIB compression efficiency.
-* **Operational Simplicity for Registrars:** Allow university staff to revoke credentials using the familiar institutional Student ID (`studentId`) rather than tracking internal bit indices.
+* **Operational Simplicity for University Staff:** Allow university staff to revoke credentials using the familiar institutional Student ID (`studentId`) rather than tracking internal bit indices.
 * **Standard OID4VCI Delivery:** Provide a turnkey bulk distribution package containing standard `openid-credential-offer://` QR codes, deep links, and batch manifests without external server dependencies.
 
 ---
@@ -55,7 +55,7 @@ Chosen option: **Option 3: Pre-Authorized Code Batch Offer Distribution with Jus
 ### Architecture & Lifecycle Flow
 
 1. **Batch Ingestion & Validation:**
-   - The registrar uploads a CSV file containing student graduation records via the Registrar Portal (`/batch-issue`) or REST endpoint (`POST /batch/offers`).
+   - Authorized university staff uploads a CSV file containing student graduation records via the Issuer Portal (`/batch-issue`) or REST endpoint (`POST /batch/offers`).
    - The CSV parser (`packages/core/src/schema/csv-parser.ts`) maps tabular rows to nested claim structures and validates all fields against the declarative credential schema (`schemas/graduation-record.v1.yaml`).
 
 2. **Pre-Authorized Offer Generation & Packaging:**
@@ -63,7 +63,7 @@ Chosen option: **Option 3: Pre-Authorized Code Batch Offer Distribution with Jus
    - For each student, the service generates an `openid-credential-offer://` URI, an inline PNG QR code, and an authorization session bound to the student's claims, providing direct PIN-less pre-authorized codes for streamlined cohort claiming (with `tx_code` transaction PIN protection supported on the interactive `/credential-offer` endpoint).
    - An in-memory ZIP archive (`batch-<id>.zip`) is assembled using a zero-dependency DEFLATE archiver (`apps/issuer/src/services/zip-archive.ts`) containing:
      - `manifest.json`: Batch metadata, timestamp, error reports, and status list endpoint URL.
-     - `offers.csv`: Tabular summary mapping student IDs, names, offer URIs, and pre-authorized codes for registrar distribution.
+     - `offers.csv`: Tabular summary mapping student IDs, names, offer URIs, and pre-authorized codes for university distribution.
      - `qr-codes/<studentId>_offer.png`: High-resolution scannable QR code images.
 
 3. **Just-In-Time (JIT) Status List Allocation:**
@@ -76,7 +76,7 @@ Chosen option: **Option 3: Pre-Authorized Code Batch Offer Distribution with Jus
      - The issuer maps `studentId -> index` in an internal `subjectIndexMap`.
 
 4. **Subject-Level Administrative Revocation:**
-   - To revoke a student's degree, registrar staff invoke `POST /status/revoke` or `POST /admin/revoke` providing either the raw bit index (`index`) or the institutional identifier (`subjectId` or `studentId`).
+   - To revoke a student's degree, authorized issuer staff invoke `POST /status/revoke` or `POST /admin/revoke` providing either the raw bit index (`index`) or the institutional identifier (`subjectId` or `studentId`).
    - The status service dereferences the student ID via `subjectIndexMap`, sets the corresponding bit in the RFC 1950 ZLIB bitstring to `1`, increments the list version, and persists the updated bitstring.
 
 ---
@@ -117,7 +117,7 @@ Chosen option: **Option 3: Pre-Authorized Code Batch Offer Distribution with Jus
 
 * Good, because it adheres strictly to OpenID4VCI 1.0 Final Pre-Authorized Code flow with full holder key binding.
 * Good, because status list bit positions are allocated only upon actual wallet redemption, guaranteeing zero orphaned bits.
-* Good, because registrars can revoke credentials directly by Student ID (`studentId`).
+* Good, because authorized issuer staff can revoke credentials directly by Student ID (`studentId`).
 * Good, because cohort distribution is packaged into a self-contained ZIP archive containing QR codes, manifest, and deep links.
 * Bad, because the issuer must maintain an active HTTP listener to fulfill redemption requests when students scan their offers.
 

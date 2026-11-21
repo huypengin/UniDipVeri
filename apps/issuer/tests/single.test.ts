@@ -6,11 +6,11 @@ import { loadIssuerConfig } from "../src/config.js";
 import {
   formatClaimLabel,
   getStyleCss,
-  handleInteractiveRequest,
+  handleSingleRequest,
   handleStyleCssRequest,
-  renderInteractiveHtml,
+  renderSingleHtml,
   renderSchemaFormFields,
-} from "../src/routes/interactive.js";
+} from "../src/routes/single.js";
 
 const SCHEMA_PATH = join(
   import.meta.dir,
@@ -24,9 +24,9 @@ const testConfig = loadIssuerConfig({
   ISSUER_DID: "did:web:issuer.university.edu",
 });
 
-describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
+describe("Single Issuer Portal Dynamic Schema Rendering", () => {
   it("renders dynamic form controls for all root and nested claims in the schema", () => {
-    const html = renderInteractiveHtml(testConfig, graduationSchema);
+    const html = renderSingleHtml(testConfig, graduationSchema);
 
     // Root scalar claims
     expect(html).toContain('data-claim-path="studentId"');
@@ -64,7 +64,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
   });
 
   it("renders accurate selective disclosure policy badges for each claim", () => {
-    const html = renderInteractiveHtml(testConfig, graduationSchema);
+    const html = renderSingleHtml(testConfig, graduationSchema);
 
     // Verify presence of both badge types
     expect(html).toContain('class="badge-sd"');
@@ -130,7 +130,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
       },
     };
 
-    const html = renderInteractiveHtml(testConfig, customEmploymentSchema);
+    const html = renderSingleHtml(testConfig, customEmploymentSchema);
 
     // Verifies custom schema properties are rendered dynamically
     expect(html).toContain("Employment Credential");
@@ -169,16 +169,16 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     const reqGet = new Request("https://issuer.university.edu/", {
       method: "GET",
     });
-    const resGet = handleInteractiveRequest(reqGet, testConfig, graduationSchema);
+    const resGet = handleSingleRequest(reqGet, testConfig, graduationSchema);
     expect(resGet.status).toBe(200);
     expect(resGet.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     const body = await resGet.text();
-    expect(body).toContain("UniDipVeri Registrar Portal");
+    expect(body).toContain("UniDipVeri Issuer Portal");
 
     const reqHead = new Request("https://issuer.university.edu/issue", {
       method: "HEAD",
     });
-    const resHead = handleInteractiveRequest(reqHead, testConfig, graduationSchema);
+    const resHead = handleSingleRequest(reqHead, testConfig, graduationSchema);
     expect(resHead.status).toBe(200);
     expect(resHead.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
     const headBody = await resHead.text();
@@ -189,7 +189,7 @@ describe("Interactive Registrar Portal Dynamic Schema Rendering", () => {
     const reqPost = new Request("https://issuer.university.edu/", {
       method: "POST",
     });
-    const resPost = handleInteractiveRequest(reqPost, testConfig, graduationSchema);
+    const resPost = handleSingleRequest(reqPost, testConfig, graduationSchema);
     expect(resPost.status).toBe(405);
     expect(resPost.headers.get("Allow")).toBe("GET, HEAD");
     const data = (await resPost.json()) as { error: string };

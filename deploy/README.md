@@ -16,7 +16,7 @@ flowchart TD
 
     Gateway -->|"GET / (HTTP 302 Redirect)"| Playground["Playground Showcase (Port 3001)"]
     Gateway -->|"/playground/*"| Playground
-    Gateway -->|"/issuer/* and /.well-known/* rewrites"| Issuer["Issuer Registrar (Port 3000)"]
+    Gateway -->|"/issuer/* and /.well-known/* rewrites"| Issuer["Credential Issuer (Port 3000)"]
     Gateway -->|"/verifier/* and /verification-session/*"| Verifier["Walt.id Verifier 2 (Port 7004)"]
     Gateway -->|"/health"| Health["Caddy Health Probe (200 OK)"]
 ```
@@ -26,7 +26,7 @@ flowchart TD
 | Component | Internal Port | Description |
 | :--- | :--- | :--- |
 | **Caddy Gateway** | `:{$PORT:10000}` | Reverse proxy managing path routing, well-known rewrites, and health checks |
-| **UniDipVeri Issuer** | `127.0.0.1:3000` | OID4VCI credential issuer, registrar portal, and DID document |
+| **UniDipVeri Issuer** | `127.0.0.1:3000` | OID4VCI credential issuer, issuer portal, and DID document |
 | **UniDipVeri Playground** | `127.0.0.1:3001` | Interactive verifier demonstration showcase UI |
 | **Walt.id Verifier 2** | `127.0.0.1:7004` | Off-the-shelf OID4VP verifier engine (JVM runtime) |
 

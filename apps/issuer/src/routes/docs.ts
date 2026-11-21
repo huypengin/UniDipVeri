@@ -511,7 +511,7 @@ export function generateOpenApiSpec(
       "/batch-issue": {
         get: {
           tags: ["Batch Issuance"],
-          summary: "Registrar Batch Issuance Portal & Template",
+          summary: "Issuer Batch Issuance Portal & Template",
           description: "Renders the interactive Batch Issuance Web UI, or returns sample CSV template when '?sample=csv' is passed.",
           parameters: [
             {
@@ -588,7 +588,7 @@ export function generateOpenApiSpec(
  */
 export function renderSwaggerHtml(title: string, config?: IssuerConfig): string {
   const basePath = config?.baseUrl ? config.baseUrl.replace(/\/+$/, "") : "";
-  const portalUrl = basePath ? `${basePath}/interactive-issue` : "/interactive-issue";
+  const portalUrl = basePath ? `${basePath}/single-issue` : "/single-issue";
   const openApiUrl = `${basePath}/docs/openapi.json`;
 
   return `<!DOCTYPE html>
@@ -647,7 +647,7 @@ export function renderSwaggerHtml(title: string, config?: IssuerConfig): string 
       <small style="color: #94a3b8;">OID4VCI 1.0 Final &bull; SD-JWT VC (draft-19) &bull; Token Status List</small>
     </div>
     <div style="display: flex; gap: 12px;">
-      <a href="${portalUrl}">&larr; Registrar Portal</a>
+      <a href="${portalUrl}">&larr; Issuer Portal</a>
       <a href="${openApiUrl}" target="_blank">OpenAPI JSON</a>
     </div>
   </div>

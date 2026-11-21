@@ -1,4 +1,3 @@
-import QRCode from "qrcode";
 import {
   type CredentialTypeConfig,
   type CsvRowValidationError,
@@ -13,6 +12,7 @@ import type { StatusListService } from "./status-list.js";
 import { deriveCredentialConfigurationId } from "./claims-metadata.js";
 import { createZipArchive, type ZipFileEntry } from "./zip-archive.js";
 import { writeIssuerLog } from "./logger.js";
+import { qrToPng } from "./qr-png.js";
 
 /**
  * Input options required to execute a batch credential issuance process.
@@ -79,7 +79,7 @@ function escapeCsvCell(val: unknown): string {
 /**
  * Processes a batch CSV file of student academic records and produces an OID4VCI batch distribution ZIP archive:
  * 1. Wallet-bound OID4VCI Credential Offers with scannable QR code PNGs for student onboarding.
- * 2. An offers summary roster (offers.csv) for registrar mail merges and student record tracking.
+ * 2. An offers summary roster (offers.csv) for university mail merges and student record tracking.
  * 3. Batch manifest and telemetry log (manifest.json).
  *
  * @param options Batch issuance configuration and dependencies
@@ -115,23 +115,28 @@ export async function executeBatchIssuance(
     "studentId,fullName,credentialOfferUri,preAuthorizedCode,status",
   ];
 
+  // Performance measurements in milliseconds
+  const t = { session: 0, qr: 0, zip: 0 };
+  const lap = () => performance.now();
+
   // 2. Process valid student records
   for (const record of parseResult.validRecords) {
     const studentId = record.studentId;
     const fullName = String(record.claims.fullName || studentId);
 
     // 2a. Create OID4VCI pre-authorized code session (status list index will be allocated JIT upon wallet claim)
+    let s = lap(); // Start measuring
     const session = sessionManager.createPreAuthorizedCode({
       studentId,
       credentialConfigurationId: targetConfigId,
       claims: record.claims,
     });
+    t.session += lap() - s; // End measuring
 
     // 2b. Assemble OID4VCI Credential Offer structure
     const credentialOffer = {
       credential_issuer: config.baseUrl,
       credential_configuration_ids: [targetConfigId],
-      credentials: [targetConfigId],
       grants: {
         "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
           "pre-authorized_code": session.code,
@@ -145,16 +150,14 @@ export async function executeBatchIssuance(
     )}`;
 
     // 2c. Render QR code PNG for student credential onboarding
-    const qrPngBuffer = await QRCode.toBuffer(offerUri, {
-      errorCorrectionLevel: "M",
-      type: "png",
-      margin: 2,
-      width: 400,
-    });
+    s = lap(); // Start measuring
+    const qrPngBuffer = qrToPng(offerUri, 4, 4);
+    t.qr += lap() - s; // End measuring
 
     zipEntries.push({
       name: `qr-codes/${studentId}_offer.png`,
       data: qrPngBuffer,
+      store: true,
     });
 
     // Record for offers.csv
@@ -203,7 +206,13 @@ export async function executeBatchIssuance(
   });
 
   // 5. Build in-memory ZIP package
+  let s = lap(); // Start measuring
   const zipBuffer = createZipArchive(zipEntries);
+  t.zip += lap() - s; // End measuring
+
+  writeIssuerLog(
+    `[Batch Timing ⏱️] session=${t.session.toFixed(0)}ms qr=${t.qr.toFixed(0)}ms zip=${t.zip.toFixed(0)}ms`
+  );
 
   writeIssuerLog(
     `[Batch Engine ✅] Assembled ZIP package (${zipBuffer.length} bytes) containing ${zipEntries.length} files.`

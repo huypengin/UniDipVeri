@@ -53,11 +53,11 @@ function generateSampleCsv(schemaConfig: CredentialTypeConfig): string {
 }
 
 /**
- * Renders the University Registrar Batch Issuance HTML page.
- * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Portal.
+ * Renders the University Issuer Batch Issuance HTML page.
+ * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Single Portal.
  */
 function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfig): string {
-  const sampleCsvEscaped = escapeHtml(generateSampleCsv(schemaConfig));
+  const sampleCsvData = JSON.stringify(generateSampleCsv(schemaConfig)).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -75,14 +75,15 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
     <div class="nav-brand">
       <svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
       <div>
-        <div class="brand-title">UniDipVeri Registrar Portal</div>
+        <div class="brand-title">UniDipVeri Issuer Portal</div>
         <div class="brand-sub">${escapeHtml(schemaConfig.name)} &bull; OID4VCI 1.0 Final</div>
       </div>
     </div>
     <nav class="nav-links">
-      <a href="${config.baseUrl}/interactive-issue">Interactive Issuance</a>
-      <a href="${config.baseUrl}/batch-issue" class="active">Batch Issuance</a>
-      <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
+      <a href="${config.baseUrl}/single-issue">Single Issue</a>
+      <a href="${config.baseUrl}/batch-issue" class="active">Batch Issue</a>
+      <a href="${config.baseUrl}/revocation">Revocation</a>
+      <a href="${config.baseUrl}/docs" target="_blank">API Docs</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
       <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>
       <span class="nav-badge">dc+sd-jwt</span>
@@ -92,7 +93,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
   <main class="container">
     <div class="hero-banner">
       <h1>Batch Academic Credential Issuance Pipeline</h1>
-      <p>Bulk ingestion for university SIS/ERP records conforming to <code>${escapeHtml(schemaConfig.name)}</code> (${escapeHtml(schemaConfig.vctPath)})</p>
+      <p>${escapeHtml(schemaConfig.description)} &bull; Type: <code>${escapeHtml(schemaConfig.vctPath)}</code></p>
     </div>
 
     <div class="dual-output-banner">
@@ -100,7 +101,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
       <div>
         <div class="dual-output-title">OID4VCI Bulk Distribution Architecture</div>
         <div class="dual-output-desc">
-          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student digital wallets (Walt.id, Sphereon, Paradym), an <strong>offers roster (offers.csv)</strong> for registrar distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
+          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student wallets supporting the credential issuance workflow, an <strong>offers roster (offers.csv)</strong> for university distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
         </div>
       </div>
     </div>
@@ -157,11 +158,11 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
   </main>
 
   <footer>
-    UniDipVeri Standalone SD-JWT VC Credential Engine &bull; Conforming to RFC 9901 and draft-ietf-oauth-sd-jwt-vc-19
+    UniDipVeri Standalone SD-JWT Academic Credential System &bull; ${config.baseUrl} &bull; OpenID4VCI 1.0 Final &bull; draft-ietf-oauth-sd-jwt-vc-19
   </footer>
 
   <script>
-    const sampleCsvData = ${JSON.stringify(sampleCsvEscaped)};
+    const sampleCsvData = ${sampleCsvData};
 
     function loadSampleCsv() {
       const editor = document.getElementById('csvEditor');
@@ -328,7 +329,7 @@ async function readLimitedRequestBody(
  * Handles GET and POST requests for /batch-issue.
  *
  * Provides:
- * - GET /batch-issue: Renders the interactive Registrar Batch Issuance HTML page.
+ * - GET /batch-issue: Renders the interactive Issuer Batch Issuance HTML page.
  * - GET /batch-issue?sample=csv: Returns a downloadable CSV template.
  * - POST /batch-issue: Ingests CSV records and returns either direct application/zip or JSON with base64 ZIP.
  *

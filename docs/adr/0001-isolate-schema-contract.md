@@ -43,7 +43,7 @@ Chosen option: **Option 1**, because it provides strict compile-time and startup
 
 * Good, because it isolates the core cryptographic engine from domain data models.
 * Good, because Zod validates unknown keys, missing selective disclosure policies, and invalid formats before any issuance occurs.
-* Good, because YAML is readable by non-programmer administrators and registrars.
+* Good, because YAML is readable by non-programmer administrators and university records staff.
 * Bad, because changes to schema syntax require updating the Zod validator.
 
 ### Option 2: Hardcoded TypeScript Interfaces (IU-VC Approach)

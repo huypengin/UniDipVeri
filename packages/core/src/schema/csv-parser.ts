@@ -1,3 +1,4 @@
+import { parse as parseCsvRecords } from "csv-parse/sync";
 import type { CredentialTypeConfig, ClaimDef } from "./types.js";
 
 /**
@@ -39,83 +40,26 @@ export interface BatchCsvParseResult {
 }
 
 /**
- * Parses raw RFC 4180 compliant CSV text into an array of string arrays.
+ * Parses RFC 4180 CSV text with a standards-tested CSV tokenizer.
  * Handles quoted fields with embedded commas, newlines, and escaped quotes.
  *
  * @param csvText Raw CSV string
  * @returns Array of row arrays
  */
 export function parseCsv(csvText: string): string[][] {
-  const rows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentField = "";
-  let inQuotes = false;
-  let i = 0;
-
-  const len = csvText.length;
-  while (i < len) {
-    const char = csvText[i];
-
-    if (inQuotes) {
-      if (char === '"') {
-        // Check for escaped quote ("")
-        if (i + 1 < len && csvText[i + 1] === '"') {
-          currentField += '"';
-          i += 2;
-          continue;
-        } else {
-          inQuotes = false;
-          i++;
-          continue;
-        }
-      } else {
-        currentField += char;
-        i++;
-        continue;
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true;
-        i++;
-        continue;
-      } else if (char === ",") {
-        currentRow.push(currentField);
-        currentField = "";
-        i++;
-        continue;
-      } else if (char === "\r") {
-        if (i + 1 < len && csvText[i + 1] === "\n") {
-          i++; // Consume \r\n
-        }
-        currentRow.push(currentField);
-        currentField = "";
-        rows.push(currentRow);
-        currentRow = [];
-        i++;
-        continue;
-      } else if (char === "\n") {
-        currentRow.push(currentField);
-        currentField = "";
-        rows.push(currentRow);
-        currentRow = [];
-        i++;
-        continue;
-      } else {
-        currentField += char;
-        i++;
-        continue;
-      }
-    }
+  if (csvText.length === 0) {
+    return [];
   }
 
-  // Push final field/row if content remains
-  if (currentField.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentField);
-    rows.push(currentRow);
-  }
+  const rows: string[][] = parseCsvRecords(csvText, {
+    bom: true,
+    skip_empty_lines: true,
+    relax_column_count: true,
+  });
 
-  // Filter out any trailing completely empty rows
-  return rows.filter((r) => r.length > 1 || (r.length === 1 && r[0].trim().length > 0));
+  return rows.filter(
+    (row) => row.length > 1 || (row.length === 1 && row[0].trim().length > 0)
+  );
 }
 
 /**

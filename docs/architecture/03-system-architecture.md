@@ -3,13 +3,13 @@
 ## 1. System Overview
 
 UniDipVeri implements a full-lifecycle verifiable credential architecture consisting of three operational roles:
-1. **Issuer Application (`apps/issuer`):** An OpenID4VCI 1.0 Final server providing an interactive registrar portal, pre-authorized code session management, direct REST offer issuance (`POST /credential-offer`), cryptographic credential issuance (`typ: "dc+sd-jwt"`), W3C `did:web` publishing, and Token Status List revocation. Inbound SIS webhook integration adapters are deliberately decoupled from this reference prototype, operating as a future enterprise ingestion boundary.
+1. **Issuer Application (`apps/issuer`):** An OpenID4VCI 1.0 Final server providing an interactive issuer portal, pre-authorized code session management, direct REST offer issuance (`POST /credential-offer`), cryptographic credential issuance (`typ: "dc+sd-jwt"`), W3C `did:web` publishing, and Token Status List revocation. Inbound SIS webhook integration adapters are deliberately decoupled from this reference prototype, operating as a future enterprise ingestion boundary.
 2. **Core SD-JWT VC Engine (`packages/core`):** A schema-agnostic TypeScript library providing RFC 9901 salting and recursive claim masking, JWS signing, and W3C `did:web` identifier resolution.
 3. **External Relying Party / Verifier (`walt.id` Verifier) & Playground Showcase (`apps/playground`):** Credential verification is not performed by a university-operated verifier backend; it is delegated to independent, off-the-shelf relying party verifiers (specifically, the `walt.id` verifier container) using OpenID4VP 1.0 Final and DCQL. A verifier demonstration showcase (`apps/playground`) provides a human-readable web UI that initiates verification sessions against the `walt.id` verifier, presents scannable QR codes to mobile wallets, and displays verified claim disclosures and audit results.
 
 ```mermaid
 flowchart TD
-    Registrar["Registrar Portal /<br/>Student Records API"]
+    IssuerAdmin["Issuer Portal /<br/>Student Records API"]
     Issuer["Issuance Server (apps/issuer)<br/>- KeyManager<br/>- StatusList Manager"]
     Wallet["Digital Mobile Wallet<br/>(Paradym / Sphereon / Lissi)<br/>- Secure Storage<br/>- Consent Barrier"]
     WebInfra["Public Web Infrastructure<br/>- did:web Document (/.well-known/did.json)<br/>- VCT Metadata (/types/*)<br/>- Status List Endpoint (/status/*)"]
@@ -20,7 +20,7 @@ flowchart TD
         Playground -->|Create session / Poll results| WaltID
     end
 
-    Registrar --> Issuer
+    IssuerAdmin --> Issuer
     Issuer -->|OID4VCI 1.0 Final<br/>Credential Offer / Pre-Auth Flow| Wallet
     Issuer -->|Publish Status List<br/>application/statuslist+jwt| WebInfra
     Wallet -->|OID4VP 1.0 Final<br/>DCQL Presentation| WaltID
@@ -31,20 +31,20 @@ flowchart TD
 
 ## 2. Issuance Architecture and Dataflow
 
-### 2.1 Interactive Issuance Protocol (OpenID4VCI 1.0 Final)
+### 2.1 Single Issuance Protocol (OpenID4VCI 1.0 Final)
 
 Credential issuance follows the Pre-Authorized Code Flow:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Registrar as University Registrar
+    actor IssuerAdmin as Authorized University Staff
     participant Issuer as apps/issuer
     actor Holder as Student (Wallet)
     
-    Registrar->>Issuer: 1. Input student claims & select schema (POST /credential-offer)
+    IssuerAdmin->>Issuer: 1. Input student claims & select schema (POST /credential-offer)
     Issuer->>Issuer: Create session, generate pre-auth code & CSPRNG transaction PIN
-    Issuer-->>Registrar: Return Offer URI & QR Code (openid-credential-offer://)
+    Issuer-->>IssuerAdmin: Return Offer URI & QR Code (openid-credential-offer://)
     
     Holder->>Issuer: 2. Scan QR & fetch metadata (GET /.well-known/openid-credential-issuer)
     Issuer-->>Holder: Return issuer metadata & supported credentials
@@ -74,14 +74,14 @@ sequenceDiagram
 
 In contrast to legacy systems (such as IU-VC, which constructed browser Merkle trees, deployed `AnchorRegistryBatch` Ethereum smart contracts via MetaMask, and distributed offline pre-signed `vc.json` files), UniDipVeri provides an automated, standards-based batch credential issuance and distribution pipeline without blockchain dependencies:
 
-1. **Tabular Ingestion & Schema Validation:** The registrar uploads a CSV file of graduation records. The CSV engine (`packages/core/src/schema/csv-parser.ts`) maps flat headers (including dot-notation paths like `papers.diploma.degreeName`) into nested JSON claim trees and validates each row against the active credential schema (`schemas/graduation-record.v1.yaml`). Request payloads are bounded by a 10 MB limit (`MAX_BATCH_REQUEST_SIZE_BYTES`) with streaming protection against memory exhaustion.
+1. **Tabular Ingestion & Schema Validation:** Authorized university staff upload a CSV file of graduation records. The CSV engine (`packages/core/src/schema/csv-parser.ts`) maps flat headers (including dot-notation paths like `papers.diploma.degreeName`) into nested JSON claim trees and validates each row against the active credential schema (`schemas/graduation-record.v1.yaml`). Request payloads are bounded by a 10 MB limit (`MAX_BATCH_REQUEST_SIZE_BYTES`) with streaming protection against memory exhaustion.
 2. **Pre-Authorized Offer Orchestration:** The batch issuer (`apps/issuer/src/services/batch-issuer.ts`) generates distinct pre-authorized code authorization sessions for each valid student record, establishing standard `openid-credential-offer://` URIs for direct, friction-free wallet claiming (with `tx_code` transaction PIN protection supported on the interactive `/credential-offer` endpoint).
 3. **Zero-Dependency In-Memory ZIP Packaging:** Using standard Node.js DEFLATE compression (`apps/issuer/src/services/zip-archive.ts`), the issuer compiles an in-memory ZIP package (`batch-<id>.zip`) containing:
    - `manifest.json`: Machine-readable batch metadata, timestamp, error reports, and status list endpoint URL.
-   - `offers.csv`: Mail-merge table mapping student IDs and names to offer URIs and pre-authorized codes for registrar distribution.
+   - `offers.csv`: Mail-merge table mapping student IDs and names to offer URIs and pre-authorized codes for university distribution.
    - `qr-codes/<studentId>_offer.png`: Pre-rendered QR code images for physical diplomas or graduation letters.
 4. **Wallet Redemption & JIT Index Mapping:** When students scan their individual QR code offers, their mobile wallets execute the standard OpenID4VCI exchange. At the credential endpoint (`POST /credential`), the issuer binds the student's public key (`cnf.jwk`), dynamically allocates the next sequential status list bit index, and stores the mapping in `subjectIndexMap[studentId]`.
-5. **Subject-Level Administrative Revocation:** Registrars can revoke a degree by issuing a request to `POST /status/revoke` or `POST /admin/revoke` specifying either the numeric status list bit index or the institutional `studentId` / `subjectId`.
+5. **Subject-Level Administrative Revocation:** Authorized issuer staff can revoke a degree by issuing a request to `POST /status/revoke` or `POST /admin/revoke` specifying either the numeric status list bit index or the institutional `studentId` / `subjectId`.
 
 ---
 

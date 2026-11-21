@@ -1135,8 +1135,8 @@ export function renderPlaygroundHtml(
 
       .qr-frame svg {
         display: block;
-        width: 256px;
-        height: 256px;
+        width: 324px;
+        height: 324px;
       }
 
       .status-badge {
@@ -2041,7 +2041,7 @@ export function renderPlaygroundHtml(
             const v = violations[0];
             if (v.policy === "credential-status" || (v.error && v.error.includes("Status validation failed"))) {
               title = "Credential Revoked (Status List Failure)";
-              subtitle = "The university registrar has revoked this credential in the Token Status List.";
+              subtitle = "The credential issuer has revoked this credential in the Token Status List.";
               detail = v.error;
             } else if (v.policy === "signature" || (v.error && v.error.includes("signature"))) {
               title = "Invalid Cryptographic Signature";
