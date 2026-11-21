@@ -57,7 +57,7 @@ function generateSampleCsv(schemaConfig: CredentialTypeConfig): string {
  * Uses the exact same design tokens, navbar branding, typography, and card palette as the Interactive Single Portal.
  */
 function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfig): string {
-  const sampleCsvEscaped = escapeHtml(generateSampleCsv(schemaConfig));
+  const sampleCsvData = JSON.stringify(generateSampleCsv(schemaConfig)).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -162,7 +162,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
   </footer>
 
   <script>
-    const sampleCsvData = ${JSON.stringify(sampleCsvEscaped)};
+    const sampleCsvData = ${sampleCsvData};
 
     function loadSampleCsv() {
       const editor = document.getElementById('csvEditor');
