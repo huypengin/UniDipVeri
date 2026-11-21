@@ -1135,8 +1135,8 @@ export function renderPlaygroundHtml(
 
       .qr-frame svg {
         display: block;
-        width: 256px;
-        height: 256px;
+        width: 324px;
+        height: 324px;
       }
 
       .status-badge {

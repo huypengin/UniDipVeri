@@ -735,8 +735,8 @@ export function renderSingleHtml(
         if (typeof QRCode !== 'undefined') {
           new QRCode(qrEl, {
             text: currentOfferUri,
-            width: 200,
-            height: 200,
+            width: 324,
+            height: 324,
             colorDark: '#0f172a',
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
