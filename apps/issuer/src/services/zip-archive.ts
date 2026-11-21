@@ -8,6 +8,8 @@ export interface ZipFileEntry {
   name: string;
   /** File contents as binary Buffer, Uint8Array, or UTF-8 string */
   data: Buffer | Uint8Array | string;
+  /** If true, store without compression (ZIP method 0). Use for already-compressed data like PNG. */
+  store?: boolean;
 }
 
 /**
@@ -40,14 +42,17 @@ export function createZipArchive(entries: ZipFileEntry[]): Buffer {
     }
 
     const crc = zlib.crc32(contentBytes);
-    const compressedData = zlib.deflateRawSync(contentBytes);
+
+    // Method 0 = stored (no compression), 8 = deflate
+    const method = entry.store ? 0 : 8;
+    const compressedData = entry.store ? contentBytes : zlib.deflateRawSync(contentBytes);
 
     // Local file header (30 bytes + filename length)
     const localHeader = Buffer.alloc(30 + nameBytes.length);
     localHeader.writeUInt32LE(0x04034b50, 0); // Local file header signature
     localHeader.writeUInt16LE(20, 4); // Minimum version needed to extract (2.0)
     localHeader.writeUInt16LE(0x0800, 6); // General purpose bit flag (Bit 11: UTF-8 filename)
-    localHeader.writeUInt16LE(8, 8); // Compression method (8 = Deflate)
+    localHeader.writeUInt16LE(method, 8); // Compression method (0 = stored, 8 = deflate)
     localHeader.writeUInt16LE(0, 10); // Last mod file time
     localHeader.writeUInt16LE(0, 12); // Last mod file date
     localHeader.writeUInt32LE(crc, 14); // CRC-32 checksum
@@ -67,7 +72,7 @@ export function createZipArchive(entries: ZipFileEntry[]): Buffer {
     centralHeader.writeUInt16LE(20, 4); // Version made by (2.0, DOS/FAT)
     centralHeader.writeUInt16LE(20, 6); // Minimum version needed to extract (2.0)
     centralHeader.writeUInt16LE(0x0800, 8); // General purpose bit flag (UTF-8 filename)
-    centralHeader.writeUInt16LE(8, 10); // Compression method (8 = Deflate)
+    centralHeader.writeUInt16LE(method, 10); // Compression method (0 = stored, 8 = deflate)
     centralHeader.writeUInt16LE(0, 12); // Last mod file time
     centralHeader.writeUInt16LE(0, 14); // Last mod file date
     centralHeader.writeUInt32LE(crc, 16); // CRC-32 checksum
