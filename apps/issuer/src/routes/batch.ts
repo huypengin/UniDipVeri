@@ -82,7 +82,8 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
     <nav class="nav-links">
       <a href="${config.baseUrl}/single-issue">Single Issue</a>
       <a href="${config.baseUrl}/batch-issue" class="active">Batch Issue</a>
-      <a href="${config.baseUrl}/docs" target="_blank">Swagger API</a>
+      <a href="${config.baseUrl}/revocation">Revocation</a>
+      <a href="${config.baseUrl}/docs" target="_blank">API Docs</a>
       <a href="${config.baseUrl}/.well-known/openid-credential-issuer" target="_blank">OID4VCI Discovery</a>
       <a href="${config.baseUrl}/.well-known/did.json" target="_blank">DID Document</a>
       <span class="nav-badge">dc+sd-jwt</span>
@@ -92,7 +93,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
   <main class="container">
     <div class="hero-banner">
       <h1>Batch Academic Credential Issuance Pipeline</h1>
-      <p>Bulk ingestion for university SIS/ERP records conforming to <code>${escapeHtml(schemaConfig.name)}</code> (${escapeHtml(schemaConfig.vctPath)})</p>
+      <p>${escapeHtml(schemaConfig.description)} &bull; Type: <code>${escapeHtml(schemaConfig.vctPath)}</code></p>
     </div>
 
     <div class="dual-output-banner">
@@ -100,7 +101,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
       <div>
         <div class="dual-output-title">OID4VCI Bulk Distribution Architecture</div>
         <div class="dual-output-desc">
-          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student digital wallets (Walt.id, Sphereon, Paradym), an <strong>offers roster (offers.csv)</strong> for university distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
+          The batch engine generates <strong>scannable OID4VCI Credential Offers (QR codes)</strong> for student wallets supporting the credential issuance workflow, an <strong>offers roster (offers.csv)</strong> for university distribution and mail merges, and an audit manifest (manifest.json), bundled into a ready-to-distribute ZIP package.
         </div>
       </div>
     </div>
@@ -157,7 +158,7 @@ function renderBatchHtml(config: IssuerConfig, schemaConfig: CredentialTypeConfi
   </main>
 
   <footer>
-    UniDipVeri Standalone SD-JWT VC Credential Engine &bull; Conforming to RFC 9901 and draft-ietf-oauth-sd-jwt-vc-19
+    UniDipVeri Standalone SD-JWT Academic Credential System &bull; ${config.baseUrl} &bull; OpenID4VCI 1.0 Final &bull; draft-ietf-oauth-sd-jwt-vc-19
   </footer>
 
   <script>
