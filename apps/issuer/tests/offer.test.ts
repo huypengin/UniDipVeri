@@ -54,6 +54,7 @@ describe("Credential Offer Endpoint (OpenID4VCI 1.0 Final)", () => {
       expect(offer.credential_issuer).toBe("https://issuer.university.edu"); // Immune to evil-attacker.com
       const expectedConfigId = deriveCredentialConfigurationId(schemaConfig.vctPath, schemaConfig.name);
       expect(offer.credential_configuration_ids).toEqual([expectedConfigId]);
+      expect("credentials" in offer).toBe(false);
 
       const grant = offer.grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"];
       expect(grant).toBeDefined();

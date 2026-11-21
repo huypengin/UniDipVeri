@@ -131,7 +131,6 @@ export async function executeBatchIssuance(
     const credentialOffer = {
       credential_issuer: config.baseUrl,
       credential_configuration_ids: [targetConfigId],
-      credentials: [targetConfigId],
       grants: {
         "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
           "pre-authorized_code": session.code,

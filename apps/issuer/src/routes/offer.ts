@@ -10,7 +10,6 @@ import { deriveCredentialConfigurationId } from "../services/claims-metadata.js"
 export interface Oid4vciCredentialOffer {
   credential_issuer: string;
   credential_configuration_ids: string[];
-  credentials?: string[];
   grants: {
     "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
       "pre-authorized_code": string;
@@ -182,7 +181,6 @@ export async function handleOfferRequest(
     // Strictly isolate from incoming Host header (using config.baseUrl)
     credential_issuer: config.baseUrl,
     credential_configuration_ids: [targetConfigId],
-    credentials: [targetConfigId],
     grants: {
       "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
         "pre-authorized_code": session.code,
