@@ -22,6 +22,7 @@ import {
 } from "./routes/status.js";
 import { handleSingleRequest, handleStyleCssRequest } from "./routes/single.js";
 import { handleBatchRequest } from "./routes/batch.js";
+import { handleRevocationRequest } from "./routes/revocation.js";
 import { handleDocsRequest } from "./routes/docs.js";
 
 /**
@@ -128,6 +129,17 @@ export function createApp(
             keyContext,
             schemaConfig,
             sessionManager,
+            statusListService,
+          })
+        );
+      }
+
+      // Route: GET /revocation and HEAD /revocation (Interactive Revocation Console)
+      if ((method === "GET" || method === "HEAD") && pathname === "/revocation") {
+        return respond(
+          handleRevocationRequest(req, {
+            config,
+            schemaConfig,
             statusListService,
           })
         );

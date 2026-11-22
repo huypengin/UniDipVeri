@@ -18,5 +18,9 @@ services:
         value: production
       - key: ISSUER_PRIVATE_KEY_JWK
         sync: false
+      - key: SCHEMA_NAME
+        value: graduation-record.v1.yaml
       - key: STATUS_LIST_PATH
         value: /tmp/status-list.json
+      - key: STATUS_LIST_TTL_SECONDS
+        value: 300
