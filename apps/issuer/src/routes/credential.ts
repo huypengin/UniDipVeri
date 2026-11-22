@@ -45,6 +45,15 @@ export interface Oid4vciCredentialResponse {
 }
 
 /**
+ * Narrows an unknown value to a non-null, non-array object record.
+ */
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+/**
  * Extracts the bearer token from the Authorization header.
  */
 function extractBearerToken(req: Request): string | null {
@@ -400,6 +409,9 @@ export async function handleCredentialRequest(
   }
 
   // 8. Allocate Status List Revocation Index (Tracked for Single Issuance)
+  const papers = asRecord(rawClaims.papers);
+  const diploma = asRecord(papers?.diploma);
+
   let revocationIndex: number;
   try {
     const studentId =
@@ -407,8 +419,16 @@ export async function handleCredentialRequest(
       (typeof rawClaims.studentId === "string" ? rawClaims.studentId : undefined);
     revocationIndex = statusListService.allocateIndex(studentId, {
       credentialConfigurationId: activeSession.credentialConfigurationId,
-      fullName: typeof rawClaims.fullName === "string" ? rawClaims.fullName : undefined,
-    });
+      fullName: typeof rawClaims.fullName === "string"
+        ? rawClaims.fullName
+        : undefined,
+      degreeName: typeof diploma?.degreeName === "string"
+        ? diploma.degreeName
+        : undefined,
+      graduationDate: typeof diploma?.graduationDate === "string"
+        ? diploma.graduationDate
+        : undefined,
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(
